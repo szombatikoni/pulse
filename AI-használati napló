@@ -1,0 +1,33 @@
+# AI-használati napló
+
+A naplóban dokumentálom, hogy a szakdolgozat készítése során mire és hogyan
+használok AI-eszközt. 
+
+A munkamódszer nem az AI-kimenet átvétele, hanem közös,
+iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én hozom,
+az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
+A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
+
+## 2026-09-16 — Koncepció és módosított terv
+
+- Eszköz: Claude (chat); a fejlesztéshez a továbbiakban: Claude Code
+
+- Az AI szerepe: a dokumentumok (koncepció-kérdőív válaszai, feladatkiírás,
+  a témavezetői visszajelzésre reagáló módosított terv) szövegtervezeteinek
+  elkészítése az általam megadott döntések és tartalmi irányok alapján,
+  több körös iterációban.
+
+- Saját szerepem: a témaválasztás és a scope meghatározása az alternatívák
+  összevetése után, a technológiai stack kiválasztása, az ütemezés; a
+  tervezetek tartalmi felülvizsgálata, javíttatása és jóváhagyása —
+  a dokumentumok végleges tartalmáért a felelősséget én viselem.
+
+- Ellenőrzés és javítások (példák):
+  - a piackutatási állításokat forrásból ellenőriztem (Tidepool: saját
+    regisztráció és tesztelés képernyőképekkel; mySugr: App Store; SmartBP,
+    Huma: hivatalos termékoldalak);
+  - az AI egy nem létező funkciót állított az egyik versenytársról (SmartBP
+    webes felület) — az ellenőrzés során kiszűrtem, a piackutatás ennek
+    nyomán módosult;
+  - elavult versenytárs-adatot azonosítottam és frissíttettem (Huma: 2024
+    óta no-code platformmodell) újraellenőrzés alapján.
