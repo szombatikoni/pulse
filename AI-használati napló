@@ -1,5 +1,26 @@
 # AI-használati napló
 
+## 2026-09-27 — M1 leadás
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a leadandó dokumentum teljes átvizsgálása oldalanként a
+  kiküldés előtt (két tördelési hiba javítása: árva fejezetcím, képaláírás
+  elszakadása az ábrától); a kísérőlevél vázlatának elkészítése az általam
+  megadott tartalmi keretek szerint, több körben igazítva; a hivatalos
+  pontozólap letöltése és tételes összevetése a vállalással.
+
+- Saját szerepem és döntéseim: a témavezető levelének újbóli tételes
+  összevetése a leadandókkal; a kísérőlevél hangjának és kérdéseinek
+  meghatározása (a pontozási kérdést kivetettem — a témavezető maga jelölte
+  tisztázandónak, az ő válaszát várom); a levél végleges szövegének megírása
+  és elküldése. A pontozólap-összevetésnél a korábbi vállalásban egy
+  elszámolást találtunk (DevOps), a helyes értékkel számolunk tovább.
+
+- Ellenőrzés: a kiküldött PDF minden oldalát átolvastam; a Szakdolgozat 1
+  hirdetményből azonosítottuk a pótlandó leadandókat (a PoC-hoz bemutató
+  videó is szükséges — beépítve a 2. mérföldkő tervébe).
+
 ## 2026-09-24 — M1 véglegesítés: pontosítások és dokumentumgenerálás
 
 - Eszköz: Claude Code
