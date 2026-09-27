@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local Claude context (not for the public repo)
+CLAUDE.md
+docs/email/
+
+# Office lock files
+~$*
+
+# Frontend (M2+)
+node_modules/
+dist/
+
+# draw.io temp/backup
+*.bkp
+*.dtmp

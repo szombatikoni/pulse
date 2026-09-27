@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PULSE — képernyővázlatok (M1)</title>
+<style>
+  :root {
+    --bg:#101216; --panel:#181b21; --card:#1e222a; --line:#2c313b;
+    --ink:#e8eaed; --dim:#9aa1ac; --faint:#6b7280;
+    --accent:#e5484d; --accent-soft:#e5484d22;
+    --ok:#4caf7d; --warn:#e0a92e; --bad:#e5484d; --nodata:#7d8590;
+  }
+  * { box-sizing:border-box; }
+  body { font-family:Calibri,'Segoe UI',sans-serif; color:var(--ink); background:var(--bg); margin:24px; }
+  h1 { font-size:22px; } h1 b, h2 b { color:var(--accent); }
+  h2 { font-size:16px; margin:36px 0 8px; }
+  p.note { font-size:13px; color:var(--dim); max-width:75ch; }
+  .frame { background:var(--panel); border:1px solid var(--line); border-radius:8px; max-width:900px; margin-bottom:6px; overflow:hidden; }
+  .chrome { border-bottom:1px solid var(--line); padding:6px 12px; font-size:11px; color:var(--faint); background:#13151a; }
+  .top { display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); }
+  .logo { font-weight:bold; letter-spacing:1px; }
+  .logo::before { content:"● "; color:var(--accent); }
+  .who { font-size:12px; color:var(--dim); }
+  .body { display:flex; }
+  .nav { width:160px; border-right:1px solid var(--line); padding:10px; font-size:13px; flex-shrink:0; }
+  .nav div { padding:7px 10px; border-radius:6px; color:var(--dim); margin-bottom:2px; }
+  .nav .on { background:var(--accent-soft); color:var(--ink); border-left:3px solid var(--accent); }
+  .badge-n { background:var(--accent); color:#fff; border-radius:8px; font-size:10px; padding:0 6px; margin-left:4px; }
+  .main { flex:1; padding:16px; font-size:13px; min-width:0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:12px; }
+  .card h3 { margin:0 0 10px; font-size:13px; color:var(--ink); }
+  .row { display:flex; gap:12px; } .row .card { flex:1; }
+  .btn { display:inline-block; border:1px solid var(--line); color:var(--ink); border-radius:6px; padding:5px 14px; font-size:12px; background:#252a33; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.ghost { background:none; color:var(--accent); border-color:var(--accent); }
+  input, select, textarea { border:1px solid var(--line); border-radius:6px; padding:5px 8px; font:inherit; font-size:12px; background:#13151a; color:var(--ink); width:150px; }
+  label { display:block; font-size:11px; color:var(--dim); margin:10px 0 3px; }
+  table { border-collapse:collapse; width:100%; font-size:12px; }
+  th, td { border-bottom:1px solid var(--line); padding:7px 10px; text-align:left; }
+  th { color:var(--dim); font-weight:normal; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+  tr.hot { background:var(--accent-soft); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .g{background:var(--ok)} .y{background:var(--warn)} .r{background:var(--bad)} .n{background:var(--nodata)}
+  .st { font-size:11px; color:var(--dim); }
+  .tag { font-size:11px; border:1px solid var(--line); border-radius:10px; padding:1px 9px; color:var(--dim); margin-left:6px; }
+  .sev { font-size:11px; border-radius:4px; padding:2px 8px; color:#fff; }
+  .sev.high{background:var(--bad)} .sev.med{background:var(--warn); color:#1a1a1a} .sev.info{background:var(--nodata)}
+  .expl { background:#20161a; border-left:3px solid var(--accent); padding:10px 12px; font-size:12px; border-radius:0 6px 6px 0; }
+  .timeline { font-size:12px; color:var(--dim); margin:0; padding-left:0; list-style:none; }
+  .timeline li { padding:4px 0 4px 18px; border-left:2px solid var(--line); position:relative; margin-left:6px; }
+  .timeline li::before { content:""; position:absolute; left:-5px; top:9px; width:8px; height:8px; border-radius:50%; background:var(--faint); }
+  .timeline li.alert::before { background:var(--accent); }
+  .kpi { display:flex; gap:12px; margin-bottom:12px; }
+  .kpi .card { flex:1; margin:0; text-align:center; }
+  .kpi .num { font-size:22px; font-weight:bold; } .kpi .lbl { font-size:11px; color:var(--dim); }
+  .radio span { display:inline-block; border:1px solid var(--line); border-radius:6px; padding:4px 12px; margin-right:6px; font-size:12px; color:var(--dim); }
+  .radio span.sel { border-color:var(--accent); color:var(--ink); background:var(--accent-soft); }
+  svg text { font-family:Calibri,'Segoe UI',sans-serif; }
+  .center { max-width:380px; margin:30px auto; }
+</style>
+</head>
+<body>
+
+<h1><b>PULSE</b> — képernyővázlatok (M1)</h1>
+<p class="note">Drótvázak a fő képernyőkről a tervezett vizuális iránnyal:
+sötét felület, piros akcentusszín. A piros mint márkaszín az interakciós
+elemeké (gombok, aktív menü, kiemelés); a beteg-státusz és a
+riasztás-súlyosság jelentéshordozó színei (zöld/sárga/piros/szürke) ettől
+függetlenek, és mindig szöveges címkével együtt jelennek meg, hogy a
+„piros = súlyos" jelzés ne olvadjon bele a felület színvilágába. Minden adat
+kitalált, mesterséges példa.</p>
+
+<!-- 0 -->
+<h2>0. Bejelentkezés</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo/login</div>
+  <div class="center">
+    <div class="card">
+      <h3 style="text-align:center; font-size:16px;"><span class="logo">PULSE</span></h3>
+      <p class="note" style="text-align:center;">Krónikus betegkövető platform — demó</p>
+      <label>E-mail</label><input style="width:100%" value="anna.kovacs@pelda.hu">
+      <label>Jelszó</label><input style="width:100%" type="password" value="********">
+      <p><span class="btn primary" style="width:100%; text-align:center;">Bejelentkezés</span></p>
+      <p class="note" style="text-align:center; font-size:11px;">Demonstrációs rendszer — kizárólag
+      mesterséges adatok. Nem orvostechnikai eszköz, nem helyettesít orvosi döntést
+      vagy sürgősségi ellátást.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 1 -->
+<h2>1. Beteg — kezdőlap (dashboard)</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo — beteg nézet</div>
+  <div class="top"><span class="logo">PULSE</span><span class="who">Kovács Anna (beteg) · HU/EN · Kijelentkezés</span></div>
+  <div class="body">
+    <div class="nav">
+      <div class="on">Kezdőlap</div><div>Méréseim</div><div>Kérdőíveim <span class="badge-n">1</span></div><div>Értesítések <span class="badge-n">2</span></div>
+    </div>
+    <div class="main">
+      <div class="card">
+        <h3>Esedékes teendőim</h3>
+        <table>
+          <tr><th>Teendő</th><th>Gyakoriság</th><th>Határidő</th><th></th></tr>
+          <tr class="hot"><td>Vérnyomásmérés rögzítése</td><td>naponta</td><td><b>ma 20:00</b></td><td><span class="btn primary">Rögzítés</span></td></tr>
+          <tr><td>„Közérzet" kérdőív kitöltése</td><td>hetente</td><td>szept. 22.</td><td><span class="btn">Kitöltés</span></td></tr>
+          <tr><td>Testsúlymérés rögzítése</td><td>hetente</td><td>szept. 24.</td><td><span class="btn">Rögzítés</span></td></tr>
+        </table>
+      </div>
+      <div class="row">
+        <div class="card">
+          <h3>Vérnyomás — 30 nap <span class="tag">céltartomány: 90–140 / 60–90</span></h3>
+          <svg viewBox="0 0 340 120" width="100%">
+            <line x1="30" y1="28" x2="330" y2="28" stroke="#e5484d55" stroke-dasharray="4 4"/>
+            <text x="32" y="24" font-size="9" fill="#e5484d">140</text>
+            <line x1="30" y1="92" x2="330" y2="92" stroke="#4caf7d44" stroke-dasharray="4 4"/>
+            <text x="32" y="104" font-size="9" fill="#4caf7d">90</text>
+            <polyline points="40,60 76,55 112,62 148,50 184,58 220,47 256,52 292,44 322,49" fill="none" stroke="#e8eaed" stroke-width="2"/>
+            <polyline points="40,84 76,80 112,85 148,78 184,82 220,76 256,80 292,74 322,78" fill="none" stroke="#9aa1ac" stroke-width="1.5" stroke-dasharray="1 0"/>
+            <text x="240" y="115" font-size="9" fill="#9aa1ac">— szisztolés &nbsp; — diasztolés</text>
+          </svg>
+        </div>
+        <div class="card">
+          <h3>Testsúly — 90 nap</h3>
+          <svg viewBox="0 0 340 120" width="100%">
+            <polyline points="40,50 90,52 140,56 190,58 240,61 290,63 322,64" fill="none" stroke="#e8eaed" stroke-width="2"/>
+            <text x="40" y="40" font-size="9" fill="#9aa1ac">84,1 kg</text>
+            <text x="290" y="80" font-size="9" fill="#9aa1ac">82,4 kg</text>
+          </svg>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Utolsó méréseim</h3>
+        <table>
+          <tr><td>Vérnyomás</td><td><b>132 / 86 Hgmm</b></td><td class="st">ma 07:41</td><td class="st">rögzítve</td></tr>
+          <tr><td>Pulzus</td><td><b>71 /perc</b></td><td class="st">ma 07:41</td><td class="st">rögzítve</td></tr>
+          <tr><td>Testsúly</td><td><b>82,4 kg</b></td><td class="st">szept. 17.</td><td class="st">rögzítve</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2 -->
+<h2>2. Beteg — mérésrögzítés</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo — beteg nézet / új mérés</div>
+  <div class="body">
+    <div class="nav"><div>Kezdőlap</div><div class="on">Méréseim</div><div>Kérdőíveim</div><div>Értesítések</div></div>
+    <div class="main">
+      <div class="card">
+        <h3>Új mérés rögzítése</h3>
+        <label>Méréstípus</label>
+        <select><option>Vérnyomás</option><option>Vércukor</option><option>Pulzus</option><option>Testsúly</option></select>
+        <div class="row">
+          <div><label>Szisztolés (Hgmm)</label><input value="132"></div>
+          <div><label>Diasztolés (Hgmm)</label><input value="86"></div>
+        </div>
+        <p class="note">A mezők a kiválasztott méréstípus komponensei szerint jelennek
+        meg — a vérnyomás kétértékű, a vércukor egyértékű mérés.</p>
+        <label>Mérés időpontja</label><input value="2026-09-20 07:41">
+        <p><span class="btn primary">Mentés</span> <span class="btn">Mégse</span></p>
+      </div>
+      <div class="card">
+        <h3>Korábbi méréseim</h3>
+        <table>
+          <tr><th>Időpont</th><th>Típus</th><th>Érték</th><th></th></tr>
+          <tr><td>szept. 19. 07:38</td><td>Vérnyomás</td><td>128 / 84</td><td><span class="btn">Javítás</span></td></tr>
+          <tr><td>szept. 18. 07:50</td><td>Vérnyomás</td><td>135 / 88 <span class="tag">javítva szept. 18. 08:10</span></td><td><span class="btn">Javítás</span></td></tr>
+          <tr><td>szept. 17. 19:02</td><td>Testsúly</td><td>82,4 kg</td><td><span class="btn">Javítás</span></td></tr>
+        </table>
+        <p class="note">A javítás nem írja felül az eredetit: új rekord jön létre az
+        eredetire hivatkozva, a rendszer újrakiértékel, és az esemény megjelenik az
+        érintett riasztás történetében.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3 -->
+<h2>3. Beteg — kérdőívkitöltés</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo — beteg nézet / kérdőív</div>
+  <div class="body">
+    <div class="main">
+      <div class="card">
+        <h3>„Közérzet" kérdőív <span class="tag">v3</span> <span class="tag">határidő: szept. 22.</span> <span class="tag">3 kérdés</span></h3>
+        <label>1. Hogyan aludt az elmúlt héten? (1 = nagyon rosszul … 5 = nagyon jól)</label>
+        <p class="radio"><span>1</span><span>2</span><span class="sel">3</span><span>4</span><span>5</span></p>
+        <label>2. Tapasztalt-e szédülést az elmúlt héten?</label>
+        <p class="radio"><span>Nem</span><span class="sel">Ritkán</span><span>Naponta</span></p>
+        <label>3. Jelölje, ami előfordult (több is választható)</label>
+        <p class="radio"><span class="sel">fejfájás</span><span>fülzúgás</span><span>mellkasi nyomás</span></p>
+        <p><span class="btn primary">Beküldés</span> <span class="btn">Mentés piszkozatként</span></p>
+        <p class="note">A kitöltés a kitöltéskori kérdőívverzióhoz (v3) kötődik — a
+        sablon későbbi módosítása a beküldött kitöltés pontszámát nem változtatja meg.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4 -->
+<h2>4. Orvos — priorizált beteglista</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo — orvosi nézet</div>
+  <div class="top"><span class="logo">PULSE</span><span class="who">Dr. Szabó Péter (orvos) · HU/EN · Kijelentkezés</span></div>
+  <div class="body">
+    <div class="nav"><div class="on">Betegeim</div><div>Riasztások <span class="badge-n">3</span></div><div>Kérdőívsablonok</div></div>
+    <div class="main">
+      <div class="kpi">
+        <div class="card"><div class="num" style="color:var(--bad)">1</div><div class="lbl">piros</div></div>
+        <div class="card"><div class="num" style="color:var(--warn)">1</div><div class="lbl">sárga</div></div>
+        <div class="card"><div class="num" style="color:var(--nodata)">1</div><div class="lbl">szürke</div></div>
+        <div class="card"><div class="num" style="color:var(--ok)">9</div><div class="lbl">zöld</div></div>
+      </div>
+      <div class="card">
+        <h3>Betegeim <span class="tag">rendezés: státusz</span> <span class="tag">szűrő: mind</span></h3>
+        <table>
+          <tr><th>Státusz</th><th>Beteg</th><th>Szül. év</th><th>Nyitott jelzés</th><th>Utolsó adat</th><th>Trend (30 nap)</th></tr>
+          <tr class="hot"><td><span class="dot r"></span>piros</td><td><b>Kovács Anna</b></td><td>1961</td><td>2 (1 súlyos)</td><td>ma</td>
+            <td><svg viewBox="0 0 90 22" width="90"><polyline points="2,16 15,14 28,15 41,12 54,10 67,8 80,5" fill="none" stroke="#e5484d" stroke-width="1.5"/></svg></td></tr>
+          <tr><td><span class="dot y"></span>sárga</td><td>Tóth Gábor</td><td>1954</td><td>1</td><td>tegnap</td>
+            <td><svg viewBox="0 0 90 22" width="90"><polyline points="2,12 15,13 28,11 41,14 54,12 67,13 80,11" fill="none" stroke="#e0a92e" stroke-width="1.5"/></svg></td></tr>
+          <tr><td><span class="dot n"></span>szürke</td><td>Kis Márta</td><td>1949</td><td>elmaradt adatküldés</td><td>9 napja</td>
+            <td><svg viewBox="0 0 90 22" width="90"><polyline points="2,12 15,11 28,12" fill="none" stroke="#7d8590" stroke-width="1.5"/><text x="36" y="16" font-size="8" fill="#7d8590">nincs adat</text></svg></td></tr>
+          <tr><td><span class="dot g"></span>zöld</td><td>Nagy Béla</td><td>1958</td><td>—</td><td>ma</td>
+            <td><svg viewBox="0 0 90 22" width="90"><polyline points="2,11 15,12 28,10 41,12 54,11 67,12 80,11" fill="none" stroke="#4caf7d" stroke-width="1.5"/></svg></td></tr>
+        </table>
+        <p class="note">A státusz a nyitott jelzésekből számítódik. A szürke =
+        „nincs elég friss adat" — az adathiány sosem eredményez kedvező státuszt.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5 -->
+<h2>5. Orvos — beteg-részletes oldal</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo — orvosi nézet / Kovács Anna</div>
+  <div class="body">
+    <div class="main">
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+        <span><span class="dot r"></span><b>Kovács Anna</b> (1961) — piros státusz <span class="tag">2 nyitott jelzés</span></span>
+        <span><span class="btn">Szabályok</span> <span class="btn">Kirendelés</span> <span class="btn">Megjegyzés</span></span>
+      </div>
+      <div class="card">
+        <h3>Vérnyomás (szisztolés) — 90 nap <span class="tag">küszöb: 140 (szabály v2)</span></h3>
+        <svg viewBox="0 0 700 150" width="100%">
+          <line x1="35" y1="40" x2="690" y2="40" stroke="#e5484d" stroke-dasharray="6 4"/>
+          <text x="38" y="34" font-size="10" fill="#e5484d">felső küszöb: 140 Hgmm</text>
+          <line x1="35" y1="120" x2="690" y2="120" stroke="#2c313b"/>
+          <polyline points="50,95 100,90 150,97 200,86 250,92 300,80 350,84 400,72 450,66 500,58 550,44 600,34 650,30"
+                    fill="none" stroke="#e8eaed" stroke-width="2"/>
+          <circle cx="550" cy="44" r="4" fill="#e5484d"/><circle cx="600" cy="34" r="4" fill="#e5484d"/><circle cx="650" cy="30" r="4" fill="#e5484d"/>
+          <rect x="530" y="12" width="150" height="16" rx="3" fill="#e5484d22"/>
+          <text x="537" y="24" font-size="10" fill="#e5484d">3 küszöb feletti mérés / 7 nap → riasztás</text>
+          <text x="50" y="135" font-size="9" fill="#6b7280">jún. 22.</text>
+          <text x="640" y="135" font-size="9" fill="#6b7280">szept. 20.</text>
+        </svg>
+      </div>
+      <div class="row">
+        <div class="card">
+          <h3>Kérdőív-pontszámok — „Közérzet", utolsó 6 kitöltés</h3>
+          <svg viewBox="0 0 340 110" width="100%">
+            <line x1="20" y1="38" x2="330" y2="38" stroke="#e0a92e88" stroke-dasharray="4 4"/>
+            <text x="24" y="33" font-size="9" fill="#e0a92e">figyelmeztető: 6 pont</text>
+            <rect x="40"  y="80" width="26" height="20" fill="#4caf7d"/>
+            <rect x="88"  y="75" width="26" height="25" fill="#4caf7d"/>
+            <rect x="136" y="70" width="26" height="30" fill="#4caf7d"/>
+            <rect x="184" y="58" width="26" height="42" fill="#e0a92e"/>
+            <rect x="232" y="50" width="26" height="50" fill="#e0a92e"/>
+            <rect x="280" y="34" width="26" height="66" fill="#e5484d"/>
+            <text x="20" y="108" font-size="9" fill="#6b7280">aug. 16. → szept. 20. · romló trend 3 kitöltésen át</text>
+          </svg>
+        </div>
+        <div class="card">
+          <h3>Követési terv</h3>
+          <table>
+            <tr><th>Előírás</th><th>Gyakoriság</th><th>Állapot</th></tr>
+            <tr><td>Vérnyomásmérés</td><td>naponta</td><td class="st">esedékes (ma 20:00)</td></tr>
+            <tr><td>„Közérzet" kérdőív</td><td>hetente</td><td class="st">kirendelve</td></tr>
+            <tr><td>Testsúlymérés</td><td>hetente</td><td class="st">teljesítve</td></tr>
+          </table>
+          <p><span class="btn ghost">+ Kirendelés</span></p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Nyitott riasztás <span class="sev high">súlyos</span></h3>
+        <div class="expl">
+          <b>Időablakos ismétlődés</b> — Szabály: „szisztolés &gt; 140 Hgmm legalább
+          3-szor 7 napon belül" <span class="tag">v2 · 2026-09-01</span><br>
+          Kiváltó mérések: szept. 16. (144/92) · szept. 18. (147/95) · szept. 20. (151/96)
+        </div>
+        <p><span class="btn">Megtekintve</span> <span class="btn">Felelőshöz rendelés</span> <span class="btn primary">Lezárás (indoklás kötelező)</span></p>
+      </div>
+      <div class="card">
+        <h3>Megjegyzések</h3>
+        <p class="note">szept. 10. — Dr. Szabó: „Gyógyszermódosítás után kontrollmérés sűrítve."</p>
+        <p><span class="btn ghost">+ Megjegyzés</span></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6 -->
+<h2>6. Orvos — szabály-szerkesztő</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo — orvosi nézet / Kovács Anna / szabályok</div>
+  <div class="body">
+    <div class="main">
+      <div class="card">
+        <h3>Szabály szerkesztése <span class="tag">mentéskor új verzió jön létre: v2 → v3</span></h3>
+        <label>Szabálytípus</label>
+        <select><option>Időablakos ismétlődés</option><option>Egyszeri küszöbátlépés</option><option>Kérdőív-pontszám</option><option>Elmaradt adatküldés</option></select>
+        <div class="row">
+          <div><label>Méréstípus / komponens</label><select><option>Vérnyomás / szisztolés</option></select></div>
+          <div><label>Küszöb</label><input value="> 140 Hgmm"></div>
+        </div>
+        <div class="row">
+          <div><label>Legalább N eltérés</label><input value="3"></div>
+          <div><label>M napon belül</label><input value="7"></div>
+          <div><label>Súlyosság</label><select><option>súlyos</option><option>közepes</option><option>enyhe</option></select></div>
+        </div>
+        <p><span class="btn primary">Mentés új verzióként (v3)</span> <span class="btn">Mégse</span></p>
+        <p class="note">A korábbi verziók nem módosíthatók és nem törölhetők; a régi
+        riasztások a keletkezéskori verzióra hivatkoznak, jelentésük nem változik.</p>
+      </div>
+      <div class="card">
+        <h3>Verziótörténet</h3>
+        <table>
+          <tr><th>Verzió</th><th>Paraméterek</th><th>Létrehozva</th><th>Létrehozta</th><th>Állapot</th></tr>
+          <tr><td><b>v2</b></td><td>szisztolés &gt; 140, 3× / 7 nap, súlyos</td><td>2026-09-01</td><td>Dr. Szabó</td><td class="st">aktív · 1 nyitott riasztás hivatkozik rá</td></tr>
+          <tr><td>v1</td><td>szisztolés &gt; 150, egyszeri, közepes</td><td>2026-08-10</td><td>Dr. Szabó</td><td class="st">lezárt</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7 -->
+<h2>7. Orvos — kérdőív-szerkesztő</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo — orvosi nézet / kérdőívsablonok / „Közérzet"</div>
+  <div class="body">
+    <div class="main">
+      <div class="card">
+        <h3>„Közérzet" sablon <span class="tag">közzétett: v3</span> <span class="tag">szerkesztés alatt: v4 piszkozat</span></h3>
+        <table>
+          <tr><th>#</th><th>Kérdés</th><th>Típus</th><th>Pontozás (egész pont)</th><th></th></tr>
+          <tr><td>1</td><td>Hogyan aludt az elmúlt héten?</td><td>skála 1–5</td><td>érték = pont</td><td class="st">✎ ↑ ↓ ✕</td></tr>
+          <tr><td>2</td><td>Tapasztalt-e szédülést az elmúlt héten?</td><td>egyválasztós</td><td>Nem: 0 · Ritkán: 2 · Naponta: 5</td><td class="st">✎ ↑ ↓ ✕</td></tr>
+          <tr><td>3</td><td>Jelölje, ami előfordult…</td><td>többválasztós</td><td>1–1 pont opciónként</td><td class="st">✎ ↑ ↓ ✕</td></tr>
+        </table>
+        <p><span class="btn ghost">+ Kérdés hozzáadása</span></p>
+        <label>Kiértékelési határok (összpontszám)</label>
+        <p style="font-size:12px;"><span class="dot g"></span>0–5: rendben &nbsp; <span class="dot y"></span>6–10: figyelmeztető &nbsp; <span class="dot r"></span>11+: súlyos</p>
+        <p><span class="btn primary">Közzététel új verzióként (v4)</span> <span class="btn">Piszkozat mentése</span></p>
+        <p class="note">A közzétett verzió immutabilis. A korábbi kitöltések a saját
+        verziójuk szerint pontozódnak — a v4 közzététele a v3-as kitöltések
+        eredményét nem érinti.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 8 -->
+<h2>8. Orvos — riasztáslista és eseménytörténet</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo — orvosi nézet / riasztások</div>
+  <div class="body">
+    <div class="main">
+      <div class="card">
+        <h3>Riasztások <span class="tag">szűrő: nyitott</span> <span class="tag">minden beteg</span> <span class="tag">súlyosság: mind</span></h3>
+        <table>
+          <tr><th>Súlyosság</th><th>Beteg</th><th>Szabály (verzió)</th><th>Állapot</th><th>Keletkezett</th><th></th></tr>
+          <tr class="hot"><td><span class="sev high">súlyos</span></td><td>Kovács Anna</td><td>Időablakos ismétlődés (v2)</td><td class="st">megtekintett · 2× ismételt aktiválódás</td><td>szept. 16.</td><td><span class="btn">Megnyitás</span></td></tr>
+          <tr><td><span class="sev med">közepes</span></td><td>Tóth Gábor</td><td>Kérdőív-pontszám (v1)</td><td class="st">keletkezett</td><td>szept. 19.</td><td><span class="btn">Megnyitás</span></td></tr>
+          <tr><td><span class="sev info">info</span></td><td>Kis Márta</td><td>Elmaradt adatküldés (v1)</td><td class="st">felelőshöz rendelt: Dr. Szabó</td><td>szept. 14.</td><td><span class="btn">Megnyitás</span></td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Riasztás #A-2031 — eseménytörténet</h3>
+        <ul class="timeline">
+          <li class="alert">szept. 16. 08:02 — <b>keletkezett</b> · szabály v2, kiváltó: 3 mérés (azonosítókkal)</li>
+          <li>szept. 16. 09:15 — megtekintette: Dr. Szabó</li>
+          <li class="alert">szept. 18. 07:50 — ismételt aktiválódás · új kiváltó mérés (147/95)</li>
+          <li class="alert">szept. 20. 07:44 — ismételt aktiválódás · súlyosság: közepes → súlyos</li>
+          <li>szept. 20. 08:30 — e-mail értesítés kézbesítve (2. próbálkozásra)</li>
+        </ul>
+        <p class="note">Minden állapotváltás rögzül: ki, mikor, mit. A lezáráshoz
+        indoklás kötelező. Ugyanarra a beteg+szabály párosra nyitott riasztás mellett
+        nem keletkezik új riasztás — az új kiváltó adat „ismételt aktiválódás"
+        eseményként jelenik meg.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 9 -->
+<h2>9. Admin — törzsadatok és összerendelések</h2>
+<div class="frame">
+  <div class="chrome">pulse.demo — admin nézet</div>
+  <div class="body">
+    <div class="nav"><div class="on">Felhasználók</div><div>Orvos–beteg összerendelés</div><div>Méréstípusok</div></div>
+    <div class="main">
+      <p class="note" style="margin-top:0;">Az alkalmazásban a bal oldali menü három
+      külön nézetet nyit; a vázlat helytakarékosságból egymás alatt mutatja mindhármat.</p>
+      <div class="card">
+        <h3>Felhasználók <span class="tag">1. fül</span> <span class="tag">szűrő: mind</span></h3>
+        <table>
+          <tr><th>Név</th><th>E-mail</th><th>Szerepkör</th><th>Állapot</th><th></th></tr>
+          <tr><td>Dr. Szabó Péter</td><td>szabo.peter@pelda.hu</td><td>orvos</td><td class="st">aktív</td><td><span class="btn">Szerkesztés</span></td></tr>
+          <tr><td>Kovács Anna</td><td>anna.kovacs@pelda.hu</td><td>beteg</td><td class="st">aktív</td><td><span class="btn">Szerkesztés</span></td></tr>
+          <tr><td>Kis Márta</td><td>kis.marta@pelda.hu</td><td>beteg</td><td class="st">letiltva</td><td><span class="btn">Szerkesztés</span></td></tr>
+        </table>
+        <p><span class="btn primary">+ Új felhasználó</span> <span class="tag">szerepkör választással: beteg / orvos / admin</span></p>
+        <p class="note">Letiltásnál a fiók nem törlődik (a mérések, riasztások,
+        kitöltések előzményei megmaradnak), csak a bejelentkezés tiltódik le.</p>
+      </div>
+      <div class="card">
+        <h3>Orvos–beteg összerendelések <span class="tag">2. fül</span></h3>
+        <table>
+          <tr><th>Orvos</th><th>Beteg</th><th>Érvényes ettől</th><th>Érvényes eddig</th><th></th></tr>
+          <tr><td>Dr. Szabó Péter</td><td>Kovács Anna</td><td>2026-08-01</td><td class="st">— (aktív)</td><td><span class="btn">Lezárás</span></td></tr>
+          <tr><td>Dr. Szabó Péter</td><td>Nagy Béla</td><td>2026-08-01</td><td class="st">— (aktív)</td><td><span class="btn">Lezárás</span></td></tr>
+          <tr><td>Dr. Varga Éva</td><td>Kovács Anna</td><td>2026-06-01</td><td>2026-07-31</td><td class="st">lezárt</td></tr>
+        </table>
+        <p class="note">Az összerendelés lezárásával az orvos hozzáférése a beteg
+        adataihoz azonnal megszűnik; új összerendeléssel azonnal kinyílik.</p>
+      </div>
+      <div class="card">
+        <h3>Méréstípusok <span class="tag">3. fül</span></h3>
+        <table>
+          <tr><th>Kód</th><th>Név</th><th>Komponensek</th></tr>
+          <tr><td>blood_pressure</td><td>Vérnyomás</td><td>szisztolés (Hgmm), diasztolés (Hgmm)</td></tr>
+          <tr><td>blood_glucose</td><td>Vércukor</td><td>vércukor (mmol/l)</td></tr>
+          <tr><td>pulse</td><td>Pulzus</td><td>pulzus (1/perc)</td></tr>
+          <tr><td>weight</td><td>Testsúly</td><td>testsúly (kg)</td></tr>
+        </table>
+        <p><span class="btn ghost">+ Új méréstípus</span></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="note">Demonstrációs rendszer vázlatai — kizárólag mesterséges adatok;
+nem orvostechnikai eszköz, nem helyettesít orvosi döntést vagy sürgősségi
+ellátást.</p>
+
+</body>
+</html>

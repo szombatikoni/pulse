@@ -1,5 +1,109 @@
 # AI-használati napló
 
+## 2026-09-24 — M1 véglegesítés: pontosítások és dokumentumgenerálás
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a feladatkiírás pontosítása a kérdéseim nyomán (a
+  riasztáskezelés tartalmának kifejtése); az M1-leadandók összefűzése egy
+  Word- és PDF-dokumentumba (PULSE_M1.docx/pdf) a képernyővázlat-képekkel;
+  az E-K diagram PNG-exportjának automatizálása a draw.io parancssori
+  exportjával.
+
+- Saját szerepem és döntéseim: a szövegek tételes átnézése és több ponton
+  pontosíttatása, átfogalmaztatása; a feladatkiírás végleges szövegének
+  jóváhagyása. Az átnézés során én vetettem fel, hogy az admin képernyőről
+  hiányzik az új felhasználó (pl. orvos) felvétele, valamint hogy a vázlat és
+  a menü viszonya félreérthető — mindkettő javításra került. Az első generált
+  dokumentumban a képek torzítását (függőleges nyúlás) én vettem észre, a
+  javítás után az eredményt oldalanként ellenőriztük. Az ismétlődő lépéseket
+  automatizáltuk (draw.io parancssori PNG-export, Word-alapú
+  dokumentumgenerálás), így a leadandó a forrásfájlok módosítása után bármikor
+  újragenerálható.
+
+- Ellenőrzés: a kész PDF minden oldalát átnéztem; az exportált E-K diagramot
+  a mentett draw.io-fájllal vetettük össze (a kapcsolatok és számosságok
+  változatlanok a kézi átrendezés után is).
+
+## 2026-09-22 — E-K diagram draw.io-ban
+
+- Eszköz: Claude Code + draw.io (VSCode-bővítmény)
+
+- Az AI szerepe: a Mermaid-vázlatból a leadandó draw.io-diagram legenerálása
+  (21 entitás attribútumokkal, 28 kapcsolat varjúláb-jelöléssel), majd a
+  kapcsolatvonalak olvashatóságát javító átrendezett elrendezés készítése.
+
+- Saját szerepem: a generált elrendezés hibáinak azonosítása (dobozokon
+  átmenő vonalak), a végleges elrendezés kézi kialakítása a
+  draw.io-szerkesztőben (entitások áthelyezése, az "előírt mérés" kapcsolat
+  útvonalának rendezése). A diagram készítése közben az AI jelezte, hogy az
+  Assignment két opcionális idegen kulcsa hiányzott a korábbi Mermaid-vázlat
+  attribútumlistájából — a pótlást átnéztem és jóváhagytam.
+
+- Ellenőrzés: a kézi szerkesztés után az AI a fájlt XML-szinten
+  visszaellenőrizte (minden entitás és kapcsolat megvan, egyik sem
+  csatlakozott át máshova mozgatás közben).
+
+## 2026-09-20 — Képernyővázlatok átdolgozása
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a képernyővázlatok átdolgozása az általam kért vizuális
+  irányra (csak sötét téma, piros akcentusszín), részletesebb tartalommal:
+  bejelentkező és admin képernyő hozzáadása, grafikon-helykitöltők cseréje
+  küszöbvonalas mintagrafikonokra, kérdőív-pontszám trendábra.
+
+- Saját szerepem: a vizuális irány meghatározása; az AI felvetette, hogy a
+  piros akcentus ütközhet a piros súlyossági jelzéssel — a megoldást (státusz
+  mindig pötty + szöveges címke párban) megvitattuk és jóváhagytam.
+
+## 2026-09-19 — Az adatmodell tételes átnézése
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: az adatmodell-vázlat elemeinek magyarázata a kérdéseimre
+  (UUID vs. egész azonosítók, idegen kulcsok, a javított mérés
+  `corrected_from` mechanizmusa, Alert–AlertEvent szétválasztás, a
+  Rule–RuleVersion verziózás, JSON-mezők indoklása), az alternatívák
+  előnyeivel-hátrányaival; a jóváhagyott döntések beírása a tervezési
+  indoklásba.
+
+- Saját szerepem és döntéseim: az adatmodellt tételesen átnéztem, minden
+  elemére rákérdeztem, amit nem értettem, és csak azt hagytam jóvá, amit én
+  is értek; döntöttem az UUID elsődleges
+  kulcsok megtartásáról (defense in depth indoklással), az egész pontszámokról
+  (klinikai konvenció + lebegőpontos hibák kizárása), valamint arról, hogy a
+  betegprofil éles rendszerben elvárt mezői (nem, TAJ, telefonszám) a
+  demonstrációs scope-ból tudatosan kimaradnak — ez konzultációs kérdésként
+  is rögzült.
+
+- Ellenőrzés: a modell általánosságát ellenőriztem (nem vérnyomás-specifikus:
+  a vércukor, pulzus, testsúly ugyanabba a MeasurementType/Component
+  szerkezetbe illeszkedik); a kapcsolatok számosságjelöléseit (crow's foot)
+  értelmeztem és jóváhagytam.
+
+## 2026-09-18 — M1 leadandók vázlatai
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: az M1 mérföldkő öt leadandójának első vázlata a `docs/M1/`
+  mappában (feladatkiírás, követelménylista, E-K diagram Mermaid-formátumban
+  tervezési indoklással, képernyővázlatok HTML-drótvázként, heti bontású
+  ütemterv) — a módosított tervben általam rögzített scope és döntések alapján.
+
+- Saját szerepem: a leadandók tartalmi kereteinek meghatározása (a témavezetői
+  visszajelzésre készült módosított terv), a vázlatok tételes felülvizsgálata
+  és javíttatása küldés előtt; az adatmodell tervezési döntéseinek (immutabilis
+  verziók, többértékű mérés normalizált kezelése) jóváhagyása; a
+  folyamatábrák (riasztás-állapotgép, kirendelés-életciklus, architektúra)
+  a saját felvetésemre kerültek be a leadandók közé; a végleges,
+  Bilicki tanár úrnak küldött változatokért a felelősséget én viselem.
+
+- Ellenőrzés: a vázlatok tartalmát a módosított terv vállalásaival tételesen
+  összevetem; az E-K diagram draw.io-változatát magam készítem el a
+  Mermaid-vázlat alapján; a felülvizsgálat még folyamatban.
+
+
 A naplóban dokumentálom, hogy a szakdolgozat készítése során mire és hogyan
 használok AI-eszközt. 
 
