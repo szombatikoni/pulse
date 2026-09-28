@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Státuszjelölés változatai</title>
+<style>
+  :root {
+    --bg:#101216; --panel:#181b21; --card:#1e222a; --line:#2c313b;
+    --ink:#e8eaed; --dim:#9aa1ac; --faint:#6b7280; --accent:#e5484d;
+    --piros:#F0595E; --sarga:#E3B341; --szurke:#8B949E; --kek:#58A6FF; --zold:#3FB950;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 16px 60px; background:var(--bg); color:var(--ink);
+         font-family:Calibri,'Segoe UI',system-ui,sans-serif; font-size:14px; }
+  main { max-width:1100px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; } h1 b { color:var(--accent); }
+  h2 { font-size:16px; margin:34px 0 6px; }
+  p.note { color:var(--dim); font-size:13px; max-width:78ch; margin:4px 0 12px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
+  .opt { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; cursor:pointer; position:relative; }
+  .opt.sel { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .opt h3 { margin:0 0 2px; font-size:14px; }
+  .opt .why { font-size:12px; color:var(--dim); margin:6px 0 10px; line-height:1.4; }
+  .opt .pick { position:absolute; top:12px; right:12px; font-size:11px; color:var(--faint); }
+  .opt.sel .pick { color:var(--accent); }
+  .list { background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .row { display:flex; align-items:center; gap:10px; padding:9px 10px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .row:last-child { border-bottom:0; }
+  .name { flex:1; min-width:90px; }
+  .sub { font-size:11px; color:var(--dim); }
+  .btn { background:var(--accent); color:#fff; border-radius:6px; padding:5px 12px; font-size:12px; display:inline-block; }
+  .toolbar { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid var(--line); font-size:12px; color:var(--dim); }
+
+  /* jelölő elemek */
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; flex:none; }
+  .lbl { font-size:12px; white-space:nowrap; }
+  .chip { display:inline-flex; align-items:center; gap:6px; padding:2px 9px; border-radius:999px; font-size:12px; white-space:nowrap; }
+  .solid { display:inline-flex; align-items:center; padding:2px 9px; border-radius:4px; font-size:12px; font-weight:600; white-space:nowrap; color:#101216; }
+  .ico { width:14px; height:14px; flex:none; }
+  .extra { font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:1px 8px; white-space:nowrap; }
+  .cetli { font-size:11px; color:var(--kek); border:1px dashed color-mix(in srgb, var(--kek) 60%, transparent); border-radius:6px; padding:1px 8px; white-space:nowrap; }
+
+  .sim { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 0; }
+  .sim button { background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:6px 12px; font:inherit; font-size:13px; cursor:pointer; }
+  .sim button.on { border-color:var(--accent); color:#fff; background:#2a1d20; }
+  .summary { margin-top:36px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .summary code { display:block; margin-top:6px; background:var(--card); padding:10px; border-radius:6px; font-family:Consolas,monospace; font-size:13px; white-space:pre-wrap; color:var(--ink); }
+  #demo.f-deut { filter:url(#deut); } #demo.f-prot { filter:url(#prot); } #demo.f-gray { filter:grayscale(1); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="deut"><feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0"/></filter>
+  <filter id="prot"><feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0"/></filter>
+</svg>
+<main>
+  <h1><b>PULSE</b> — státuszjelölés változatai</h1>
+  <p class="note">Ugyanaz az öt státusz különböző megjelenítéssel, a vázlatok sötét
+  felületén. Minden szekcióban kattints arra a változatra, amelyiket választanád.
+  Az oldal alján összegyűlik a döntésed, azt küldd vissza. A „Színtévesztés"
+  gombokkal megnézheted, hogyan látják ugyanezt a vörös-zöld színtévesztők,
+  illetve szürkeárnyalatos nyomtatásban.</p>
+
+  <div class="sim" id="simbar">
+    <button data-f="" class="on">Normál látás</button>
+    <button data-f="f-deut">Színtévesztés: deuteranópia</button>
+    <button data-f="f-prot">Színtévesztés: protanópia</button>
+    <button data-f="f-gray">Szürkeárnyalat (nyomtatás)</button>
+  </div>
+  <p class="note" style="font-size:12px">A szimuláció közelítő színmátrixszal készül; tájékoztató jellegű.</p>
+
+  <div id="demo">
+    <h2>1. A státusz jelölése</h2>
+    <p class="note">Mindegyik mellett ott van a piros gomb (a márkaszín), hogy látszódjon,
+    elkülönül-e tőle a piros státusz.</p>
+    <div class="grid" data-group="jeloles">
+      <div class="opt" data-val="A"><span class="pick">választ</span><h3>A · Pötty + szöveg</h3>
+        <div class="why">A legvisszafogottabb. Nyugodt felület, de a szín csak egy kis pöttyön látszik, sok sor között kevésbé „ugrik ki".</div><div class="list" data-style="A"></div></div>
+      <div class="opt" data-val="B"><span class="pick">választ</span><h3>B · Tónusozott chip</h3>
+        <div class="why">Pötty + színes szöveg + halvány (~15%-os) színes háttér. Jól észrevehető, mégsem harsány — ez volt az eredeti javaslat.</div><div class="list" data-style="B"></div></div>
+      <div class="opt" data-val="C"><span class="pick">választ</span><h3>C · Teli kitöltés (ellenpélda)</h3>
+        <div class="why">Telített, teli színes címke. Nagyon erős, de sötét háttéren harsány, és a piros státusz összemosódik a piros gombbal.</div><div class="list" data-style="C"></div></div>
+      <div class="opt" data-val="D"><span class="pick">választ</span><h3>D · Chip + ikon</h3>
+        <div class="why">Mint a B, de minden státusznak saját formája is van. A színtévesztés-szimulációban ez marad a legjobban megkülönböztethető.</div><div class="list" data-style="D"></div></div>
+    </div>
+
+    <h2>2. A sor kiemelése</h2>
+    <p class="note">A kiválasztott jelöléssel (1. szekció) jelenik meg. Csak a piros és a sárga sort emeljük ki, a többit nem.</p>
+    <div class="grid" data-group="sor">
+      <div class="opt" data-val="nincs"><span class="pick">választ</span><h3>Nincs kiemelés</h3>
+        <div class="why">Csak a jelölés hordozza a színt. Tiszta, de a sürgős sorok kevésbé tűnnek fel.</div><div class="list" data-row="nincs"></div></div>
+      <div class="opt" data-val="tonus"><span class="pick">választ</span><h3>Tónusozott sor</h3>
+        <div class="why">Az egész sor halvány színes hátteret kap. Erős jelzés, de több ilyen sor esetén zsúfolt lehet.</div><div class="list" data-row="tonus"></div></div>
+      <div class="opt" data-val="csik"><span class="pick">választ</span><h3>Bal oldali színcsík</h3>
+        <div class="why">Vékony függőleges csík a sor elején. Feltűnő, mégis diszkrét, és jól bírja a sok sort.</div><div class="list" data-row="csik"></div></div>
+    </div>
+
+    <h2>3. Az „Orvos által lezárva" cetli</h2>
+    <p class="note">A kék státuszú betegnél. A kiválasztott jelöléssel jelenik meg.</p>
+    <div class="grid" data-group="cetli">
+      <div class="opt" data-val="sorban"><span class="pick">választ</span><h3>A státusz mellett, egy sorban</h3>
+        <div class="why">Rögtön látszik, ki és mikor zárta le. Keskeny képernyőn tördelődhet.</div><div class="list" data-cetli="sorban"></div></div>
+      <div class="opt" data-val="alatta"><span class="pick">választ</span><h3>A név alatt, második sorban</h3>
+        <div class="why">Rendezettebb oszlopok, a cetli a beteghez tartozó megjegyzésként olvasható.</div><div class="list" data-cetli="alatta"></div></div>
+      <div class="opt" data-val="ikon"><span class="pick">választ</span><h3>Csak ikon, a részlet fölé víve</h3>
+        <div class="why">A legtömörebb; a lezárás adatai és indoklása egérrel fölé víve jelennek meg (itt: állj az ikonra).</div><div class="list" data-cetli="ikon"></div></div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <b>A döntésed</b> — ezt másold ki és küldd vissza:
+    <code id="out">Még nincs kiválasztva semmi.</code>
+  </div>
+</main>
+
+<script>
+const S = {
+  piros:{c:'--piros', t:'súlyos'},  sarga:{c:'--sarga', t:'közepes'},
+  szurke:{c:'--szurke', t:'adathiány'}, kek:{c:'--kek', t:'lezárva, megerősítésre vár'},
+  zold:{c:'--zold', t:'rendben'}
+};
+const ROWS = [
+  {s:'piros', n:'Kovács Anna', sub:'2 nyitott jelzés'},
+  {s:'sarga', n:'Tóth Gábor', sub:'1 nyitott jelzés', extra:'adathiány is'},
+  {s:'szurke', n:'Kis Márta', sub:'elmaradt mérés · 9 napja'},
+  {s:'kek', n:'Nagy Béla', sub:'utolsó mérés: szept. 18.', cetli:true},
+  {s:'zold', n:'Varga Ilona', sub:'utolsó mérés: ma'}
+];
+const ICON = {
+  piros:'<svg class="ico" viewBox="0 0 16 16"><path d="M8 1 15 8 8 15 1 8Z" fill="currentColor"/><path d="M8 4.5v4.5M8 11v.8" stroke="#101216" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  sarga:'<svg class="ico" viewBox="0 0 16 16"><path d="M8 1.5 15 14H1Z" fill="currentColor"/><path d="M8 6v3.8M8 11.6v.6" stroke="#101216" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  szurke:'<svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2.6 2"/></svg>',
+  kek:'<svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 4.6V8l2.4 1.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  zold:'<svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="currentColor"/><path d="m4.8 8.2 2.2 2.2 4.2-4.4" fill="none" stroke="#101216" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+const CETLI_TXT = 'Orvos által lezárva · Dr. Szabó · szept. 21.';
+const CETLI_WHY = 'Indoklás: telefonon egyeztettem, gyógyszer módosítva';
+const choice = { jeloles:null, sor:null, cetli:null };
+
+function marker(style, s){
+  const v = `var(${S[s].c})`, t = S[s].t;
+  if (style==='A') return `<span class="dot" style="background:${v}"></span><span class="lbl">${t}</span>`;
+  if (style==='C') return `<span class="solid" style="background:${v}">${t}</span>`;
+  const bg = `color-mix(in srgb, ${v} 15%, transparent)`;
+  const lead = style==='D' ? `<span style="color:${v};display:inline-flex">${ICON[s]}</span>` : `<span class="dot" style="background:${v}"></span>`;
+  return `<span class="chip" style="background:${bg};color:${v}">${lead}${t}</span>`;
+}
+function rowStyle(mode, s){
+  if (!['piros','sarga'].includes(s)) return '';
+  const v = `var(${S[s].c})`;
+  if (mode==='tonus') return `background:color-mix(in srgb, ${v} 10%, transparent)`;
+  if (mode==='csik') return `box-shadow:inset 3px 0 0 ${v}`;
+  return '';
+}
+function render(el, {style, rowMode='nincs', cetli='sorban', only=null}){
+  const rows = only ? ROWS.filter(r=>only.includes(r.s)) : ROWS;
+  let h = `<div class="toolbar"><span>Betegeim</span><span class="btn">+ Kirendelés</span></div>`;
+  for (const r of rows){
+    const c = r.cetli ? (cetli==='sorban' ? `<span class="cetli">${CETLI_TXT}</span>`
+            : cetli==='ikon' ? `<span class="cetli" title="${CETLI_TXT}\n${CETLI_WHY}" style="cursor:help;display:inline-flex;align-items:center;gap:4px">${ICON.kek} lezárva</span>` : '') : '';
+    const below = r.cetli && cetli==='alatta' ? `<div class="sub" style="color:var(--kek)">${CETLI_TXT}</div>` : '';
+    h += `<div class="row" style="${rowStyle(rowMode, r.s)}">${marker(style, r.s)}
+          <div class="name">${r.n}<div class="sub">${r.sub}</div>${below}</div>
+          ${r.extra ? `<span class="extra">${r.extra}</span>` : ''}${c}</div>`;
+  }
+  el.innerHTML = h;
+}
+function drawAll(){
+  const st = choice.jeloles || 'B';
+  document.querySelectorAll('[data-style]').forEach(el => render(el, {style:el.dataset.style}));
+  document.querySelectorAll('[data-row]').forEach(el => render(el, {style:st, rowMode:el.dataset.row}));
+  document.querySelectorAll('[data-cetli]').forEach(el => render(el, {style:st, rowMode:choice.sor||'nincs', cetli:el.dataset.cetli, only:['sarga','kek','zold']}));
+  const names = { A:'A · pötty + szöveg', B:'B · tónusozott chip', C:'C · teli kitöltés', D:'D · chip + ikon',
+                  nincs:'nincs sorkiemelés', tonus:'tónusozott sor', csik:'bal oldali színcsík',
+                  sorban:'cetli a státusz mellett', alatta:'cetli a név alatt', ikon:'cetli ikonként, fölé víve' };
+  const parts = [];
+  if (choice.jeloles) parts.push('Jelölés: ' + names[choice.jeloles]);
+  if (choice.sor) parts.push('Sorkiemelés: ' + names[choice.sor]);
+  if (choice.cetli) parts.push('Cetli: ' + names[choice.cetli]);
+  document.getElementById('out').textContent = parts.length ? parts.join('\n') : 'Még nincs kiválasztva semmi.';
+}
+document.querySelectorAll('[data-group]').forEach(g => g.addEventListener('click', e => {
+  const o = e.target.closest('.opt'); if (!o) return;
+  g.querySelectorAll('.opt').forEach(x => x.classList.toggle('sel', x===o));
+  g.querySelectorAll('.opt .pick').forEach(p => p.textContent = 'választ');
+  o.querySelector('.pick').textContent = '✓ kiválasztva';
+  choice[g.dataset.group] = o.dataset.val; drawAll();
+}));
+document.getElementById('simbar').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#simbar button').forEach(x => x.classList.toggle('on', x===b));
+  document.getElementById('demo').className = b.dataset.f;
+});
+drawAll();
+</script>
+</body>
+</html>

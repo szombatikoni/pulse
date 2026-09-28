@@ -1,0 +1,27 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Beteg-státusz" id="status-flow">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" page="1" pageWidth="700" pageHeight="760">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="dA" value="Súlyos nyitott&lt;br&gt;riasztás?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="20" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="dB" value="Közepes nyitott&lt;br&gt;riasztás?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="160" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="dC" value="Legutóbbi alkalom elmaradt,&lt;br&gt;pótlás nélkül?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="300" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="dE" value="Lezárt riasztás óta&lt;br&gt;jött rendben lévő adat?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" vertex="1" parent="1"><mxGeometry x="40" y="440" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="oS" value="&lt;b&gt;Súlyos&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#D0393F;strokeWidth=2;fontSize=12;" vertex="1" parent="1"><mxGeometry x="380" y="40" width="160" height="50" as="geometry" /></mxCell>
+        <mxCell id="oF" value="&lt;b&gt;Figyelem&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FDF6E3;strokeColor=#C9952A;strokeWidth=2;fontSize=12;" vertex="1" parent="1"><mxGeometry x="380" y="180" width="160" height="50" as="geometry" /></mxCell>
+        <mxCell id="oD" value="&lt;b&gt;Adathiány&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F1F2F4;strokeColor=#6B7280;strokeWidth=2;dashed=1;fontSize=12;" vertex="1" parent="1"><mxGeometry x="380" y="320" width="160" height="50" as="geometry" /></mxCell>
+        <mxCell id="oK" value="&lt;b&gt;Kezelve&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF3FF;strokeColor=#2F7BD6;strokeWidth=2;fontSize=12;" vertex="1" parent="1"><mxGeometry x="380" y="460" width="160" height="50" as="geometry" /></mxCell>
+        <mxCell id="oR" value="&lt;b&gt;Rendben&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EAF6EC;strokeColor=#2E9A45;strokeWidth=2;fontSize=12;" vertex="1" parent="1"><mxGeometry x="70" y="600" width="160" height="50" as="geometry" /></mxCell>
+        <mxCell id="e1" value="igen" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="dA" target="oS"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" value="nem" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="dA" target="dB"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" value="igen" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="dB" target="oF"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" value="nem" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="dB" target="dC"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" value="igen" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="dC" target="oD"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" value="nem" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="dC" target="dE"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" value="nem" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="dE" target="oK"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" value="igen / nem volt lezárás" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="dE" target="oR"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

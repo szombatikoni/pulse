@@ -1,13 +1,17 @@
-﻿# Folyamat- és architektúraábrák
+# Folyamat- és architektúraábrák
 
-Kiegészítő ábrák az adatmodellhez: a két kulcs-életciklus állapotgépe és a
-rendszer architektúrája.
+Kiegészítő ábrák az adatmodellhez: a riasztás és az alkalom életciklusa, a
+beteg-státusz előállítása és a rendszer architektúrája. A működési
+szabályokat példákon a `07_mukodesi_szabalyok.md` mutatja be.
 
 ## Riasztás-életút (állapotgép)
 
-Minden átmenet `AlertEvent`-ként rögzül (ki, mikor, mit); a lezárás indoklása
-kötelező. A nyitott riasztás melletti új kiváltó adat nem új riasztás, hanem
-„ismételt aktiválódás" esemény.
+Minden átmenet `AlertEvent`-ként rögzül (ki, mikor, mit, melyik
+szabályverzió, milyen kiváltó adat); a lezárás indoklása kötelező. A nyitott
+riasztás melletti új kiváltó adat nem új riasztás, hanem „ismételt
+aktiválódás" esemény. A szabály módosítása és a kiváltó adat javítása szintén
+eseményként rögzül, állapotváltás nélkül; javítás után a riasztás
+„kiváltó adat javítva" jelölést kap, és csak az orvos zárhatja le.
 
 ```mermaid
 stateDiagram-v2
@@ -23,20 +27,38 @@ stateDiagram-v2
     Lezárt --> [*]
 ```
 
-A beteg zöld/sárga/piros/szürke státusza a **nyitott** jelzésekből számítódik
-— a riasztás lezárása tehát elkülönül a beteg állapotjelzésétől: lezáráskor a
-státusz újraszámítódik a fennmaradó nyitott jelzések alapján.
+## Alkalom-életciklus (egy előírás egy alkalma)
 
-## Kirendelés-életciklus (követési terv eleme)
+Az alkalmakat az ütemezett háttérfolyamat hozza létre az előírás szerint, és
+ugyanez a folyamat jelöli elmulasztottnak a lejárt, teljesítetlen alkalmakat
+— akkor is, ha semmilyen adat nem érkezik.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Kirendelve : orvos kirendeli<br/>(mit, milyen gyakran, határidő)
-    Kirendelve --> Esedékes : esedékességi idő elérve
-    Esedékes --> Teljesítve : mérés / kitöltés beérkezik
-    Esedékes --> Elmulasztva : határidő lejár adat nélkül
-    Elmulasztva --> [*] : „elmaradt adatküldés" szabály aktiválódik<br/>(szürke státusz felé)
+    [*] --> Esedékes : a háttérfolyamat létrehozza<br/>(az előírás szerint)
+    Esedékes --> Teljesítve : mérés / kitöltés a határidőig
+    Esedékes --> Elmulasztva : a határidő adat nélkül lejár<br/>(ellenőrzés 15 percenként)
+    Elmulasztva --> KésveTeljesítve : pótlás legfeljebb 2 napon belül<br/>(a mérés időpontja szerint)
     Teljesítve --> [*]
+    KésveTeljesítve --> [*]
+    Elmulasztva --> [*] : 2 nap után végleges
+```
+
+Az elmulasztás a beteg státuszát Adathiányra állítja; az „elmaradt
+adatküldés" szabály a beállított számú elmulasztás után riasztást nyit.
+
+## A beteg-státusz előállítása
+
+```mermaid
+flowchart TD
+    A{Súlyos nyitott<br/>riasztás?} -- igen --> S[Súlyos]
+    A -- nem --> B{Közepes nyitott<br/>riasztás?}
+    B -- igen --> F[Figyelem]
+    B -- nem --> C{Legutóbbi alkalom<br/>elmaradt, pótlás nélkül?}
+    C -- igen --> D[Adathiány]
+    C -- nem --> E{Lezárt riasztás óta<br/>jött rendben lévő adat?}
+    E -- nem --> K[Kezelve]
+    E -- igen / nem volt lezárás --> R[Rendben]
 ```
 
 ## Architektúra
@@ -46,13 +68,15 @@ flowchart LR
     B[Böngésző<br/>React + TypeScript SPA] -->|HTTPS / REST + JWT| A[FastAPI backend<br/>szolgáltatásréteg, jogosultság-szűrés]
     A --> R[Szabálymotor<br/>4 szabálytípus, verziózott kiértékelés]
     A --> DB[(PostgreSQL<br/>SQLAlchemy + Alembic)]
-    R --> DB
     R -->|riasztás tranzakcióban| DB
+    W[Háttérfolyamat<br/>alkalmak, határidő-ellenőrzés<br/>15 percenként] --> R
+    W --> DB
     A --> Q[E-mail küldő<br/>retry + kézbesítés-nyilvántartás]
     Q --> M[SMTP<br/>dev: Mailpit]
     subgraph DC[Docker Compose]
         A
         R
+        W
         DB
         Q
         M
@@ -61,6 +85,11 @@ flowchart LR
 ```
 
 A szabálymotor a backend része (nem külön szolgáltatás), de logikailag
-elkülönített modul: bemenete a beérkező/javított adat, kimenete riasztás vagy
-„ismételt aktiválódás" esemény, mindig adatbázis-tranzakción belül. Az
-e-mail-küldés a tranzakción kívül, újrapróbálkozással történik.
+elkülönített modul: bemenete a beérkező vagy javított adat, illetve egy
+elmulasztott alkalom, kimenete riasztás vagy riasztási esemény, mindig
+adatbázis-tranzakción belül. A háttérfolyamat ugyanazt a backend-kódot
+futtatja külön konténerben: létrehozza az esedékes alkalmakat, és
+elmulasztottnak jelöli a lejártakat. Az ellenőrzés egyetlen, ismételten is
+biztonságosan futtatható függvény, amelyet a tesztek szimulált idővel, a
+bemutató pedig kézi indítással is meghívhat. Az e-mail-küldés a tranzakción
+kívül, újrapróbálkozással történik.

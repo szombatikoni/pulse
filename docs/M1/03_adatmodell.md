@@ -18,7 +18,9 @@ erDiagram
 
     Rule }o--|| PatientProfile : "betegre vonatkozik"
     Rule ||--|{ RuleVersion : "verziói"
-    RuleVersion ||--o{ Alert : "kiváltotta"
+    Rule ||--o{ Alert : "szabálya (deduplikáció)"
+    RuleVersion ||--o{ Alert : "megnyitó verzió"
+    RuleVersion ||--o{ AlertEvent : "alkalmazott verzió"
     Alert }o--|| PatientProfile : "betege"
     Alert ||--|{ AlertEvent : "eseménytörténet"
     Alert ||--o{ NotificationDelivery : "kézbesítések"
@@ -26,10 +28,13 @@ erDiagram
     QuestionnaireTemplate ||--|{ QuestionnaireVersion : "verziói"
     QuestionnaireVersion ||--|{ Question : "kérdései"
     Assignment }o--|| PatientProfile : "betege"
-    Assignment }o--o| QuestionnaireVersion : "kirendelt kérdőív"
+    Assignment }o--o| QuestionnaireTemplate : "kirendelt kérdőív"
     Assignment }o--o| MeasurementType : "előírt mérés"
-    Assignment ||--o{ Submission : "teljesítései"
-    Submission }o--|| QuestionnaireVersion : "kitöltéskori verzió"
+    Assignment ||--o{ AssignmentOccurrence : "alkalmai"
+    AssignmentOccurrence }o--o| QuestionnaireVersion : "rögzített verzió"
+    AssignmentOccurrence |o--o| Measurement : "teljesítő mérés"
+    AssignmentOccurrence ||--o| Submission : "teljesítő kitöltés"
+    Submission }o--|| QuestionnaireVersion : "kitöltött verzió"
     Submission ||--|{ Answer : "válaszai"
     Answer }o--|| Question : "kérdése"
 
@@ -80,8 +85,8 @@ erDiagram
         uuid id PK
         uuid patient_id FK
         uuid type_id FK
-        datetime measured_at
-        datetime recorded_at
+        datetime measured_at "a beteg szerint, max. 2 napra vissza"
+        datetime recorded_at "a rögzítés tényleges ideje"
         uuid corrected_from FK "javítás esetén az eredeti"
     }
     MeasurementValue {
@@ -109,17 +114,21 @@ erDiagram
     Alert {
         uuid id PK
         uuid patient_id FK
-        uuid rule_version_id FK
+        uuid rule_id FK "deduplikáció: beteg + szabály"
+        uuid rule_version_id FK "a megnyitáskori verzió"
         enum status "new|seen|assigned|closed"
-        enum severity
-        json trigger_data_ids "kiváltó adatok azonosítói"
+        enum severity "aktuális súlyosság"
+        json trigger_data_ids "megnyitáskori kiváltó adatok"
+        bool needs_review "kiváltó adat javítva"
         datetime created_at
     }
     AlertEvent {
         uuid id PK
         uuid alert_id FK
-        uuid actor_id FK
-        enum event_type "created|seen|assigned|closed|re_triggered|re_evaluated"
+        uuid actor_id FK "NULL = rendszer"
+        enum event_type "created|seen|assigned|closed|re_triggered|rule_changed|trigger_corrected"
+        uuid rule_version_id FK "az eseménykor alkalmazott verzió"
+        json trigger_data_ids "az eseményt kiváltó adatok"
         string reason "lezárásnál kötelező"
         datetime created_at
     }
@@ -156,32 +165,50 @@ erDiagram
         uuid id PK
         uuid template_id FK
         int version_no
-        json scoring_thresholds "immutabilis"
+        json scoring_thresholds "kiértékelési határok, immutabilis"
         datetime created_at
     }
     Question {
         uuid id PK
         uuid version_id FK
         int order_no
-        enum question_type "scale_1_5|scale_1_10|single|multi"
+        enum question_type "scale|single|multi"
         string text
-        json options_scores "válaszlehetőségek és pontszámok"
+        int scale_min "skálánál, pl. 1"
+        int scale_max "skálánál, pl. 5"
+        enum good_end "min|max, skálánál kötelező"
+        json options_scores "válasz -> pont tábla"
     }
     Assignment {
         uuid id PK
         uuid patient_id FK
         uuid assigned_by FK
         enum target_kind "questionnaire|measurement"
-        uuid questionnaire_version_id FK "0..1, kérdőív-kirendelésnél"
-        uuid measurement_type_id FK "0..1, mérés-előírásnál"
-        string frequency "pl. naponta, hetente"
-        datetime due_at
-        enum status "assigned|due|completed|missed"
+        uuid questionnaire_template_id FK "0..1"
+        uuid measurement_type_id FK "0..1"
+        enum frequency "daily|weekly|every_n_days"
+        int interval_days "every_n_days esetén"
+        time window_start "opcionális napon belüli kezdőidő"
+        time due_time "határidő a napon belül"
+        date start_date
+        date end_date "NULL = visszavonásig"
+        datetime revoked_at
+    }
+    AssignmentOccurrence {
+        uuid id PK
+        uuid assignment_id FK
+        datetime window_start
+        datetime due_at "egyedi: assignment + due_at"
+        enum status "due|fulfilled|fulfilled_late|missed"
+        uuid measurement_id FK "0..1, teljesítő mérés"
+        uuid questionnaire_version_id FK "0..1, rögzített verzió"
+        datetime fulfilled_at
+        datetime created_at
     }
     Submission {
         uuid id PK
-        uuid assignment_id FK
-        uuid version_id FK
+        uuid occurrence_id FK "a teljesített alkalom"
+        uuid version_id FK "= az alkalomhoz rögzített verzió"
         uuid patient_id FK
         int total_score
         datetime submitted_at
@@ -200,10 +227,50 @@ erDiagram
 **Immutabilis verziók.** A `Rule` és a `QuestionnaireTemplate` csak identitást
 hordoz; a tényleges paraméterek a `RuleVersion`, illetve a
 `QuestionnaireVersion` + `Question` rekordokban élnek, amelyek létrejöttük
-után nem módosulnak — minden változtatás új verziósort szúr be. Az `Alert` a
-kiváltó szabályverzióra, a `Submission` a kitöltéskori kérdőívverzióra
-hivatkozik, így a régi riasztások és kitöltések jelentése és pontszáma utólag
-nem változhat.
+után nem módosulnak — minden változtatás új verziósort szúr be. A riasztás
+eseményei a náluk alkalmazott szabályverzióra, a kitöltések az alkalomhoz
+rögzített kérdőívverzióra hivatkoznak, így a régi riasztások és kitöltések
+jelentése és pontszáma utólag nem változhat.
+
+**Előírás és alkalom.** Az `Assignment` az orvos által beállított, ismétlődő
+előírás (mit, milyen gyakran, milyen napon belüli időablakban és határidővel,
+mettől meddig). Egyes alkalmai külön `AssignmentOccurrence` sorok, amelyeket
+egy ütemezett háttérfolyamat menet közben hoz létre — nem előre, egész
+időszakra —, így az előírás módosítása vagy visszavonása nem igényli előre
+legyártott sorok törlését. Minden alkalom rögzíti a saját határidejét,
+státuszát (esedékes, teljesítve, késve teljesítve, elmulasztva) és a
+teljesítő mérést vagy kitöltést; az `(assignment_id, due_at)` egyedi
+megkötés garantálja, hogy a háttérfolyamat ismételt futása sem hoz létre
+dupla alkalmat. A mérés a mérés időpontja alapján rendelődik az alkalomhoz
+(visszamenőleg legfeljebb két napra); a rögzítés tényleges idejét a
+`recorded_at` őrzi.
+
+**Riasztás és szabályverziók.** A deduplikáció a `rule_id` alapján történik
+(beteg + szabály), ezért egy szabály módosítása után ugyanaz a nyitott
+riasztás folytatódik, új riasztás nem keletkezik. Az `Alert` a megnyitáskori
+verziót és kiváltó adatokat őrzi, minden további esemény (`AlertEvent`) a
+saját alkalmazott verzióját és kiváltó adatait tárolja; így az
+eseménytörténetből minden lépésnél kiolvasható, melyik verzió, milyen adat
+alapján mit állapított meg.
+
+**Javított mérés.** A javítás nem írja felül az eredetit: az új `Measurement`
+a `corrected_from` mezővel hivatkozik rá. A javítás újrakiértékelést vált ki,
+amely `trigger_corrected` eseményként rögzül; ha a feltétel már nem teljesül,
+a riasztás nem záródik le automatikusan, hanem `needs_review` jelölést kap,
+és az orvos zárja le indoklással.
+
+**Beteg-státusz.** A státusz (Súlyos, Figyelem, Adathiány, Kezelve, Rendben)
+számított érték, nem tárolt mező: a nyitott riasztásokból, az alkalmak
+teljesítéséből és a lezárás utáni megerősítő adatból áll elő. A számítás
+szabályait a működési szabályokat bemutató fejezet írja le példákon.
+
+**Pontozás iránya.** A pontozás egységes: több pont = rosszabb állapot. A
+skálás kérdésnél a kérdőív készítője kötelezően megadja, melyik vég jelenti a
+jobb állapotot (`good_end`); a rendszer ebből képlettel számítja ki a
+válasz → pont táblát (a jobb vég mindig 0 pont), és ezt a verzióban
+(`options_scores`) tárolja. Kitöltéskor a pontszám a tárolt táblából
+olvasódik ki, így egy későbbi kódmódosítás sem változtathatja meg a régi
+kitöltések pontjait.
 
 **Többértékű mérés.** A vérnyomás két értékből áll (szisztolés/diasztolés),
 ezért a méréstípus komponensekre bomlik (`MeasurementComponent`), és egy
@@ -212,10 +279,6 @@ megoldás: a szabálykiértékelés komponens-szinten tud küszöböt vizsgálni
 új többértékű típus séma­módosítás nélkül vehető fel. Az alternatíva (értékek
 JSONB-oszlopban) a dolgozat relációs vs. NoSQL alfejezetében kerül
 összevetésre.
-
-**Javított mérés.** A javítás nem írja felül az eredetit: az új `Measurement`
-a `corrected_from` mezővel hivatkozik rá. A javítás újrakiértékelést vált ki,
-amely `re_evaluated` eseményként rögzül az érintett riasztás történetében.
 
 **Riasztás-életút és kézbesítés.** Az `Alert` státuszváltásai kizárólag
 `AlertEvent` rögzítésével történnek (ki, mikor, mit, lezárásnál indoklás).
@@ -237,18 +300,15 @@ adatmennyiségnél ez nem érdemi hátrány.
 **Egész pontszámok.** A kérdőív-pontszámok (`Answer.score`,
 `Submission.total_score`) szándékosan egészek: ez a klinikai kérdőívek
 konvenciója (pl. PHQ-9), és kizárja a lebegőpontos összehasonlítás hibáit a
-szabályhatár-vizsgálatoknál. A szerkesztő kérdésenként csak egész pontot enged
-felvenni, így az összeg sem lehet tört; a számított értékek (pl. trendvizsgálat
+szabályhatár-vizsgálatoknál. A számított értékek (pl. trendvizsgálat
 átlaga) futásidőben lehetnek törtek, de tárolt pontszám nem.
 
 **Tudatosan elhagyott mezők.** A diagram a szerkezetet mutatja, nem a teljes
-mezőlistát: a betegprofilban éles rendszerben elvárt további adatok — nem
-(orvosilag releváns, pl. referenciatartományoknál), TAJ-szám, telefonszám,
-lakcím — a demonstrációs scope-ból tudatosan kimaradtak, mert kizárólag
-mesterséges adatokkal dolgozunk, és minden további mező karbantartó felületet
-és tesztet is igényelne. Utólagos felvételük egy-egy oszlop hozzáadása
-(Alembic-migráció), a szerkezetet nem érinti. *Konzultációs kérdés: elegendő-e
-így, vagy kerüljön be 1–2 további mező (pl. nem)?*
+mezőlistát. A betegprofil a bemutatáshoz szükséges szűk adattartalommal
+marad: az éles rendszerben elvárt további adatok (nem, TAJ-szám, telefonszám,
+lakcím) a demonstrációs scope-ból tudatosan kimaradtak, mert kizárólag
+mesterséges adatokkal dolgozunk. Utólagos felvételük egy-egy oszlop
+hozzáadása (Alembic-migráció), a szerkezetet nem érinti.
 
-**Megfontolás alatt:** `AuditLog` tábla az adminisztratív műveletek
-naplózására — az M2 tapasztalatai alapján dől el, bekerül-e a scope-ba.
+**Későbbre halasztva:** általános `AuditLog` tábla az adminisztratív
+műveletek naplózására — a két központi modul elsőbbséget élvez.

@@ -1,5 +1,74 @@
 # AI-használati napló
 
+## 2026-09-28 — A témavezetői visszajelzés feldolgozása: működési szabályok
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a témavezető M1-re adott visszajelzésének négy pontjára
+  tervezési javaslatok kidolgozása alternatívákkal és példasorokkal
+  (betegállapot és riasztáslezárás; esedékesség és elmaradás; verzióváltás és
+  adatjavítás; a kiértékelés forgatókönyvei és a kérdőív-pontozás); a
+  státuszjelölés vizuális változatainak elkészítése összehasonlító
+  HTML-oldalakon, kontrasztszámítással és színtévesztés-szimulációval; a
+  jóváhagyott döntések átvezetése az M1-anyagba (adatmodell és E-K diagram,
+  követelmények, új, működési szabályokat bemutató fejezet, folyamatábrák,
+  képernyővázlatok, ütemterv, módosított terv), valamint a
+  képernyővázlat-képek automatikus előállítása.
+
+- Saját szerepem és döntéseim: a négy pontot egyenként végigvettük; a
+  döntéseket minden pontnál én hoztam meg, a javaslatokat csak az elhangzott
+  indoklás és a felmerült kérdéseim tisztázása után fogadtam el.
+
+- Visszakérdezéseim (amelyek nyomán a javaslatok pontosodtak vagy
+  módosultak):
+  - miért előzi meg az adathiány a rendben lévő állapotot a sorrendben, és
+    hogyan maradnak jól olvashatók a státuszszínek sötét felületen;
+  - miért ismétli ugyanazt a státusz szövege és a lezárási jelzés — ennek
+    nyomán a státusz egyetlen szóra rövidült, a lezárás adatai pedig a
+    magyarázó oszlopba kerültek;
+  - ki hozza létre az ismétlődő teendők egyes alkalmait, és hogyan adja meg
+    az orvos az időtartamot;
+  - hogyan működik a határidőket figyelő háttérfolyamat, és nem túl sűrű-e
+    az ellenőrzés — ennek nyomán 5 helyett 15 perc lett, beállíthatóan;
+  - mi történik, ha a kérdőív új verziója éppen egy határidő lejártakor
+    jelenik meg;
+  - a betegnek kell-e kiválasztania, melyik alkalmat teljesíti egy késve
+    rögzített méréssel;
+  - nem keverednek-e össze a pontok az eltérő irányú kérdéseknél, ki
+    állítja be az irányt, és hogyan számolja ki a rendszer megbízhatóan a
+    pontokat — ennek nyomán derült ki, hogy a két pontozási irány eltérő
+    tartományból indult volna, ezt egységesítettük;
+  - mit jelent pontosan az egyik kiértékelési forgatókönyv — ennek nyomán
+    az összehasonlítást igazságosabbá tettük (az alapvonal is figyeli a
+    kérdőív-pontszámot);
+  - megjelenik-e valahol, ha egy riasztást kiváltó mérést utólag javítottak;
+  - honnan ered és mennyire tartható a dolgozat központi állítása.
+
+- Saját felvetéseim, amelyek bekerültek a tervbe: az „Orvos által lezárva"
+  jelzés; a megerősítésre váró állapot külön (kék) státusza a sárga helyett;
+  a napon belüli időablak az előírásoknál; a „késve teljesítve" státusz, hogy
+  a késve beküldött adat ne maradjon elmulasztottként; a státuszok
+  megjelenítésének egyszerűsítése és a másodlagos szövegek halványítása.
+
+- Tudatosan jóváhagyott javaslatok: a lezárás után a korábbi, időablakon
+  belüli mérések is számítanak; a háttérfolyamat külön konténerben fut (a két
+  lehetséges elhelyezés előnyeinek és hátrányainak összevetése után); az első
+  elmulasztás adathiány-státuszt, a riasztás csak a beállított számú
+  elmulasztás után keletkezik; a verzióváltás és az adatjavítás kezelésének
+  négy szabálya; a pontozás számítási módja; a dolgozat központi állításának
+  pontosított változata (három megfogalmazás közül választva).
+
+- Ellenőrzés: a státuszszínek kontrasztját a WCAG 1.4.3 és 1.4.11 szerinti
+  határértékekkel vetettük össze (ennek során kiderült, hogy a korábbi
+  legsötétebb szürke szöveg 3,57:1-es kontrasztja a 4,5:1-es határ alatt volt
+  — javítva); a vizuális változatokat böngészőben, színtévesztés-
+  szimulációval néztem át; a pontozás számítási szabályát példán ellenőriztem,
+  és teszteléssel fogjuk igazolni. Az átvezetett anyagokat átnéztem, az E-K
+  diagram elrendezését kézzel igazítottam; a diagram kapcsolatait a
+  módosítás után gépileg is ellenőriztük (22 entitás, 33 kapcsolat, egyik
+  sem szakadt le), a módosított tervben pedig visszakerestük, hogy nem maradt
+  elavult megfogalmazás.
+
 ## 2026-09-27 — M1 leadás
 
 - Eszköz: Claude Code

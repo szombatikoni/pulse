@@ -1,0 +1,207 @@
+﻿<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Státuszjelölés javaslat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#101216; --panel:#181b21; --card:#1e222a; --line:#2c313b; --line2:#252a33;
+    --ink:#e8eaed; --dim:#7d848f; --faint:#7d848f; --accent:#e5484d;
+    --piros:#F0595E; --sarga:#E3B341; --szurke:#8B949E; --kek:#58A6FF; --zold:#3FB950;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+  body.f-calibri { --font: Calibri, 'Segoe UI', sans-serif; }
+  body.f-system  { --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 16px 60px; background:var(--bg); color:var(--ink);
+         font-family:var(--font); font-size:14px; line-height:1.4; font-feature-settings:"tnum" 1, "cv11" 1; }
+  main { max-width:1100px; margin:0 auto; }
+  h1 { font-size:21px; margin:0 0 4px; font-weight:700; letter-spacing:-.01em; } h1 b { color:var(--accent); }
+  h2 { font-size:15px; margin:34px 0 8px; font-weight:600; }
+  p.note { color:var(--dim); font-size:13px; max-width:80ch; margin:4px 0 12px; }
+  .bar { display:flex; gap:18px; flex-wrap:wrap; margin:12px 0 4px; }
+  .seg { display:flex; gap:0; border:1px solid var(--line); border-radius:0; overflow:hidden; }
+  .seg span { font-size:12px; color:var(--faint); padding:6px 10px; border-right:1px solid var(--line); }
+  .seg button { background:var(--card); color:var(--dim); border:0; border-right:1px solid var(--line); padding:6px 12px; font:inherit; font-size:12.5px; cursor:pointer; }
+  .seg button:last-child { border-right:0; }
+  .seg button.on { background:#2a1d20; color:#fff; }
+
+  .frame { background:var(--panel); border:1px solid var(--line); border-radius:0; overflow:hidden; }
+  .kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:14px; border-bottom:1px solid var(--line); }
+  .kpi { background:var(--card); border:1px solid var(--line2); border-radius:0; padding:10px 12px; display:flex; align-items:center; gap:10px; }
+  .kpi .n { font-size:22px; font-weight:700; line-height:1; }
+  .kpi .t { font-size:12px; color:var(--dim); }
+  .kpi.quiet .n { color:var(--dim); }
+
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:11px; font-weight:500; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; padding:10px 14px; border-bottom:1px solid var(--line); }
+  td { padding:11px 14px; border-bottom:1px solid var(--line2); vertical-align:top; }
+  tr:last-child td { border-bottom:0; }
+  tr.stripe-piros td:first-child { box-shadow:inset 3px 0 0 var(--piros); }
+  tr.stripe-sarga td:first-child { box-shadow:inset 3px 0 0 var(--sarga); }
+  .name { font-weight:500; } .meta { font-size:12px; color:var(--faint); }
+  .reason { font-size:13px; }
+  .reason2 { font-size:12px; color:var(--dim); margin-top:3px; display:flex; align-items:center; gap:5px; }
+  .num { font-variant-numeric:tabular-nums; }
+
+  .st { display:inline-flex; align-items:center; gap:6px; padding:3px 9px 3px 7px; border-radius:0; font-size:12.5px; font-weight:500; white-space:nowrap; }
+  .st.quiet { background:none !important; color:var(--dim) !important; padding-left:0; }
+  html:not(.box) .st { background:none !important; padding-left:0; padding-right:0; }
+  .st.loud { font-weight:600; }
+  .ico { width:14px; height:14px; flex:none; }
+  .ico.s { width:12px; height:12px; }
+  [title] { cursor:help; }
+
+  .detail { display:grid; grid-template-columns: 1.3fr 1fr; gap:14px; padding:14px; }
+  .card { background:var(--card); border:1px solid var(--line2); border-radius:0; padding:14px; }
+  .card h3 { margin:0 0 8px; font-size:13px; font-weight:600; }
+  .closure { border-left:3px solid var(--kek); }
+  .closure .q { font-size:13px; margin:6px 0 10px; padding:8px 10px; background:color-mix(in srgb, var(--kek) 8%, transparent); border-radius:0; }
+  .steps { font-size:12.5px; color:var(--dim); margin:0; padding-left:18px; }
+  .steps li { margin:3px 0; } .steps .done { color:var(--ink); }
+
+  .why { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+  .why .card p { margin:0; font-size:12.5px; color:var(--dim); }
+  .legend { display:flex; gap:10px; flex-wrap:wrap; padding:12px 14px; border-top:1px solid var(--line); font-size:12px; color:var(--dim); }
+
+  #demo.f-deut { filter:url(#deut); } #demo.f-prot { filter:url(#prot); } #demo.f-gray { filter:grayscale(1); }
+  @media (max-width:720px) {
+    .kpis { grid-template-columns:repeat(3,1fr); }
+    .detail { grid-template-columns:1fr; }
+    th.hide, td.hide { display:none; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="deut"><feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0"/></filter>
+  <filter id="prot"><feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0"/></filter>
+</svg>
+<main>
+  <h1><b>PULSE</b> — státuszjelölés: kidolgozott javaslat</h1>
+  <p class="note">Egy státusz = ikon + szín + egy szó. Minden magyarázat az „Ok" oszlopba
+  kerül, egy mondatban. A vizuális hangerő a sürgősséget követi: a kivételek hangosak,
+  a rendben lévő betegek csendesek. A lezárás részletes indoklása a beteg oldalán jelenik
+  meg, a listán csak egy rövid mondat látszik (egérrel fölé víve az indoklás is).</p>
+
+  <div class="bar">
+    <div class="seg" id="sim"><span>Látás</span>
+      <button data-f="" class="on">Normál</button><button data-f="f-deut">Deuteranópia</button>
+      <button data-f="f-prot">Protanópia</button><button data-f="f-gray">Szürkeárnyalat</button></div>
+    <div class="seg" id="font"><span>Betűtípus</span>
+      <button data-f="" class="on">Inter</button><button data-f="f-calibri">Calibri</button><button data-f="f-system">Rendszer</button></div>
+    <div class="seg" id="box"><span>Státusz</span>
+      <button data-f="" class="on">Doboz nélkül</button><button data-f="box">Dobozzal</button></div>
+  </div>
+
+  <div id="demo">
+    <h2>1. Orvosi beteglista</h2>
+    <div class="frame">
+      <div class="kpis" id="kpis"></div>
+      <table>
+        <thead><tr><th>Státusz</th><th>Beteg</th><th>Ok</th><th class="hide">Utolsó adat</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <h2>2. Beteg oldala — kezelt, megerősítésre váró állapot</h2>
+    <div class="frame">
+      <div style="padding:14px 14px 0; display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+        <span style="font-size:17px; font-weight:600">Nagy Béla</span><span class="meta">1958</span>
+        <span id="detailStatus"></span>
+        <span class="meta">Megerősítő mérés még nem érkezett a lezárás óta</span>
+      </div>
+      <div class="detail">
+        <div class="card closure">
+          <h3>Lezárt riasztás — megerősítésre vár</h3>
+          <div class="meta">Időablakos ismétlődés (v2) · szisztolés &gt; 140 Hgmm 3× 7 napon belül</div>
+          <div class="q">„Telefonon egyeztettem, gyógyszer módosítva. Kontrollmérés holnaptól naponta."</div>
+          <div class="meta">Dr. Szabó Péter · 2026. szept. 21. 10:02</div>
+        </div>
+        <div class="card">
+          <h3>Mitől lesz „Rendben"?</h3>
+          <ol class="steps">
+            <li class="done">Riasztás lezárva indoklással ✓</li>
+            <li>Friss vérnyomásmérés érkezik (esedékes: ma 20:00)</li>
+            <li>A szabály rendben lévőnek értékeli</li>
+          </ol>
+          <p class="meta" style="margin:10px 0 0">Ha a mérés határidőre elmarad, a státusz „Adathiány" lesz.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>3. Miért így</h2>
+  <div class="why">
+    <div class="card"><h3>Egy információ egy helyen</h3><p>A státusz csak azt mondja meg, <i>mi</i> a helyzet (egy szó), az Ok oszlop azt, hogy <i>miért</i>. Így megszűnik az ismétlés, és minden sornak ugyanaz a felépítése.</p></div>
+    <div class="card"><h3>A hangerő a sürgősséget követi</h3><p>Súlyos és Figyelem: chip + színcsík. Adathiány és Kezelve: chip. Rendben: csak ikon, háttér nélkül. A figyelem a kivételekre irányul, nem terheljük túl az orvost fölösleges jelzéssel.</p></div>
+    <div class="card"><h3>Nem csak a szín jelez</h3><p>Minden státusznak saját formája van (rombusz, háromszög, szaggatott kör, óra, pipa), és mindig ott a szöveg is. Színtévesztők és szürkeárnyalatos nyomtatás esetén is egyértelmű (WCAG 1.4.1).</p></div>
+    <div class="card"><h3>Kontraszt sötét háttéren</h3><p>Az öt státuszszín kontrasztja a háttérhez 4,8:1 és 8,2:1 között van, jóval a felületi elemekre előírt 3:1 felett (WCAG 1.4.11). A másodlagos szöveg egyetlen szürke szint (#7d848f, 4,57:1): a lehető leghalványabb, ami a szövegre előírt 4,5:1-et még teljesíti (WCAG 1.4.3). Telített, nagy színes felületet nem használunk.</p></div>
+    <div class="card"><h3>Rövid, párhuzamos nevek</h3><p>Súlyos · Figyelem · Adathiány · Kezelve · Rendben. Egy-egy szó, amely a listán gyorsan átfutható, és keskeny képernyőn sem tördelődik.</p></div>
+    <div class="card"><h3>Betűtípus</h3><p>Inter: képernyőre tervezett, ingyenes, magyar ékezetekkel; táblázatos számjegyekkel, így a mérési értékek oszlopban egymás alá esnek.</p></div>
+  </div>
+</main>
+
+<script>
+const S = {
+  piros:  {c:'var(--piros)',  t:'Súlyos',    k:'súlyos nyitott riasztás'},
+  sarga:  {c:'var(--sarga)',  t:'Figyelem',  k:'közepes nyitott riasztás'},
+  szurke: {c:'var(--szurke)', t:'Adathiány', k:'előírt adat elmaradt'},
+  kek:    {c:'var(--kek)',    t:'Kezelve',   k:'lezárva, megerősítő adatra vár'},
+  zold:   {c:'var(--zold)',   t:'Rendben',   k:'friss, rendben lévő adat'}
+};
+const ICON = {
+  piros:'<svg class="ico" viewBox="0 0 16 16"><path d="M8 1 15 8 8 15 1 8Z" fill="currentColor"/><path d="M8 4.6v4.2M8 11v.7" stroke="#101216" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  sarga:'<svg class="ico" viewBox="0 0 16 16"><path d="M8 1.5 15 14H1Z" fill="currentColor"/><path d="M8 6v3.6M8 11.5v.6" stroke="#101216" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  szurke:'<svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2.6 2"/></svg>',
+  kek:'<svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 4.6V8l2.4 1.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  zold:'<svg class="ico" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="currentColor"/><path d="m4.8 8.2 2.2 2.2 4.2-4.4" fill="none" stroke="#101216" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+const small = s => ICON[s].replace('class="ico"', 'class="ico s"');
+function chip(s){
+  const q = s==='zold' ? ' quiet' : (['piros','sarga'].includes(s) ? ' loud' : '');
+  return `<span class="st${q}" style="background:color-mix(in srgb, ${S[s].c} 15%, transparent);color:${S[s].c}">
+    <span style="color:${S[s].c};display:inline-flex">${ICON[s]}</span>${S[s].t}</span>`;
+}
+const ROWS = [
+  {s:'piros', n:'Kovács Anna', y:1961, r:'Szisztolés > 140 Hgmm 3× 7 napon belül (151/96)', last:'ma 07:41'},
+  {s:'sarga', n:'Tóth Gábor', y:1954, r:'„Közérzet" kérdőív: 12 pont (határ: 11)', r2:{s:'szurke', t:'Tegnapi vérnyomásmérés is elmaradt'}, last:'tegnap'},
+  {s:'szurke', n:'Kis Márta', y:1949, r:'Napi vérnyomásmérés 9 napja elmaradt', last:'9 napja'},
+  {s:'kek', n:'Nagy Béla', y:1958, r:'Dr. Szabó lezárta · szept. 21. — megerősítő mérés még nem érkezett',
+     tip:'Indoklás: „Telefonon egyeztettem, gyógyszer módosítva. Kontrollmérés holnaptól naponta."', last:'szept. 20.'},
+  {s:'zold', n:'Varga Ilona', y:1966, r:'Utolsó mérés rendben', last:'ma 07:12', quiet:true},
+  {s:'zold', n:'Horváth Péter', y:1952, r:'Utolsó mérés rendben', last:'ma 06:58', quiet:true}
+];
+document.getElementById('rows').innerHTML = ROWS.map(r => `
+  <tr class="${['piros','sarga'].includes(r.s) ? 'stripe-'+r.s : ''}">
+    <td>${chip(r.s)}</td>
+    <td><div class="name">${r.n}</div><div class="meta num">${r.y}</div></td>
+    <td><div class="reason" ${r.tip ? `title='${r.tip}'` : ''} style="${r.quiet ? 'color:var(--dim)' : ''}">${r.r}</div>
+        ${r.r2 ? `<div class="reason2"><span style="color:${S[r.r2.s].c};display:inline-flex">${small(r.r2.s)}</span>${r.r2.t}</div>` : ''}</td>
+    <td class="hide meta num">${r.last}</td>
+  </tr>`).join('');
+const counts = {piros:1, sarga:1, szurke:1, kek:1, zold:9};
+document.getElementById('kpis').innerHTML = Object.keys(S).map(s => `
+  <div class="kpi${s==='zold' ? ' quiet' : ''}"><span style="color:${S[s].c};display:inline-flex">${ICON[s]}</span>
+  <div><div class="n num" style="${s==='zold' ? '' : 'color:'+S[s].c}">${counts[s]}</div><div class="t">${S[s].t}</div></div></div>`).join('');
+document.getElementById('legend').innerHTML = Object.keys(S).map(s =>
+  `<span style="display:inline-flex;align-items:center;gap:5px"><span style="color:${S[s].c};display:inline-flex">${small(s)}</span><b style="font-weight:500;color:var(--ink)">${S[s].t}</b> — ${S[s].k}</span>`).join('') + `<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-flex;gap:2px"><i style="width:3px;height:13px;background:var(--piros)"></i><i style="width:3px;height:13px;background:var(--sarga)"></i></span><b style="font-weight:500;color:var(--ink)">Színcsík</b> — orvosi döntést igénylő nyitott riasztás</span>`;
+document.getElementById('detailStatus').innerHTML = chip('kek');
+
+function seg(id, target, prefixFilter){
+  document.getElementById(id).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#'+id+' button').forEach(x => x.classList.toggle('on', x===b));
+    target().className = b.dataset.f;
+  });
+}
+seg('sim', () => document.getElementById('demo'));
+seg('font', () => document.body);
+seg('box', () => document.documentElement);
+</script>
+</body>
+</html>

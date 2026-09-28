@@ -1,0 +1,41 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Alkalom-életciklus" id="occ-fsm">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" page="1" pageWidth="1150" pageHeight="420">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="start" value="" style="ellipse;fillColor=#2C4A6E;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="155" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="sE" value="Esedékes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="200" y="140" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sT" value="Teljesítve" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F9;strokeColor=#2C4A6E;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="40" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sX" value="Elmulasztva" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="240" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sK" value="Késve teljesítve" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F9;strokeColor=#2C4A6E;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="240" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="end1" value="" style="ellipse;fillColor=#FFFFFF;strokeColor=#2C4A6E;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="820" y="53" width="24" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="end2" value="" style="ellipse;fillColor=#FFFFFF;strokeColor=#2C4A6E;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="253" width="24" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="end3" value="" style="ellipse;fillColor=#FFFFFF;strokeColor=#2C4A6E;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="623" y="360" width="24" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="u1" value="a háttérfolyamat létrehozza&#10;(az előírás szerint)" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="start" target="sE"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u2" value="mérés / kitöltés a határidőig" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;exitX=1;exitY=0.25;" edge="1" parent="1" source="sE" target="sT"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u3" value="a határidő adat nélkül lejár&#10;(ellenőrzés 15 percenként)" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;exitX=1;exitY=0.75;" edge="1" parent="1" source="sE" target="sX"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u4" value="pótlás legfeljebb 2 napon belül&#10;(a mérés időpontja szerint)" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sX" target="sK"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sT" target="end1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u6" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sK" target="end2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u7" value="2 nap után végleges" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sX" target="end3"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

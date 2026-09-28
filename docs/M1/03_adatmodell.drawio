@@ -1,109 +1,109 @@
 <mxfile host="65bd71144e">
     <diagram name="PULSE adatmodell" id="pulse-er">
-        <mxGraphModel dx="1057" dy="2304" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2350" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="779" dy="1946" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2350" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="eNotification" value="&lt;b&gt;Notification&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;user_id : uuid (FK)&lt;br&gt;title&lt;br&gt;body&lt;br&gt;is_read : bool&lt;br&gt;created_at" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="60" y="60" width="180" height="126" as="geometry"/>
+                <mxCell id="eNotification" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;Notification&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;user_id : uuid (FK)&lt;br&gt;title&lt;br&gt;body&lt;br&gt;is_read : bool&lt;br&gt;created_at" vertex="1">
+                    <mxGeometry height="126" width="180" x="60" y="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="eUser" value="&lt;b&gt;User&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;email&lt;br&gt;password_hash&lt;br&gt;role : beteg | orvos | admin&lt;br&gt;is_active : bool" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="60" y="250" width="200" height="110" as="geometry"/>
+                <mxCell id="eUser" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;User&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;email&lt;br&gt;password_hash&lt;br&gt;role : beteg | orvos | admin&lt;br&gt;is_active : bool" vertex="1">
+                    <mxGeometry height="110" width="200" x="60" y="250" as="geometry"/>
                 </mxCell>
-                <mxCell id="eDoctor" value="&lt;b&gt;DoctorProfile&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;user_id : uuid (FK)&lt;br&gt;name" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="340" y="60" width="180" height="78" as="geometry"/>
+                <mxCell id="eDoctor" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;DoctorProfile&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;user_id : uuid (FK)&lt;br&gt;name" vertex="1">
+                    <mxGeometry height="78" width="180" x="340" y="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="eDocPat" value="&lt;b&gt;DoctorPatient&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;doctor_id : uuid (FK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;valid_from&lt;br&gt;valid_to (NULL = aktív)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="625" y="-90" width="190" height="110" as="geometry"/>
+                <mxCell id="eDocPat" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;DoctorPatient&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;doctor_id : uuid (FK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;valid_from&lt;br&gt;valid_to (NULL = aktív)" vertex="1">
+                    <mxGeometry height="110" width="190" x="625" y="-90" as="geometry"/>
                 </mxCell>
-                <mxCell id="eNote" value="&lt;b&gt;Note&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;doctor_id : uuid (FK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;content&lt;br&gt;created_at" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="630" y="68" width="180" height="110" as="geometry"/>
+                <mxCell id="eNote" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;Note&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;doctor_id : uuid (FK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;content&lt;br&gt;created_at" vertex="1">
+                    <mxGeometry height="110" width="180" x="630" y="68" as="geometry"/>
                 </mxCell>
-                <mxCell id="ePatient" value="&lt;b&gt;PatientProfile&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;user_id : uuid (FK)&lt;br&gt;name&lt;br&gt;birth_date" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFF2CC;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="340" y="320" width="180" height="94" as="geometry"/>
+                <mxCell id="ePatient" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFF2CC;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;PatientProfile&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;user_id : uuid (FK)&lt;br&gt;name&lt;br&gt;birth_date" vertex="1">
+                    <mxGeometry height="94" width="180" x="340" y="320" as="geometry"/>
                 </mxCell>
-                <mxCell id="eMType" value="&lt;b&gt;MeasurementType&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;code (pl. blood_pressure)&lt;br&gt;name&lt;br&gt;unit" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="1220" y="60" width="200" height="94" as="geometry"/>
+                <mxCell id="eMType" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;MeasurementType&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;code (pl. blood_pressure)&lt;br&gt;name&lt;br&gt;unit" vertex="1">
+                    <mxGeometry height="94" width="200" x="1220" y="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="eMComp" value="&lt;b&gt;MeasurementComponent&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;type_id : uuid (FK)&lt;br&gt;code (pl. systolic)&lt;br&gt;name&lt;br&gt;ref_min&lt;br&gt;ref_max" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="1500" y="60" width="200" height="126" as="geometry"/>
+                <mxCell id="eMComp" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;MeasurementComponent&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;type_id : uuid (FK)&lt;br&gt;code (pl. systolic)&lt;br&gt;name&lt;br&gt;ref_min&lt;br&gt;ref_max" vertex="1">
+                    <mxGeometry height="126" width="200" x="1500" y="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="eMeas" value="&lt;b&gt;Measurement&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;type_id : uuid (FK)&lt;br&gt;measured_at&lt;br&gt;recorded_at&lt;br&gt;corrected_from : uuid (FK, önhiv.)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="1175" y="304" width="200" height="126" as="geometry"/>
+                <mxCell id="eMeas" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;Measurement&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;type_id : uuid (FK)&lt;br&gt;measured_at (max. 2 napra vissza)&lt;br&gt;recorded_at&lt;br&gt;corrected_from : uuid (FK, önhiv.)" vertex="1">
+                    <mxGeometry height="126" width="200" x="1175" y="304" as="geometry"/>
                 </mxCell>
-                <mxCell id="eMVal" value="&lt;b&gt;MeasurementValue&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;measurement_id : uuid (FK)&lt;br&gt;component_id : uuid (FK)&lt;br&gt;value : float" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="1500" y="320" width="200" height="94" as="geometry"/>
+                <mxCell id="eMVal" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;MeasurementValue&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;measurement_id : uuid (FK)&lt;br&gt;component_id : uuid (FK)&lt;br&gt;value : float" vertex="1">
+                    <mxGeometry height="94" width="200" x="1500" y="320" as="geometry"/>
                 </mxCell>
-                <mxCell id="eRule" value="&lt;b&gt;Rule&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;created_by : uuid (FK)&lt;br&gt;is_active : bool" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="60" y="620" width="180" height="94" as="geometry"/>
+                <mxCell id="eRule" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;Rule&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;created_by : uuid (FK)&lt;br&gt;is_active : bool" vertex="1">
+                    <mxGeometry height="94" width="180" x="60" y="620" as="geometry"/>
                 </mxCell>
-                <mxCell id="eRuleVer" value="&lt;b&gt;RuleVersion&lt;/b&gt; (immutabilis)&lt;hr&gt;id : uuid (PK)&lt;br&gt;rule_id : uuid (FK)&lt;br&gt;version_no : int&lt;br&gt;rule_type : threshold | window |&lt;br&gt;&amp;nbsp;&amp;nbsp;questionnaire | missing_data&lt;br&gt;params : JSON&lt;br&gt;severity&lt;br&gt;created_at, created_by (FK)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#F4F6F9;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="325" y="620" width="210" height="158" as="geometry"/>
+                <mxCell id="eRuleVer" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#F4F6F9;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;RuleVersion&lt;/b&gt; (immutabilis)&lt;hr&gt;id : uuid (PK)&lt;br&gt;rule_id : uuid (FK)&lt;br&gt;version_no : int&lt;br&gt;rule_type : threshold | window |&lt;br&gt;&amp;nbsp;&amp;nbsp;questionnaire | missing_data&lt;br&gt;params : JSON&lt;br&gt;severity&lt;br&gt;created_at, created_by (FK)" vertex="1">
+                    <mxGeometry height="158" width="210" x="325" y="620" as="geometry"/>
                 </mxCell>
-                <mxCell id="eAlert" value="&lt;b&gt;Alert&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;rule_version_id : uuid (FK)&lt;br&gt;status : new | seen |&lt;br&gt;&amp;nbsp;&amp;nbsp;assigned | closed&lt;br&gt;severity&lt;br&gt;trigger_data_ids : JSON&lt;br&gt;created_at" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="650" y="620" width="200" height="158" as="geometry"/>
+                <mxCell id="eAlert" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;Alert&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;rule_id : uuid (FK, deduplikáció)&lt;br&gt;rule_version_id : uuid (FK, megnyitáskori)&lt;br&gt;status : new | seen |&lt;br&gt;&amp;nbsp;&amp;nbsp;assigned | closed&lt;br&gt;severity (aktuális)&lt;br&gt;trigger_data_ids : JSON&lt;br&gt;needs_review : bool&lt;br&gt;created_at" vertex="1">
+                    <mxGeometry height="190" width="200" x="650" y="620" as="geometry"/>
                 </mxCell>
-                <mxCell id="eAlertEv" value="&lt;b&gt;AlertEvent&lt;/b&gt; (append-only)&lt;hr&gt;id : uuid (PK)&lt;br&gt;alert_id : uuid (FK)&lt;br&gt;actor_id : uuid (FK)&lt;br&gt;event_type : created | seen |&lt;br&gt;&amp;nbsp;&amp;nbsp;assigned | closed |&lt;br&gt;&amp;nbsp;&amp;nbsp;re_triggered | re_evaluated&lt;br&gt;reason (lezárásnál kötelező)&lt;br&gt;created_at" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#F4F6F9;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="910" y="588" width="210" height="158" as="geometry"/>
+                <mxCell id="eAlertEv" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#F4F6F9;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;AlertEvent&lt;/b&gt; (append-only)&lt;hr&gt;id : uuid (PK)&lt;br&gt;alert_id : uuid (FK)&lt;br&gt;actor_id : uuid (FK, NULL = rendszer)&lt;br&gt;event_type : created | seen | assigned |&lt;br&gt;&amp;nbsp;&amp;nbsp;closed | re_triggered |&lt;br&gt;&amp;nbsp;&amp;nbsp;rule_changed | trigger_corrected&lt;br&gt;rule_version_id : uuid (FK, alkalmazott)&lt;br&gt;trigger_data_ids : JSON&lt;br&gt;reason (lezárásnál kötelező)&lt;br&gt;created_at" vertex="1">
+                    <mxGeometry height="190" width="210" x="910" y="588" as="geometry"/>
                 </mxCell>
-                <mxCell id="eNotifDel" value="&lt;b&gt;NotificationDelivery&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;alert_id : uuid (FK)&lt;br&gt;recipient&lt;br&gt;status : pending | sent | failed&lt;br&gt;attempts : int&lt;br&gt;last_attempt_at" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="620" y="860" width="200" height="126" as="geometry"/>
+                <mxCell id="eNotifDel" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;NotificationDelivery&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;alert_id : uuid (FK)&lt;br&gt;recipient&lt;br&gt;status : pending | sent | failed&lt;br&gt;attempts : int&lt;br&gt;last_attempt_at" vertex="1">
+                    <mxGeometry height="126" width="200" x="620" y="860" as="geometry"/>
                 </mxCell>
-                <mxCell id="eQTpl" value="&lt;b&gt;QuestionnaireTemplate&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;name&lt;br&gt;created_by : uuid (FK)&lt;br&gt;is_active : bool" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="1800" y="60" width="200" height="94" as="geometry"/>
+                <mxCell id="eQTpl" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;QuestionnaireTemplate&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;name&lt;br&gt;created_by : uuid (FK)&lt;br&gt;is_active : bool" vertex="1">
+                    <mxGeometry height="94" width="200" x="1800" y="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="eQVer" value="&lt;b&gt;QuestionnaireVersion&lt;/b&gt; (immutabilis)&lt;hr&gt;id : uuid (PK)&lt;br&gt;template_id : uuid (FK)&lt;br&gt;version_no : int&lt;br&gt;scoring_thresholds : JSON&lt;br&gt;created_at" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#F4F6F9;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="1790" y="240" width="210" height="110" as="geometry"/>
+                <mxCell id="eQVer" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#F4F6F9;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;QuestionnaireVersion&lt;/b&gt; (immutabilis)&lt;hr&gt;id : uuid (PK)&lt;br&gt;template_id : uuid (FK)&lt;br&gt;version_no : int&lt;br&gt;scoring_thresholds : JSON&lt;br&gt;created_at" vertex="1">
+                    <mxGeometry height="110" width="210" x="1790" y="240" as="geometry"/>
                 </mxCell>
-                <mxCell id="eQuestion" value="&lt;b&gt;Question&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;version_id : uuid (FK)&lt;br&gt;order_no : int&lt;br&gt;question_type : scale_1_5 |&lt;br&gt;&amp;nbsp;&amp;nbsp;scale_1_10 | single | multi&lt;br&gt;text&lt;br&gt;options_scores : JSON" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="2085" y="250" width="200" height="142" as="geometry"/>
+                <mxCell id="eQuestion" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;Question&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;version_id : uuid (FK)&lt;br&gt;order_no : int&lt;br&gt;question_type : scale | single | multi&lt;br&gt;text&lt;br&gt;scale_min, scale_max : int&lt;br&gt;good_end : min | max (skálánál kötelező)&lt;br&gt;options_scores : JSON (válasz → pont)" vertex="1">
+                    <mxGeometry height="178" width="200" x="2085" y="250" as="geometry"/>
                 </mxCell>
-                <mxCell id="eAssign" value="&lt;b&gt;Assignment&lt;/b&gt; (követési terv eleme)&lt;hr&gt;id : uuid (PK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;assigned_by : uuid (FK)&lt;br&gt;target_kind : questionnaire | measurement&lt;br&gt;questionnaire_version_id : uuid (FK, 0..1)&lt;br&gt;measurement_type_id : uuid (FK, 0..1)&lt;br&gt;frequency&lt;br&gt;due_at&lt;br&gt;status : assigned | due | completed | missed" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="1475" y="-350" width="250" height="174" as="geometry"/>
+                <mxCell id="eAssign" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;Assignment&lt;/b&gt; (előírás)&lt;hr&gt;id : uuid (PK)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;assigned_by : uuid (FK)&lt;br&gt;target_kind : questionnaire | measurement&lt;br&gt;questionnaire_template_id : uuid (FK, 0..1)&lt;br&gt;measurement_type_id : uuid (FK, 0..1)&lt;br&gt;frequency : daily | weekly | every_n_days&lt;br&gt;interval_days : int&lt;br&gt;window_start : time (opcionális)&lt;br&gt;due_time : time&lt;br&gt;start_date, end_date (NULL = visszavonásig)&lt;br&gt;revoked_at" vertex="1">
+                    <mxGeometry height="222" width="250" x="1475" y="-350" as="geometry"/>
                 </mxCell>
-                <mxCell id="eSubmission" value="&lt;b&gt;Submission&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;assignment_id : uuid (FK)&lt;br&gt;version_id : uuid (FK, kitöltéskori)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;total_score : int&lt;br&gt;submitted_at" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="1790" y="540" width="210" height="126" as="geometry"/>
+                <mxCell id="eSubmission" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;Submission&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;occurrence_id : uuid (FK)&lt;br&gt;version_id : uuid (FK, rögzített verzió)&lt;br&gt;patient_id : uuid (FK)&lt;br&gt;total_score : int&lt;br&gt;submitted_at" vertex="1">
+                    <mxGeometry height="126" width="210" x="1788" y="580" as="geometry"/>
                 </mxCell>
-                <mxCell id="eAnswer" value="&lt;b&gt;Answer&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;submission_id : uuid (FK)&lt;br&gt;question_id : uuid (FK)&lt;br&gt;value : JSON&lt;br&gt;score : int" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" parent="1" vertex="1">
-                    <mxGeometry x="2060" y="690" width="190" height="110" as="geometry"/>
+                <mxCell id="eAnswer" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFFFFF;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;Answer&lt;/b&gt;&lt;hr&gt;id : uuid (PK)&lt;br&gt;submission_id : uuid (FK)&lt;br&gt;question_id : uuid (FK)&lt;br&gt;value : JSON&lt;br&gt;score : int" vertex="1">
+                    <mxGeometry height="110" width="190" x="2060" y="690" as="geometry"/>
                 </mxCell>
-                <mxCell id="r1" value="profilja" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;" parent="1" source="eUser" target="ePatient" edge="1">
+                <mxCell id="r1" edge="1" parent="1" source="eUser" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;" target="ePatient" value="profilja">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r2" value="profilja" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;" parent="1" source="eUser" target="eDoctor" edge="1">
+                <mxCell id="r2" edge="1" parent="1" source="eUser" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;" target="eDoctor" value="profilja">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r3" value="értesítései" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" parent="1" source="eUser" target="eNotification" edge="1">
+                <mxCell id="r3" edge="1" parent="1" source="eUser" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" target="eNotification" value="értesítései">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r4" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" parent="1" source="eDoctor" target="eDocPat" edge="1">
+                <mxCell id="r4" edge="1" parent="1" source="eDoctor" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" target="eDocPat">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r5" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" parent="1" source="ePatient" target="eDocPat" edge="1">
+                <mxCell id="r5" edge="1" parent="1" source="ePatient" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" target="eDocPat">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r6" value="írja" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" parent="1" source="eDoctor" target="eNote" edge="1">
+                <mxCell id="r6" edge="1" parent="1" source="eDoctor" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" target="eNote" value="írja">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r7" value="betegről" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" parent="1" source="eNote" target="ePatient" edge="1">
+                <mxCell id="r7" edge="1" parent="1" source="eNote" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" target="ePatient" value="betegről">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r8" value="komponensei" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" parent="1" source="eMType" target="eMComp" edge="1">
+                <mxCell id="r8" edge="1" parent="1" source="eMType" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" target="eMComp" value="komponensei">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r9" value="rögzíti" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" parent="1" source="ePatient" target="eMeas" edge="1">
+                <mxCell id="r9" edge="1" parent="1" source="ePatient" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" target="eMeas" value="rögzíti">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r10" value="típusa" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" parent="1" source="eMeas" target="eMType" edge="1">
+                <mxCell id="r10" edge="1" parent="1" source="eMeas" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" target="eMType" value="típusa">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r11" value="értékei" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" parent="1" source="eMeas" target="eMVal" edge="1">
+                <mxCell id="r11" edge="1" parent="1" source="eMeas" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" target="eMVal" value="értékei">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r12" value="komponense" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" parent="1" source="eMVal" target="eMComp" edge="1">
+                <mxCell id="r12" edge="1" parent="1" source="eMVal" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" target="eMComp" value="komponense">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r13" value="javítása (corrected_from)" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;exitX=0.25;exitY=1;entryX=0.75;entryY=1;" parent="1" source="eMeas" target="eMeas" edge="1">
+                <mxCell id="r13" edge="1" parent="1" source="eMeas" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;exitX=0.25;exitY=1;entryX=0.75;entryY=1;" target="eMeas" value="javítása (corrected_from)">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="1270" y="490"/>
@@ -111,50 +111,94 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="r14" value="betegre vonatkozik" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" parent="1" source="eRule" target="ePatient" edge="1">
+                <mxCell id="r14" edge="1" parent="1" source="eRule" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" target="ePatient" value="betegre vonatkozik">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r15" value="verziói" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" parent="1" source="eRule" target="eRuleVer" edge="1">
+                <mxCell id="r15" edge="1" parent="1" source="eRule" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" target="eRuleVer" value="verziói">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r16" value="kiváltotta" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" parent="1" source="eRuleVer" target="eAlert" edge="1">
+                <mxCell id="r16" edge="1" parent="1" source="eRuleVer" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" target="eAlert" value="megnyitó verzió">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r17" value="betege" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" parent="1" source="eAlert" target="ePatient" edge="1">
+                <mxCell id="r17" edge="1" parent="1" source="eAlert" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" target="ePatient" value="betege">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r18" value="eseménytörténet" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" parent="1" source="eAlert" target="eAlertEv" edge="1">
+                <mxCell id="r18" edge="1" parent="1" source="eAlert" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" target="eAlertEv" value="eseménytörténet">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r19" value="kézbesítések" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" parent="1" source="eAlert" target="eNotifDel" edge="1">
+                <mxCell id="r19" edge="1" parent="1" source="eAlert" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" target="eNotifDel" value="kézbesítések">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r20" value="verziói" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" parent="1" source="eQTpl" target="eQVer" edge="1">
+                <mxCell id="r20" edge="1" parent="1" source="eQTpl" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" target="eQVer" value="verziói">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r21" value="kérdései" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" parent="1" source="eQVer" target="eQuestion" edge="1">
+                <mxCell id="r21" edge="1" parent="1" source="eQVer" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" target="eQuestion" value="kérdései">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r22" value="betege" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" parent="1" source="eAssign" target="ePatient" edge="1">
+                <mxCell id="r22" edge="1" parent="1" source="eAssign" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" target="ePatient" value="betege">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r23" value="kirendelt kérdőív" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;" parent="1" source="eAssign" target="eQVer" edge="1">
+                <mxCell id="r23" edge="1" parent="1" source="eAssign" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;" target="eQTpl" value="kirendelt kérdőív">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r24" value="előírt mérés" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;" parent="1" source="eAssign" target="eMType" edge="1">
+                <mxCell id="r24" edge="1" parent="1" source="eAssign" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERzeroToOne;endFill=0;strokeColor=#666666;" target="eMType" value="előírt mérés">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r25" value="teljesítései" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;strokeColor=#666666;" parent="1" source="eAssign" target="eSubmission" edge="1">
+                <mxCell id="r25" edge="1" parent="1" source="eAssign" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;rounded=0;startFill=0;endFill=0;strokeColor=#666666;startArrow=ERmandOne;endArrow=ERzeroToMany;exitX=1;exitY=0.5;entryX=0.75;entryY=0;" target="eOccur" value="alkalmai">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1740" y="-239"/>
+                            <mxPoint x="1740" y="440"/>
+                            <mxPoint x="1670" y="440"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r26" edge="1" parent="1" source="eSubmission" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" target="eQVer" value="kitöltött verzió">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r26" value="kitöltéskori verzió" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" parent="1" source="eSubmission" target="eQVer" edge="1">
+                <mxCell id="r27" edge="1" parent="1" source="eSubmission" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" target="eAnswer" value="válaszai">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r27" value="válaszai" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERmandOne;startFill=0;endArrow=ERoneToMany;endFill=0;strokeColor=#666666;" parent="1" source="eSubmission" target="eAnswer" edge="1">
+                <mxCell id="r28" edge="1" parent="1" source="eAnswer" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" target="eQuestion" value="kérdése">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="r28" value="kérdése" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startArrow=ERzeroToMany;startFill=0;endArrow=ERmandOne;endFill=0;strokeColor=#666666;" parent="1" source="eAnswer" target="eQuestion" edge="1">
+                <mxCell id="eOccur" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=6;fillColor=#FFF2CC;strokeColor=#2C4A6E;fontSize=11;" value="&lt;b&gt;AssignmentOccurrence&lt;/b&gt; (alkalom)&lt;hr&gt;id : uuid (PK)&lt;br&gt;assignment_id : uuid (FK)&lt;br&gt;window_start, due_at&lt;br&gt;&amp;nbsp;&amp;nbsp;(egyedi: assignment + due_at)&lt;br&gt;status : due | fulfilled |&lt;br&gt;&amp;nbsp;&amp;nbsp;fulfilled_late | missed&lt;br&gt;measurement_id : uuid (FK, 0..1)&lt;br&gt;questionnaire_version_id : uuid (FK, 0..1)&lt;br&gt;fulfilled_at, created_at" vertex="1">
+                    <mxGeometry height="174" width="260" x="1465" y="492" as="geometry"/>
+                </mxCell>
+                <mxCell id="r29" edge="1" parent="1" source="eOccur" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;rounded=0;startFill=0;endFill=0;strokeColor=#666666;startArrow=ERzeroToMany;endArrow=ERzeroToOne;exitX=1;exitY=0.17;entryX=0;entryY=0.55;" target="eQVer" value="rögzített verzió">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1772" y="500"/>
+                            <mxPoint x="1772" y="300"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r30" edge="1" parent="1" source="eOccur" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;rounded=0;startFill=0;endFill=0;strokeColor=#666666;startArrow=ERzeroToOne;endArrow=ERzeroToOne;exitX=0;exitY=0.25;entryX=1;entryY=0.85;" target="eMeas" value="teljesítő mérés">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1430" y="513"/>
+                            <mxPoint x="1430" y="411"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r31" edge="1" parent="1" source="eOccur" style="edgeStyle=entityRelationEdgeStyle;html=1;fontSize=10;rounded=0;startFill=0;endFill=0;strokeColor=#666666;startArrow=ERmandOne;endArrow=ERzeroToOne;" target="eSubmission" value="teljesítő kitöltés">
                     <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="r32" edge="1" parent="1" source="eRule" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;rounded=0;startFill=0;endFill=0;strokeColor=#666666;startArrow=ERmandOne;endArrow=ERzeroToMany;exitX=0.5;exitY=1;entryX=0.25;entryY=1;" target="eAlert" value="szabálya (deduplikáció)">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="150" y="830"/>
+                            <mxPoint x="700" y="830"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="r33" edge="1" parent="1" source="eRuleVer" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;rounded=0;startFill=0;endFill=0;strokeColor=#666666;startArrow=ERmandOne;endArrow=ERzeroToMany;exitX=0.5;exitY=0;entryX=0.5;entryY=0;" target="eAlertEv" value="alkalmazott verzió">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="430" y="570"/>
+                            <mxPoint x="1015" y="570"/>
+                        </Array>
+                    </mxGeometry>
                 </mxCell>
             </root>
         </mxGraphModel>
