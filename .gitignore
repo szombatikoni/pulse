@@ -236,3 +236,8 @@ docs/files/
 # Az M1 PDF köztes fájljai (a docs/M1/tools szkriptjei állítják elő)
 docs/M1/PULSE_M1.html
 docs/M1/PULSE_M1.docx
+
+# A szakdolgozat generált köztes fájljai (docs/dolgozat/tools)
+docs/dolgozat/build/
+docs/dolgozat/PULSE_szakdolgozat.docx
+docs/dolgozat/sablon/alap.docx

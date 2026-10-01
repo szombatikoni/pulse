@@ -8,6 +8,29 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-10-01 — A szakdolgozat vázának előkészítése
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a témavezető által korábban használt mintadolgozat
+  (Nyugtafelosztó) és munkaterv-minta szerkezetének és formai jegyeinek
+  elemzése; a PULSE-dolgozat fejezettervének javaslata; a markdown-forrásból
+  Word-dokumentumot előállító szkriptek és a mintához igazított Word-sablon
+  elkészítése (fejezet- és ábraszámozás, tartalomjegyzék, számozott
+  irodalomjegyzék megtekintési dátummal); az előlapok és az üres
+  fejezetvázak létrehozása.
+
+- Saját döntéseim: a dolgozat a mintadolgozat szerkezetét és formáját
+  követi; a forrás a repóban tárolt markdown, a Word-változat ebből
+  generálódik; amíg egy fejezet nem végleges, csak Word-változat készül, amelyet
+  változáskövetéssel javítok, PDF csak a leadott, kész fejezetekből; a
+  tervezési anyagból készülő fejezetvázlatokat az AI készíti, én átírom és
+  jóváhagyom; a Motiváció személyes részeit magam írom.
+
+- Ellenőrzés: a generált előlapokat és a tartalomjegyzéket oldalanként
+  összevetettük a mintával; a forrásjegyzékbe csak megnyitott, ellenőrzött
+  forrás kerülhet a tényleges megtekintés dátumával.
+
 ## 2026-09-29 — Az M1-anyag belső felülvizsgálata
 
 - Eszköz: Claude Code (az átvizsgálás és az ellenőrzés két különböző
