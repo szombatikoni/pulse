@@ -1,5 +1,57 @@
 # AI-használati napló
 
+A naplóban dokumentálom, hogy a szakdolgozat készítése során mire és hogyan
+használok AI-eszközt. 
+
+A munkamódszer nem az AI-kimenet átvétele, hanem közös,
+iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én hozom,
+az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
+A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
+
+## 2026-09-29 — Az M1-anyag belső felülvizsgálata
+
+- Eszköz: Claude Code (az átvizsgálás és az ellenőrzés két különböző
+  modellel)
+
+- Az AI szerepe: az M1-anyag átvizsgálása a pontosítások átvezetése után, az
+  ellentmondások és logikai hézagok listázása, javítási javaslatok és azok
+  átvezetése; ezt követően a változtatások két, egymástól független
+  ellenőrzése, amelyek eredményét összevetettük.
+
+- Javítások:
+  - a leadandó PDF újragenerálva a szeptember 28-i pontosításokkal (új,
+    működési szabályokat bemutató fejezet, frissített ábrák és
+    képernyővázlatok), a disclaimer teljes, kiemelt formájában;
+  - az entitásszám egységesítve (22) a dokumentumok között;
+  - a Mermaid-modellbe bekerült a javított mérés önhivatkozó kapcsolata, a
+    draw.io-val azonos számossággal;
+  - az elmaradt adatküldés szabály paraméterei egységesítve (az egymást
+    követő elmulasztott alkalmak száma);
+  - egy képernyővázlaton a nyitott, elmaradás miatti riasztású beteg
+    státusza a szabályok szerinti Figyelemre javítva.
+
+- Feltárt logikai hézagok és döntéseim:
+  - a késve rögzített esti mérés nem volt egyértelműen alkalomhoz
+    rendelhető: a mérés a mérés napja (heti előírásnál az időszak) szerinti
+    alkalomé; a határidő előtti rögzítés teljesíti, a későbbi késve teljesíti;
+    a napon belüli kezdőidő ajánlás; heti előírásnál a határidő az időszak
+    utolsó napja;
+  - az adat nélküli beteg Rendben státuszt kapott volna: a státusza
+    Adathiány, és előírás nélkül a 7 napnál régebbi adat sem friss
+    (rendszerszintű beállítás);
+  - az egyszeri kiugrásnál a két módszer csak rögzített szabálykonfigurációval
+    tér el: az egyszeri küszöbszabály a kritikus, az időablakos szabály a
+    normál határon fut; hogy az eredmény ettől a választástól függ, a
+    korlátok között szerepel.
+
+- Ellenőrzés: az átvizsgálás a megoldásokat is átvezette a fájlokba, ezért a
+  változtatásokat két független ellenőrzéssel is átnézettem. Ezek
+  egybehangzóan jelezték, hogy az időablak kezelése és az előírás nélküli
+  beteg frissessége még pontosításra szorul, és hogy több helyen régi
+  megfogalmazás maradt. A két kérdésben a változatok összevetése után
+  döntöttem, a maradványokat javítottuk. A draw.io és a Mermaid-modell
+  entitásait és kapcsolatait gépileg összevetettük (22 entitás, 33 kapcsolat).
+
 ## 2026-09-28 — A témavezetői visszajelzés feldolgozása: működési szabályok
 
 - Eszköz: Claude Code
@@ -192,15 +244,6 @@
 - Ellenőrzés: a vázlatok tartalmát a módosított terv vállalásaival tételesen
   összevetem; az E-K diagram draw.io-változatát magam készítem el a
   Mermaid-vázlat alapján; a felülvizsgálat még folyamatban.
-
-
-A naplóban dokumentálom, hogy a szakdolgozat készítése során mire és hogyan
-használok AI-eszközt. 
-
-A munkamódszer nem az AI-kimenet átvétele, hanem közös,
-iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én hozom,
-az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
-A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
 ## 2026-09-16 — Koncepció és módosított terv
 

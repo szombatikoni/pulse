@@ -46,6 +46,8 @@ nem is tehet megállapítást.
 A megvalósítás technológiái: React + TypeScript frontend, Python + FastAPI
 backend, PostgreSQL adatbázis, Docker-alapú futtatókörnyezet. A fejlesztést
 teljes CI/CD-folyamat (GitHub Actions) kíséri, automatizált tesztekkel és
-nyilvános demókörnyezettel. A rendszer demonstrációs célú, kizárólag
-mesterséges adatokkal működik; nem orvostechnikai eszköz, és nem helyettesít
-orvosi döntést.
+nyilvános demókörnyezettel.
+
+A rendszer demonstrációs célú, kizárólag mesterséges adatokkal működik; nem
+orvostechnikai eszköz, és nem helyettesít orvosi döntést vagy sürgősségi
+ellátást.

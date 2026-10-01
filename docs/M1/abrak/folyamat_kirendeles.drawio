@@ -29,12 +29,12 @@
           <mxGeometry x="623" y="360" width="24" height="24" as="geometry" />
         </mxCell>
         <mxCell id="u1" value="a háttérfolyamat létrehozza&#10;(az előírás szerint)" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="start" target="sE"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="u2" value="mérés / kitöltés a határidőig" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;exitX=1;exitY=0.25;" edge="1" parent="1" source="sE" target="sT"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="u3" value="a határidő adat nélkül lejár&#10;(ellenőrzés 15 percenként)" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;exitX=1;exitY=0.75;" edge="1" parent="1" source="sE" target="sX"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="u4" value="pótlás legfeljebb 2 napon belül&#10;(a mérés időpontja szerint)" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sX" target="sK"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u2" value="rögzítés a határidőig" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;exitX=1;exitY=0.25;" edge="1" parent="1" source="sE" target="sT"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u3" value="a határidő rögzítés nélkül lejár&#10;(ellenőrzés 15 percenként)" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;exitX=1;exitY=0.75;" edge="1" parent="1" source="sE" target="sX"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u4" value="pótlás: az időszakba eső mérés,&#10;legfeljebb 2 napra visszamenőleg" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sX" target="sK"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="u5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sT" target="end1"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="u6" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sK" target="end2"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="u7" value="2 nap után végleges" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sX" target="end3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="u7" value="az időszak vége után&#10;2 nappal végleges" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;endArrow=block;strokeColor=#2C4A6E;" edge="1" parent="1" source="sX" target="end3"><mxGeometry relative="1" as="geometry" /></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

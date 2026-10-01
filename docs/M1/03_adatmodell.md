@@ -14,6 +14,7 @@ erDiagram
     PatientProfile ||--o{ Measurement : "rögzíti"
     Measurement }o--|| MeasurementType : "típusa"
     Measurement ||--|{ MeasurementValue : "értékei"
+    Measurement }o--o| Measurement : "javítása (corrected_from)"
     MeasurementValue }o--|| MeasurementComponent : "komponense"
 
     Rule }o--|| PatientProfile : "betegre vonatkozik"
@@ -188,8 +189,8 @@ erDiagram
         uuid measurement_type_id FK "0..1"
         enum frequency "daily|weekly|every_n_days"
         int interval_days "every_n_days esetén"
-        time window_start "opcionális napon belüli kezdőidő"
-        time due_time "határidő a napon belül"
+        time suggested_time "opcionális ajánlott kezdőidő (csak megjelenítés)"
+        time due_time "határidő az időszak utolsó napján"
         date start_date
         date end_date "NULL = visszavonásig"
         datetime revoked_at
@@ -197,8 +198,8 @@ erDiagram
     AssignmentOccurrence {
         uuid id PK
         uuid assignment_id FK
-        datetime window_start
-        datetime due_at "egyedi: assignment + due_at"
+        datetime period_start "az alkalom időszakának kezdete"
+        datetime due_at "határidő; egyedi: assignment + due_at"
         enum status "due|fulfilled|fulfilled_late|missed"
         uuid measurement_id FK "0..1, teljesítő mérés"
         uuid questionnaire_version_id FK "0..1, rögzített verzió"
@@ -233,7 +234,7 @@ rögzített kérdőívverzióra hivatkoznak, így a régi riasztások és kitöl
 jelentése és pontszáma utólag nem változhat.
 
 **Előírás és alkalom.** Az `Assignment` az orvos által beállított, ismétlődő
-előírás (mit, milyen gyakran, milyen napon belüli időablakban és határidővel,
+előírás (mit, milyen gyakran, milyen határidővel és ajánlott kezdőidővel,
 mettől meddig). Egyes alkalmai külön `AssignmentOccurrence` sorok, amelyeket
 egy ütemezett háttérfolyamat menet közben hoz létre — nem előre, egész
 időszakra —, így az előírás módosítása vagy visszavonása nem igényli előre
@@ -241,9 +242,17 @@ legyártott sorok törlését. Minden alkalom rögzíti a saját határidejét,
 státuszát (esedékes, teljesítve, késve teljesítve, elmulasztva) és a
 teljesítő mérést vagy kitöltést; az `(assignment_id, due_at)` egyedi
 megkötés garantálja, hogy a háttérfolyamat ismételt futása sem hoz létre
-dupla alkalmat. A mérés a mérés időpontja alapján rendelődik az alkalomhoz
-(visszamenőleg legfeljebb két napra); a rögzítés tényleges idejét a
-`recorded_at` őrzi.
+dupla alkalmat. Minden alkalomhoz egy időszak tartozik (`period_start` –
+következő alkalom kezdete; napi előírásnál a naptári nap, heti vagy N napos
+előírásnál a teljes időköz), a határidő (`due_at`) az időszak utolsó napján
+van. A mérés a mérés időpontja (`measured_at`) alapján ahhoz az alkalomhoz
+rendelődik, amelynek időszakába esik. Ha a rögzítés (`recorded_at`) a
+határidő előtt történik, az alkalom teljesítve, ha utána, késve teljesítve;
+mérést legfeljebb két napra visszamenőleg lehet rögzíteni, így az elmulasztott
+alkalom az időszaka vége után két napig pótolható. Kérdőívnél nincs
+visszadátumozás: a kitöltés a legrégebbi, még pótolható alkalomhoz rendelődik.
+A `suggested_time` csak a beteg felületén megjelenő ajánlás, a hozzárendelést
+nem befolyásolja.
 
 **Riasztás és szabályverziók.** A deduplikáció a `rule_id` alapján történik
 (beteg + szabály), ezért egy szabály módosítása után ugyanaz a nyitott
@@ -261,8 +270,11 @@ a riasztás nem záródik le automatikusan, hanem `needs_review` jelölést kap,
 
 **Beteg-státusz.** A státusz (Súlyos, Figyelem, Adathiány, Kezelve, Rendben)
 számított érték, nem tárolt mező: a nyitott riasztásokból, az alkalmak
-teljesítéséből és a lezárás utáni megerősítő adatból áll elő. A számítás
-szabályait a működési szabályokat bemutató fejezet írja le példákon.
+teljesítéséből, a friss adat meglétéből és a lezárás utáni megerősítő adatból
+áll elő. Adat nélkül (pl. frissen felvett beteg) a státusz Adathiány, nem
+Rendben. Előírás nélkül a frissességi határ (alapértelmezés szerint 7 nap)
+rendszerszintű beállítás, ezért nem igényel külön mezőt. A számítás szabályait
+a működési szabályokat bemutató fejezet írja le példákon.
 
 **Pontozás iránya.** A pontozás egységes: több pont = rosszabb állapot. A
 skálás kérdésnél a kérdőív készítője kötelezően megadja, melyik vég jelenti a

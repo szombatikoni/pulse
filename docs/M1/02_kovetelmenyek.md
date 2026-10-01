@@ -29,11 +29,12 @@
 ### Orvos
 - **F9.** Az orvos priorizált beteglistát lát öt státusszal: Súlyos (súlyos
   nyitott riasztás), Figyelem (közepes nyitott riasztás), Adathiány (előírt
-  adat elmaradt), Kezelve (az orvos lezárta a riasztást, megerősítő adatra
-  vár) és Rendben (friss, rendben lévő adat). A státusz a nyitott
-  riasztásokból, az alkalmak teljesítéséből és a lezárás utáni megerősítő
-  adatból számítódik; a lezárás önmagában soha nem eredményez Rendben
-  állapotot. Minden státusz mellett egy mondatos indoklás jelenik meg.
+  adat elmaradt, vagy nincs friss adat), Kezelve (az orvos lezárta a
+  riasztást, megerősítő adatra vár) és Rendben (friss, rendben lévő adat). A
+  státusz a nyitott riasztásokból, az alkalmak teljesítéséből, a friss adat
+  meglétéből és a lezárás utáni megerősítő adatból számítódik; sem a lezárás,
+  sem az adat hiánya nem eredményez Rendben állapotot. Minden státusz mellett
+  egy mondatos indoklás jelenik meg.
 - **F10.** Az orvos beteg-részletes oldalt lát: grafikonok küszöbvonalakkal,
   mérési és kitöltési előzmények, riasztások magyarázattal, megjegyzések.
 - **F11.** Az orvos a négy szabálytípust paraméterezheti betegenként:
@@ -41,8 +42,9 @@
   (2) időablakos ismétlődés (≥N eltérés M napon belül);
   (3) kérdőív-pontszám határátlépése vagy romló trend K kitöltésen át — a
   trend csak azonos kérdőívverziójú kitöltések között számítódik;
-  (4) elmaradt adatküldés jelzése, a beállított számú elmulasztott alkalom
-  után.
+  (4) elmaradt adatküldés jelzése, a beállított számú egymást követő
+  elmulasztott alkalom után (paraméterek: előírás, elmulasztások száma,
+  súlyosság).
 - **F12.** Minden szabálymódosítás új, immutabilis szabályverziót hoz létre;
   a riasztás a keletkezéskori verzióra hivatkozik.
 - **F13.** Az orvos kérdőívsablonokat szerkeszthet: skálás (1–5, 1–10) és
@@ -52,11 +54,14 @@
   pontozást ebből számítja. Minden sablonmódosítás új, immutabilis
   kérdőívverziót hoz létre; a beteg az alkalomhoz rögzített verziót tölti ki.
 - **F14.** Az orvos követési tervet állít össze: mit, milyen gyakran, milyen
-  napon belüli időablakban és határidőre, mettől meddig (időtartam vagy
-  visszavonásig). Az előírás egyes alkalmai külön rögzülnek (határidő,
-  teljesítő mérés vagy kitöltés, státusz: esedékes → teljesítve / késve
-  teljesítve / elmulasztva). Egy ütemezett háttérfolyamat adat nélkül is
-  ellenőrzi a határidőket, és létrehozza a soron következő alkalmakat.
+  határidőre (és opcionálisan milyen ajánlott kezdőidővel), mettől meddig
+  (időtartam vagy visszavonásig). Az előírás egyes alkalmai külön rögzülnek
+  (időszak, határidő, teljesítő mérés vagy kitöltés, státusz: esedékes →
+  teljesítve / késve teljesítve / elmulasztva). A mérés a mérés időpontja
+  alapján kerül az időszakába eső alkalomhoz; a határidő előtti rögzítés
+  teljesíti, a későbbi késve teljesíti. Egy ütemezett háttérfolyamat adat
+  nélkül is ellenőrzi a határidőket, és létrehozza a soron következő
+  alkalmakat.
 - **F15.** Az orvos kezeli a riasztásokat: megtekintés, felelőshöz rendelés,
   lezárás kötelező indoklással; minden váltás eseményként rögzül
   (ki, mikor, mit).
@@ -70,7 +75,7 @@
   mérést javítanak, a riasztás nem záródik le automatikusan, hanem
   megjelölődik, és az orvos zárja le.
 - **F18.** Deduplikáció: nyitott riasztás mellett ugyanarra a beteg+szabály
-  párosra új kiváltó adat nem új riasztást, hanem "ismételt aktiválódás"
+  párosra új kiváltó adat nem új riasztást, hanem „ismételt aktiválódás”
   eseményt hoz létre (a súlyosság emelkedhet).
 - **F19.** A riasztás létrejötte adatbázis-tranzakcióban történik; az
   e-mail-küldés ettől elkülönítve, újrapróbálkozással fut, kézbesítése külön
@@ -105,4 +110,4 @@
 - **NF7. Nemzetköziesítés:** a felület i18next-alapú, magyar és angol nyelven.
 - **NF8. Korlátok (disclaimer):** a rendszer demonstrációs célú, kizárólag
   mesterséges adatokkal működik; nem orvostechnikai eszköz, nem helyettesít
-  orvosi döntést.
+  orvosi döntést vagy sürgősségi ellátást.

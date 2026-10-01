@@ -232,3 +232,7 @@ dist/
 *.bkp
 *.dtmp
 docs/files/
+
+# Az M1 PDF köztes fájljai (a docs/M1/tools szkriptjei állítják elő)
+docs/M1/PULSE_M1.html
+docs/M1/PULSE_M1.docx

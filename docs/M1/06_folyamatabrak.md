@@ -9,9 +9,9 @@ szabályokat példákon a `07_mukodesi_szabalyok.md` mutatja be.
 Minden átmenet `AlertEvent`-ként rögzül (ki, mikor, mit, melyik
 szabályverzió, milyen kiváltó adat); a lezárás indoklása kötelező. A nyitott
 riasztás melletti új kiváltó adat nem új riasztás, hanem „ismételt
-aktiválódás" esemény. A szabály módosítása és a kiváltó adat javítása szintén
+aktiválódás” esemény. A szabály módosítása és a kiváltó adat javítása szintén
 eseményként rögzül, állapotváltás nélkül; javítás után a riasztás
-„kiváltó adat javítva" jelölést kap, és csak az orvos zárhatja le.
+„kiváltó adat javítva” jelölést kap, és csak az orvos zárhatja le.
 
 ```mermaid
 stateDiagram-v2
@@ -31,23 +31,31 @@ stateDiagram-v2
 
 Az alkalmakat az ütemezett háttérfolyamat hozza létre az előírás szerint, és
 ugyanez a folyamat jelöli elmulasztottnak a lejárt, teljesítetlen alkalmakat
-— akkor is, ha semmilyen adat nem érkezik.
+— akkor is, ha semmilyen adat nem érkezik. Mérés rögzítésekor a rendszer
+előbb ugyanezt az ellenőrzést futtatja, így a határidő után rögzített mérés
+mindig már elmulasztott alkalomhoz kerül, és azt késve teljesíti.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Esedékes : a háttérfolyamat létrehozza<br/>(az előírás szerint)
-    Esedékes --> Teljesítve : mérés / kitöltés a határidőig
-    Esedékes --> Elmulasztva : a határidő adat nélkül lejár<br/>(ellenőrzés 15 percenként)
-    Elmulasztva --> KésveTeljesítve : pótlás legfeljebb 2 napon belül<br/>(a mérés időpontja szerint)
+    Esedékes --> Teljesítve : rögzítés a határidőig
+    Esedékes --> Elmulasztva : a határidő rögzítés nélkül lejár<br/>(ellenőrzés 15 percenként)
+    Elmulasztva --> KésveTeljesítve : pótlás: az időszakba eső mérés,<br/>legfeljebb 2 napra visszamenőleg
     Teljesítve --> [*]
     KésveTeljesítve --> [*]
-    Elmulasztva --> [*] : 2 nap után végleges
+    Elmulasztva --> [*] : az időszak vége után<br/>2 nappal végleges
 ```
 
 Az elmulasztás a beteg státuszát Adathiányra állítja; az „elmaradt
-adatküldés" szabály a beállított számú elmulasztás után riasztást nyit.
+adatküldés” szabály a beállított számú elmulasztás után riasztást nyit.
 
 ## A beteg-státusz előállítása
+
+Friss adat: ahol már lejárt alkalom van, a frissességet az alkalmak
+teljesítése adja (ezt a „Legutóbbi alkalom elmaradt?” pont vizsgálja). Előírás
+nélkül, illetve az első határidő előtt a legutóbbi mérés vagy kitöltés
+legfeljebb 7 napos (rendszerszintű beállítás). Adat nélküli, frissen felvett
+beteg így Adathiány.
 
 ```mermaid
 flowchart TD
@@ -56,7 +64,9 @@ flowchart TD
     B -- igen --> F[Figyelem]
     B -- nem --> C{Legutóbbi alkalom<br/>elmaradt, pótlás nélkül?}
     C -- igen --> D[Adathiány]
-    C -- nem --> E{Lezárt riasztás óta<br/>jött rendben lévő adat?}
+    C -- nem --> G{Van friss adat?}
+    G -- nem --> D
+    G -- igen --> E{Lezárt riasztás óta<br/>jött rendben lévő adat?}
     E -- nem --> K[Kezelve]
     E -- igen / nem volt lezárás --> R[Rendben]
 ```

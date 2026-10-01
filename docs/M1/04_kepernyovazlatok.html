@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="hu">
 <head>
 <meta charset="utf-8">
@@ -115,9 +115,9 @@ példa.</p>
         <h3>Teendőim</h3>
         <table>
           <tr><th>Teendő</th><th>Előírás</th><th>Határidő</th><th>Állapot</th><th></th></tr>
-          <tr><td>Vérnyomásmérés</td><td class="dim">naponta 06:00–10:00</td><td><b>ma 10:00</b></td><td>esedékes</td><td><span class="btn primary">Rögzítés</span></td></tr>
-          <tr><td>Vérnyomásmérés (tegnapi)</td><td class="dim">naponta 06:00–10:00</td><td class="dim">szept. 19.</td><td class="dim">elmaradt · még pótolható</td><td><span class="btn">Pótlás</span></td></tr>
-          <tr><td>„Közérzet" kérdőív</td><td class="dim">hetente</td><td>szept. 22.</td><td>esedékes</td><td><span class="btn">Kitöltés</span></td></tr>
+          <tr><td>Vérnyomásmérés</td><td class="dim" style="white-space:nowrap">naponta · 06:00-tól</td><td><b>ma 10:00</b></td><td>esedékes</td><td><span class="btn primary">Rögzítés</span></td></tr>
+          <tr><td>Vérnyomásmérés (tegnapi)</td><td class="dim" style="white-space:nowrap">naponta · 06:00-tól</td><td class="dim">szept. 19.</td><td class="dim">elmaradt · még pótolható</td><td><span class="btn">Pótlás</span></td></tr>
+          <tr><td>„Közérzet” kérdőív</td><td class="dim">hetente</td><td>szept. 22.</td><td>esedékes</td><td><span class="btn">Kitöltés</span></td></tr>
           <tr><td>Testsúlymérés</td><td class="dim">hetente</td><td class="dim">szept. 17.</td><td class="dim">teljesítve</td><td></td></tr>
         </table>
       </div>
@@ -205,7 +205,7 @@ példa.</p>
   <div class="body">
     <div class="main">
       <div class="card">
-        <h3>„Közérzet" kérdőív <span class="tag">v3</span> <span class="tag">határidő: szept. 22.</span> <span class="tag">3 kérdés</span></h3>
+        <h3>„Közérzet” kérdőív <span class="tag">v3</span> <span class="tag">határidő: szept. 22.</span> <span class="tag">3 kérdés</span></h3>
         <label>1. Hogyan aludt az elmúlt héten?</label>
         <p class="radio" style="margin:4px 0"><span>1</span><span>2</span><span>3</span><span class="sel">4</span><span>5</span></p>
         <div class="scale-ends"><span>1 = nagyon rosszul</span><span>5 = nagyon jól</span></div>
@@ -232,7 +232,7 @@ példa.</p>
     <div class="main">
       <div class="kpi">
         <div class="card"><span class="s" data-s="piros" data-i></span><div><div class="num" style="color:var(--piros)">1</div><div class="lbl">Súlyos</div></div></div>
-        <div class="card"><span class="s" data-s="sarga" data-i></span><div><div class="num" style="color:var(--sarga)">1</div><div class="lbl">Figyelem</div></div></div>
+        <div class="card"><span class="s" data-s="sarga" data-i></span><div><div class="num" style="color:var(--sarga)">2</div><div class="lbl">Figyelem</div></div></div>
         <div class="card"><span class="s" data-s="szurke" data-i></span><div><div class="num" style="color:var(--szurke)">1</div><div class="lbl">Adathiány</div></div></div>
         <div class="card"><span class="s" data-s="kek" data-i></span><div><div class="num" style="color:var(--kek)">1</div><div class="lbl">Kezelve</div></div></div>
         <div class="card"><span class="s" data-s="zold" data-i></span><div><div class="num dim">8</div><div class="lbl">Rendben</div></div></div>
@@ -244,11 +244,14 @@ példa.</p>
             <td>Szisztolés &gt; 135 Hgmm 3× 7 napon belül (v3)</td><td class="dim">ma 07:41</td>
             <td><svg viewBox="0 0 90 22" width="90"><polyline points="2,16 15,14 28,15 41,12 54,10 67,8 80,5" fill="none" stroke="#F0595E" stroke-width="1.5"/></svg></td></tr>
           <tr class="stripe-sarga"><td><span class="s loud" data-s="sarga"></span></td><td><b>Tóth Gábor</b><div class="dim small">1954</div></td>
-            <td>„Közérzet" kérdőív: 12 pont (határ: 11)<div class="dim small" style="margin-top:3px"><span class="s quiet" data-s="szurke" data-t="Tegnapi vérnyomásmérés is elmaradt"></span></div></td><td class="dim">tegnap</td>
+            <td>„Közérzet” kérdőív: 12 pont (határ: 11)<div class="dim small" style="margin-top:3px"><span class="s quiet" data-s="szurke" data-t="Tegnapi vérnyomásmérés is elmaradt"></span></div></td><td class="dim">tegnap</td>
             <td><svg viewBox="0 0 90 22" width="90"><polyline points="2,12 15,13 28,11 41,14 54,12 67,13 80,11" fill="none" stroke="#E3B341" stroke-width="1.5"/></svg></td></tr>
-          <tr><td><span class="s" data-s="szurke"></span></td><td><b>Kis Márta</b><div class="dim small">1949</div></td>
-            <td>Napi vérnyomásmérés 9 napja elmaradt</td><td class="dim">9 napja</td>
+          <tr class="stripe-sarga"><td><span class="s loud" data-s="sarga"></span></td><td><b>Kis Márta</b><div class="dim small">1949</div></td>
+            <td>Elmaradt adatküldés: a napi vérnyomásmérés 9 napja elmaradt</td><td class="dim">9 napja</td>
             <td><svg viewBox="0 0 90 22" width="90"><polyline points="2,12 15,11 28,12" fill="none" stroke="#8B949E" stroke-width="1.5"/><text x="36" y="15" font-size="8" fill="#7d848f">nincs adat</text></svg></td></tr>
+          <tr><td><span class="s" data-s="szurke"></span></td><td><b>Horváth Zsolt</b><div class="dim small">1961</div></td>
+            <td>A mai vérnyomásmérés elmaradt (még pótolható)</td><td class="dim">tegnap</td>
+            <td><svg viewBox="0 0 90 22" width="90"><polyline points="2,11 15,12 28,10 41,11 54,12 67,11" fill="none" stroke="#8B949E" stroke-width="1.5"/></svg></td></tr>
           <tr><td><span class="s" data-s="kek"></span></td><td><b>Nagy Béla</b><div class="dim small">1958</div></td>
             <td title="Indoklás: „Telefonon egyeztettem, gyógyszer módosítva.”">Dr. Szabó lezárta · szept. 19. — megerősítő mérés még nem érkezett</td><td class="dim">szept. 18.</td>
             <td><svg viewBox="0 0 90 22" width="90"><polyline points="2,8 15,9 28,7 41,10 54,11" fill="none" stroke="#58A6FF" stroke-width="1.5"/></svg></td></tr>
@@ -260,7 +263,7 @@ példa.</p>
       <div class="legend">
         <span><span class="s" data-s="piros" data-t=""></span> <b>Súlyos</b> — súlyos nyitott riasztás</span>
         <span><span class="s" data-s="sarga" data-t=""></span> <b>Figyelem</b> — közepes nyitott riasztás</span>
-        <span><span class="s" data-s="szurke" data-t=""></span> <b>Adathiány</b> — előírt adat elmaradt</span>
+        <span><span class="s" data-s="szurke" data-t=""></span> <b>Adathiány</b> — előírt adat elmaradt, vagy nincs friss adat</span>
         <span><span class="s" data-s="kek" data-t=""></span> <b>Kezelve</b> — lezárva, megerősítő adatra vár</span>
         <span><span class="s" data-s="zold" data-t=""></span> <b>Rendben</b> — friss, rendben lévő adat</span>
         <span><i style="display:inline-block;width:3px;height:12px;background:var(--piros)"></i><i style="display:inline-block;width:3px;height:12px;background:var(--sarga);margin:0 5px 0 2px"></i><b>Színcsík</b> — orvosi döntést igénylő nyitott riasztás</span>
@@ -296,7 +299,7 @@ példa.</p>
       </div>
       <div class="row">
         <div class="card">
-          <h3>„Közérzet" pontszámok — alkalmanként</h3>
+          <h3>„Közérzet” pontszámok — alkalmanként</h3>
           <svg viewBox="0 0 340 125" width="100%">
             <line x1="20" y1="44" x2="330" y2="44" stroke="#E3B341" stroke-opacity=".7" stroke-dasharray="4 4"/>
             <text x="24" y="39" font-size="9" fill="#E3B341">figyelmeztető: 6 pont</text>
@@ -315,9 +318,9 @@ példa.</p>
           <h3>Követési terv</h3>
           <table>
             <tr><th>Előírás</th><th>Utolsó 7 alkalom</th></tr>
-            <tr><td>Vérnyomásmérés<div class="dim small">naponta 06–10 · szept. 10–30.</div></td>
+            <tr><td>Vérnyomásmérés<div class="dim small">naponta, 10:00-ig · szept. 10–30.</div></td>
               <td><span class="occ"><i style="background:var(--zold)"></i><i style="background:var(--zold)"></i><i style="background:var(--kek)"></i><i style="background:var(--zold)"></i><i style="border:1px dashed var(--szurke)"></i><i style="background:var(--zold)"></i><i style="border:1px solid var(--line);background:#13151a"></i></span></td></tr>
-            <tr><td>„Közérzet" kérdőív<div class="dim small">hetente · visszavonásig</div></td>
+            <tr><td>„Közérzet” kérdőív<div class="dim small">hetente · visszavonásig</div></td>
               <td><span class="occ"><i style="background:var(--zold)"></i><i style="background:var(--zold)"></i><i style="background:var(--zold)"></i><i style="border:1px solid var(--line);background:#13151a"></i></span></td></tr>
           </table>
           <div class="legend" style="margin-top:8px"><span><span style="color:var(--zold)">■</span> teljesítve</span><span><span style="color:var(--kek)">■</span> késve teljesítve</span><span><span style="color:var(--szurke)">▢</span> elmulasztva</span><span>▢ esedékes</span></div>
@@ -335,7 +338,7 @@ példa.</p>
       </div>
       <div class="card">
         <h3>Megjegyzések</h3>
-        <p class="note">szept. 10. — Dr. Szabó: „Gyógyszermódosítás után kontrollmérés sűrítve."</p>
+        <p class="note">szept. 10. — Dr. Szabó: „Gyógyszermódosítás után kontrollmérés sűrítve.”</p>
         <p><span class="btn ghost">+ Megjegyzés</span></p>
       </div>
     </div>
@@ -384,11 +387,11 @@ példa.</p>
 <section id="s7">
 <h2>7. Orvos — kérdőív-szerkesztő</h2>
 <div class="frame">
-  <div class="chrome">pulse.demo — orvosi nézet / kérdőívsablonok / „Közérzet"</div>
+  <div class="chrome">pulse.demo — orvosi nézet / kérdőívsablonok / „Közérzet”</div>
   <div class="body">
     <div class="main">
       <div class="card">
-        <h3>„Közérzet" sablon <span class="tag">közzétett: v3</span> <span class="tag">szerkesztés alatt: v4 piszkozat</span></h3>
+        <h3>„Közérzet” sablon <span class="tag">közzétett: v3</span> <span class="tag">szerkesztés alatt: v4 piszkozat</span></h3>
         <p class="note" style="margin-top:0">Pontozás: <b style="color:var(--ink)">több pont = rosszabb állapot.</b> A legjobb válasz mindig 0 pont.</p>
         <table>
           <tr><th>#</th><th>Kérdés</th><th>Típus</th><th>Pontozás</th><th></th></tr>
@@ -429,7 +432,7 @@ példa.</p>
           <tr><th>Súlyosság</th><th>Beteg</th><th>Szabály (verzió)</th><th>Állapot</th><th>Keletkezett</th><th></th></tr>
           <tr class="stripe-piros"><td><span class="s loud" data-s="piros"></span></td><td>Kovács Anna</td><td>Időablakos ismétlődés (v2 → v3)</td><td class="dim">megtekintett · 1× ismételt aktiválódás</td><td>szept. 16.</td><td><span class="btn">Megnyitás</span></td></tr>
           <tr class="stripe-sarga"><td><span class="s loud" data-s="sarga"></span></td><td>Tóth Gábor</td><td>Kérdőív-pontszám (v1)</td><td class="dim">keletkezett</td><td>szept. 19.</td><td><span class="btn">Megnyitás</span></td></tr>
-          <tr><td><span class="s" data-s="szurke"></span></td><td>Kis Márta</td><td>Elmaradt adatküldés (v1)</td><td class="dim">felelőshöz rendelt: Dr. Szabó</td><td>szept. 13.</td><td><span class="btn">Megnyitás</span></td></tr>
+          <tr class="stripe-sarga"><td><span class="s loud" data-s="sarga"></span></td><td>Kis Márta</td><td>Elmaradt adatküldés (v1)</td><td class="dim">felelőshöz rendelt: Dr. Szabó</td><td>szept. 13.</td><td><span class="btn">Megnyitás</span></td></tr>
         </table>
       </div>
       <div class="card">
@@ -443,7 +446,7 @@ példa.</p>
         </ul>
         <p class="note">Minden esemény rögzíti, ki, mikor, mit tett, melyik szabályverzió alapján
         és milyen kiváltó adattal. Nyitott riasztás mellett ugyanarra a beteg + szabály párosra
-        nem keletkezik új riasztás. Ha egy kiváltó mérést javítanak, „kiváltó adat javítva"
+        nem keletkezik új riasztás. Ha egy kiváltó mérést javítanak, „kiváltó adat javítva”
         esemény jön létre, és a riasztást az orvos zárja le.</p>
       </div>
     </div>
@@ -466,7 +469,7 @@ példa.</p>
           <tr><th>Név</th><th>E-mail</th><th>Szerepkör</th><th>Állapot</th><th></th></tr>
           <tr><td>Dr. Szabó Péter</td><td>szabo.peter@pelda.hu</td><td>orvos</td><td class="dim">aktív</td><td><span class="btn">Szerkesztés</span></td></tr>
           <tr><td>Kovács Anna</td><td>anna.kovacs@pelda.hu</td><td>beteg</td><td class="dim">aktív</td><td><span class="btn">Szerkesztés</span></td></tr>
-          <tr><td>Kis Márta</td><td>kis.marta@pelda.hu</td><td>beteg</td><td class="dim">letiltva</td><td><span class="btn">Szerkesztés</span></td></tr>
+          <tr><td>Balogh Ervin</td><td>balogh.ervin@pelda.hu</td><td>beteg</td><td class="dim">letiltva</td><td><span class="btn">Szerkesztés</span></td></tr>
         </table>
         <p><span class="btn primary">+ Új felhasználó</span> <span class="tag">szerepkör választással: beteg / orvos / admin</span></p>
         <p class="note">Letiltásnál a fiók nem törlődik (a mérések, riasztások, kitöltések
