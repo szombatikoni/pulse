@@ -1,0 +1,4 @@
+/* Táblázatos számjegyek: a mérési értékek oszlopban egymás alá esnek. */
+body {
+  font-variant-numeric: tabular-nums;
+}
