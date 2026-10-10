@@ -8,6 +8,100 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-10-10 — A projektváz első indítása Dockerben
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a Docker Desktop indítási hibájának kivizsgálása és a
+  telepítési lépések leírása; a három konténer első felépítése és indítása;
+  a működés ellenőrzése és a backend-teszt futtatása; a védési jegyzet
+  bővítése.
+
+- Saját lépéseim és döntéseim: a két lehetséges futtatókörnyezet (WSL2,
+  Hyper-V) közül a WSL2 mellett döntöttem; rendszergazdaként telepítettem,
+  majd elindítottam a Docker Desktopot.
+
+- Visszakérdezéseim:
+  - miért kell a Dockernek a WSL — ennek nyomán a konténerek működésének
+    alapja (Linux-kernelfunkciók) bekerült a jegyzetembe;
+  - nem futhatna-e a Docker a gépen elérhető Hyper-V-vel — az ellenőrzés
+    szerint a Hyper-V funkció nem volt bekapcsolva (a futó hipervizor a
+    Windows memóriaintegritás-védelméhez tartozik), így mindkét út
+    telepítést igényelt volna;
+  - eltávolítható-e a WSL utólag — igen, a lépéseket rögzítettük.
+
+- Ellenőrzés: mindhárom konténer fut; az állapot-ellenőrző végpont
+  közvetlenül és a webszerveren keresztül is válaszol; a frontend aloldala
+  közvetlen megnyitáskor sem ad hibát; a teszt-adatbázis létrejött; a
+  backend-teszt sikeres (lefedettség 88%). A tesztfuttatás elavulási
+  figyelmeztetést adott (httpx); a javasolt utódcsomagot (httpx2) a PyPI-on
+  ellenőriztük, a cseréről még döntök.
+
+## 2026-10-05 — Védési jegyzet; források ellenőrzése
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a projektváz teljes leírása egy saját, a repóba nem kerülő
+  jegyzetben (használt szoftverek verzióval és indoklással, mappastruktúra,
+  fájlonkénti és függvényenkénti magyarázat, Docker-fogalmak, parancsok,
+  döntések, valószínű védési kérdések); a témavezető október 5-i levelében
+  hivatkozott források (NICE NG136 1.2.7, cql-execution, cql-exec-fhir)
+  felkeresése és összefoglalása.
+
+- Saját döntéseim: a védésre készüléshez kértem a jegyzetet, amely minden
+  kódlépés után bővül; külön jelölés mutatja benne, mit hagytam jóvá, és mit
+  választott az AI (ezeket még átnézem).
+
+- Ellenőrzés: a jegyzetbe a csomagok ténylegesen telepített verziói kerültek
+  a zárolt fájlokból, nem a megadott minimumverziók. A NICE-ajánlás szövegét
+  és a CQL-végrehajtó jellemzőit (Node.js-könyvtár, előre lefordított ELM-et
+  futtat, a nyelv nem minden elemét támogatja) az elsődleges forrásokból
+  ellenőriztük.
+
+## 2026-10-01 — Az M2 projektvázának megtervezése és elkészítése
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a tervezett mappastruktúra bemutatása; a nyitott technikai
+  kérdések összegyűjtése alternatívákkal és javaslattal; a számomra új
+  eszközök (uv, Docker, háttérfolyamat, fejlesztői levelezőszerver)
+  elmagyarázása; a jóváhagyott döntések alapján a projektváz elkészítése:
+  FastAPI-backend állapot-ellenőrző végponttal, adatbázis-kapcsolattal,
+  migrációs keretrendszerrel és első teszttel; React-frontend Mantine-témával
+  (a státuszterv színeiből), lekérdezés- és fordításkezeléssel; Docker-fájlok,
+  webszerver-beállítás és docker-compose.
+
+- Saját döntéseim:
+  - Python-csomagkezelés: uv a pip helyett, zárolt verziókkal (a különbség
+    tisztázása után);
+  - szinkron adatbázis-elérés;
+  - hitelesítés: JWT a kérés fejlécében; a választást a dolgozat biztonsági
+    részében indoklom;
+  - a docker compose a lefordított frontendet indítja webszerverrel,
+    fejlesztéskor a fejlesztői szervert használom;
+  - a háttérfolyamat és a levelezőszerver a követési tervekkel együtt
+    (8. hét) kerül a rendszerbe;
+  - felületi könyvtár: Mantine;
+  - a kisebb alapértelmezéseket (útvonalkezelő, kódellenőrzők, valódi
+    PostgreSQL a tesztekhez, migráció induláskor, image-verziók) egyben
+    hagytam jóvá;
+  - munkamódszer: a vázat az AI egy menetben készítette el; ezután úgy
+    döntöttem, hogy a kódot lépésenként nézem át — minden lépés után
+    megállunk, és a következő csak az átnézés után kezdődik.
+
+- Visszakérdezéseim: mi a különbség az uv és a pip között; mit jelent a
+  háttérfolyamat és a fejlesztői levelezőszerver; mi a különbség a
+  Dockerben futó „kész" és a fejlesztői frontend között.
+
+- Ellenőrzés: a kódellenőrzők (ruff, ESLint) és a frontend-build hiba nélkül
+  futottak. Az AI által választott további részleteket (image-változatok,
+  portok, szigorú típusellenőrzés, kódstílus) külön listán kaptam meg
+  átnézésre. A telepített felületi könyvtár újabb főverzió volt (Mantine 9),
+  mint amit az AI biztosan ismert, ezért a témát a csomag saját
+  típusdefiníciói és forrása alapján írtuk meg. Az AI jelezte, hogy a
+  .gitignore egyik mintája (lib/) a frontend egy későbbi mappáját is
+  kizárná; a szűkítést jóváhagytam.
+
 ## 2026-10-01 — A szakdolgozat vázának előkészítése
 
 - Eszköz: Claude Code
