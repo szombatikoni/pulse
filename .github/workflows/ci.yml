@@ -1,0 +1,86 @@
+# Folyamatos integráció (CI) a GitHub saját gépein. Ha bármelyik lépés hibát
+# ad, a commit vagy a pull request mellett piros X jelenik meg.
+#
+# Ágmodell: a napi munka a develop ágon folyik, a main csak pull requesttel
+# kap változást (mérföldkövenként, tagekkel: m2, m3, ...).
+#   - push a developra: azonnali visszajelzés munka közben;
+#   - pull request a mainre: piros CI mellett nem szabad összefésülni
+#     (ezt a GitHub ágvédelmi beállítása kényszeríti ki);
+#   - push a mainre (a merge után): a zöld pipa a stabil állapotot igazolja.
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (ruff, migrációk, pytest)
+    runs-on: ubuntu-latest
+    # A tesztekhez valódi PostgreSQL kell (ugyanaz a verzió, mint a compose-ban).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: pulse
+          POSTGRES_PASSWORD: pulse
+          POSTGRES_DB: pulse_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pulse -d pulse_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+psycopg://pulse:pulse@localhost:5432/pulse_test
+      TEST_DATABASE_URL: postgresql+psycopg://pulse:pulse@localhost:5432/pulse_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Függőségek a uv.lock szerint
+        run: uv sync --locked
+      - name: Kódellenőrzés (ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: A migrációk lefutnak, és egyeznek a modellekkel
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+      - name: Tesztek, legalább 70% lefedettséggel
+        run: uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+
+  frontend:
+    name: Frontend (lint, formázás, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - name: Típusellenőrzés és build
+        run: npm run build
+
+  docker:
+    name: Docker-image-ek építése
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose build
