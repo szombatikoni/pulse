@@ -3,7 +3,7 @@ import os
 # A tesztek külön adatbázison futnak (pulse_test), hogy ne írják felül a
 # fejlesztői adatokat. A beállítást az alkalmazás importálása előtt kell megadni.
 os.environ["DATABASE_URL"] = os.environ.get(
-    "TEST_DATABASE_URL", "postgresql+psycopg://pulse:pulse@localhost:5432/pulse_test"
+    "TEST_DATABASE_URL", "postgresql+psycopg://pulse:pulse@127.0.0.1:5432/pulse_test"
 )
 
 from collections.abc import Iterator  # noqa: E402

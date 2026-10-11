@@ -37,8 +37,8 @@ jobs:
       run:
         working-directory: backend
     env:
-      DATABASE_URL: postgresql+psycopg://pulse:pulse@localhost:5432/pulse_test
-      TEST_DATABASE_URL: postgresql+psycopg://pulse:pulse@localhost:5432/pulse_test
+      DATABASE_URL: postgresql+psycopg://pulse:pulse@127.0.0.1:5432/pulse_test
+      TEST_DATABASE_URL: postgresql+psycopg://pulse:pulse@127.0.0.1:5432/pulse_test
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10

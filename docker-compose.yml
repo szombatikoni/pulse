@@ -16,9 +16,9 @@ services:
       # Az első indításkor létrehozza a teszt-adatbázist (pulse_test).
       - ./backend/docker/initdb:/docker-entrypoint-initdb.d:ro
     ports:
-      # Kifelé is elérhető, hogy a helyben futó tesztek és az `npm run dev`
-      # mellett futó backend is használhassa.
-      - "5432:5432"
+      # Csak a saját gépről érhető el (127.0.0.1), hogy a helyben futó tesztek
+      # és az `npm run dev` melletti backend használhassa; a hálózat más gépei nem.
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pulse} -d ${POSTGRES_DB:-pulse}"]
       interval: 5s
@@ -37,14 +37,14 @@ services:
         # Csak akkor indul, ha az adatbázis már fogad kapcsolatot.
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
   frontend:
     build: ./frontend
     depends_on:
       - api
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
 
 volumes:
   pgdata:
