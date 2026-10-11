@@ -8,6 +8,131 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-10-11 — Független átnézés, javítások, indítási leírás
+
+- Eszköz: Claude Code; a napi munka független átnézéséhez egy további agent
+  (Fable)
+
+- Az AI szerepe: az előző napi munka független átnézése; a leletek javítása;
+  a README Docker-alapú indítási leírása; a méréstípusok
+  nemzetközi kódjainak összegyűjtése ellenőrzésre.
+
+- Saját döntéseim:
+  - az egész napi munkát független agenttel nézettem át, mielőtt továbbmentünk;
+  - a leletek közül jóváhagytam: a portok csak a saját gépről legyenek
+    elérhetők; a demóadatok kapjanak tesztet; a dokumentáció elavult részei
+    frissüljenek.
+
+- Visszakérdezéseim, amelyek nyomán a terv pontosodott:
+  - honnan származnak a méréstípusok kódjai: ennek nyomán a hat LOINC-kódot
+    (név és státusz) magam ellenőriztem a loinc.org-on.
+
+- Ellenőrzés és javítások:
+  - átnézés közben egy hibát találtunk: ha a szerver nem a lejárt munkamenet
+    jelzésével, hanem más hibával válaszolt, a felület végtelen átirányításba
+    került. Javítva, és mesterséges szerverhibával ellenőrizve;
+  - a portok a gép minden hálózati felületén elérhetők voltak; a szűkítés
+    után a tesztek lelassultak, mert a helyi név előbb IPv6-on próbálkozott.
+    Mérés alapján javítva, a futásidő visszaállt;
+  - a demóadatok tesztet kaptak (ismételt futtatás, belépés, hozzáférés);
+  - a README lépéseit egy üres Docker-környezetben végigpróbáltuk.
+
+## 2026-10-10 — Bejelentkezés, jogosultság, független tesztelés, CI
+
+- Eszköz: Claude Code; a független tesztíráshoz két további, eltérő modellű
+  agent (Fable, Sonnet)
+
+- Az AI szerepe: a bejelentkezés és a jogosultság backendjének elkészítése
+  (felhasználó, beteg- és orvosprofil, orvos–beteg összerendelés, három
+  migráció, jelszóhash, token, szerepkör- és hozzáférés-ellenőrzés,
+  demóadatok, tesztek); a belépőoldal és a szerepkör szerinti oldalak a
+  felületen, böngészőben végigpróbálva; a CI-konfiguráció; a független
+  tesztírók leleteinek összevetése és a javítások; a kód magyarázata a közös
+  átnézéshez.
+
+- Saját döntéseim:
+  - jelszóhash: Argon2; a token 60 percig érvényes, a megújítás az M3-ban jön;
+  - az M2-ben e-mail + jelszó; a saját JSON-alapú belépés az OAuth2-űrlap
+    helyett (az OAuth2 „password" módját a mai biztonsági ajánlás nem engedi);
+  - aktív fiók = csak kézi letiltás, törlés helyett; a beteg inaktivitása
+    orvosi jelzés, nem letiltási ok;
+  - utolsó belépés idejének tárolása; a jelszó létrehozáskor 10–255 karakter;
+  - a token a böngésző munkamenet-tárolójában; lejáratkor visszairányítás a
+    belépőoldalra;
+  - CI már az M2-ben; develop + main ágmodell, a main pull requesttel kap
+    változást; a commitok logikai egységekre bontva.
+
+- Saját felvetéseim:
+  - a kódot író agent ne egyedül tesztelje a saját kódját: két független
+    agent is írjon és futtasson teszteket a követelményekből, és ezeket
+    közösen nézzük át;
+  - a develop–main ágmodell bevezetése (a CI ehhez igazodik);
+  - továbbfejlesztési jelöltként: kétlépcsős azonosítás „megbízható
+    eszközzel", illetve jelszó nélküli belépés.
+
+- Visszakérdezéseim, amelyek nyomán a terv pontosodott:
+  - érdemes-e jelszó helyett e-mailes megerősítő kóddal belépni: az
+    összevetés (NIST SP 800-63B) után maradt a jelszó;
+  - elegendő-e az adatbázis tartalma: bekerült az utolsó belépés ideje, a
+    belépési próbálkozások korlátozása nyitott pontként szerepel;
+  - mit jelentsen az „aktív fiók" (kézi letiltás vagy inaktivitás): a beteg
+    inaktivitása orvosi jelzés, nem letiltási ok;
+  - miért nem fér hozzá az admin a betegadatokhoz: az indoklás
+    (adattakarékosság, az egészségügyi adat különleges kategória) bekerült a
+    dokumentációba.
+
+- Ellenőrzés és javítások:
+  - az első migráció generált változatában a szerepkör-ellenőrzés háromszor
+    szerepelt, kettő azonos néven: kézzel javítva; a migrációk oda-vissza
+    lefuttatva, a modell és az adatbázis egyezése ellenőrizve;
+  - a jelszóhash paramétereit a telepített csomag forrásában, a belépési mód
+    és a második tényező korlátait elsődleges forrásból (RFC 9700, NIST SP
+    800-63B) ellenőriztük;
+  - az egyik független tesztíró (Fable) első körben négy specifikációs hézagot
+    talált (az e-mail kisbetűssége és az összerendelések átfedése csak a kódban
+    volt biztosítva; a jelszóhossz a létrehozásnál és a belépésnél eltért);
+    ezeket adatbázis- és szolgáltatás-szintű szabállyal javítottuk. A végén 287
+    teszt fut, az alkalmazáskód 100%-os lefedettségével;
+  - a webszerver a backend újraépítése után a régi címre továbbított (502):
+    javítva, és újraépítéssel ellenőrizve.
+
+## 2026-10-10 — Az integrációs irány: kutatás és a NICE-ajánlás
+
+- Eszköz: Claude Code; a kutatás két független, eltérő modellű agenttel
+  (Fable, Opus), az összevetés a fő munkamenetben
+
+- Az AI szerepe: a témavezető javaslatának (NICE NG136, HL7 FHIR R4, LOINC,
+  UCUM, CQL-eszközlánc) tényfeltárása elsődleges forrásokból; a két jelentés
+  összevetése; a megvalósítási lehetőségek és kockázatok összefoglalása;
+  válaszlevél-tervezet.
+
+- Saját döntéseim:
+  - az integrációs irányt vállalom: az M2-be a mesterséges beteg FHIR-csomagja,
+    a CQL-szabály és a kézi számítás kerül, a motor futtatása október 25-ig;
+  - a NICE-ajánlást magam olvastam el böngészőben; a dolgozatba rövid angol
+    idézet és saját magyar összefoglaló kerül, a repóba csak hivatkozás.
+
+- Visszakérdezéseim, amelyek nyomán a terv pontosodott:
+  - mikor érdemes az integrációval foglalkozni az M2 ütemezéséhez képest:
+    két független kutatás indult, és ez alapján döntöttem a szűkített M2-próba
+    mellett;
+  - a szakdolgozat a NICE feltételei szerint „personal research and study"
+    felhasználásnak számít-e: ennek nyomán rögzítettük az idézés módját.
+
+- Ellenőrzés:
+  - a két jelentés egyező és eltérő állításait összevetettük (pl. a
+    ráfordítás-becslés és a javasolt fordítóverzió eltért);
+  - a NICE 1.2.7, 1.2.8, 1.4.15 és 1.4.22 szövegét böngészőben ellenőriztem,
+    egyezett a kutatással; az 1.4.22 utolsó mondatát (gyenge, illetve több
+    betegséggel élő betegeknél orvosi mérlegelés) én találtam meg; a
+    frissítés dátuma 2026. február 26.;
+  - a kutatás kézi példaszámítását újraszámoltuk; az idézési jog (Szjt. 34. §
+    (1)) és a módszerek védelmének hiánya (Szjt. 1. § (6)) szövegét a Nemzeti
+    Jogszabálytárban ellenőriztük;
+  - átláthatóság: a kutató agentek a NICE-oldalt automatikusan is lekérték;
+    mivel a NICE feltételei ezt nem engedik, a dolgozatba csak az általam
+    böngészőben ellenőrzött szöveg kerül.
+
 ## 2026-10-10 — A projektváz első indítása Dockerben
 
 - Eszköz: Claude Code
@@ -21,21 +146,12 @@ A hibák szűrése kétirányú — több esetben én azonosítottam az AI téve
   Hyper-V) közül a WSL2 mellett döntöttem; rendszergazdaként telepítettem,
   majd elindítottam a Docker Desktopot.
 
-- Visszakérdezéseim:
-  - miért kell a Dockernek a WSL — ennek nyomán a konténerek működésének
-    alapja (Linux-kernelfunkciók) bekerült a jegyzetembe;
-  - nem futhatna-e a Docker a gépen elérhető Hyper-V-vel — az ellenőrzés
-    szerint a Hyper-V funkció nem volt bekapcsolva (a futó hipervizor a
-    Windows memóriaintegritás-védelméhez tartozik), így mindkét út
-    telepítést igényelt volna;
-  - eltávolítható-e a WSL utólag — igen, a lépéseket rögzítettük.
-
 - Ellenőrzés: mindhárom konténer fut; az állapot-ellenőrző végpont
   közvetlenül és a webszerveren keresztül is válaszol; a frontend aloldala
   közvetlen megnyitáskor sem ad hibát; a teszt-adatbázis létrejött; a
   backend-teszt sikeres (lefedettség 88%). A tesztfuttatás elavulási
   figyelmeztetést adott (httpx); a javasolt utódcsomagot (httpx2) a PyPI-on
-  ellenőriztük, a cseréről még döntök.
+  ellenőriztük; a cserét később jóváhagytam.
 
 ## 2026-10-05 — Védési jegyzet; források ellenőrzése
 
@@ -63,10 +179,10 @@ A hibák szűrése kétirányú — több esetben én azonosítottam az AI téve
 - Eszköz: Claude Code
 
 - Az AI szerepe: a tervezett mappastruktúra bemutatása; a nyitott technikai
-  kérdések összegyűjtése alternatívákkal és javaslattal; a számomra új
-  eszközök (uv, Docker, háttérfolyamat, fejlesztői levelezőszerver)
-  elmagyarázása; a jóváhagyott döntések alapján a projektváz elkészítése:
-  FastAPI-backend állapot-ellenőrző végponttal, adatbázis-kapcsolattal,
+  kérdések összegyűjtése alternatívákkal és javaslattal; az eszközök
+  (uv, Docker, háttérfolyamat, fejlesztői levelezőszerver) összevetése és
+  elmagyarázása a döntéseimhez; a jóváhagyott döntések alapján a projektváz
+  elkészítése: FastAPI-backend állapot-ellenőrző végponttal, adatbázis-kapcsolattal,
   migrációs keretrendszerrel és első teszttel; React-frontend Mantine-témával
   (a státuszterv színeiből), lekérdezés- és fordításkezeléssel; Docker-fájlok,
   webszerver-beállítás és docker-compose.
@@ -88,10 +204,6 @@ A hibák szűrése kétirányú — több esetben én azonosítottam az AI téve
   - munkamódszer: a vázat az AI egy menetben készítette el; ezután úgy
     döntöttem, hogy a kódot lépésenként nézem át — minden lépés után
     megállunk, és a következő csak az átnézés után kezdődik.
-
-- Visszakérdezéseim: mi a különbség az uv és a pip között; mit jelent a
-  háttérfolyamat és a fejlesztői levelezőszerver; mi a különbség a
-  Dockerben futó „kész" és a fejlesztői frontend között.
 
 - Ellenőrzés: a kódellenőrzők (ruff, ESLint) és a frontend-build hiba nélkül
   futottak. Az AI által választott további részleteket (image-változatok,
