@@ -56,7 +56,7 @@ jobs:
           uv run alembic upgrade head
           uv run alembic check
       - name: Tesztek, legalább 70% lefedettséggel
-        run: uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+        run: uv run pytest --cov=app --cov=seed --cov-report=term-missing --cov-fail-under=70
 
   frontend:
     name: Frontend (lint, formázás, build)
