@@ -7,10 +7,36 @@ export const en: typeof hu = {
     disclaimer:
       'Demonstration system using synthetic data only. Not a medical device and does not replace clinical judgement.',
   },
-  health: {
-    title: 'System status',
-    checking: 'Checking…',
-    ok: 'The API and the database are reachable.',
-    error: 'The API is not reachable.',
+  login: {
+    email: 'Email address',
+    password: 'Password',
+    submit: 'Sign in',
+    invalid: 'Incorrect email address or password.',
+    expired: 'Your session has expired. Please sign in again.',
+  },
+  errors: {
+    unavailable: 'The server is not reachable right now. Please try again later.',
+  },
+  layout: {
+    logout: 'Sign out',
+  },
+  roles: {
+    patient: 'Patient',
+    doctor: 'Doctor',
+    admin: 'Administrator',
+  },
+  home: {
+    patient: {
+      title: 'My tasks',
+      placeholder: 'Your due measurements and questionnaires will appear here.',
+    },
+    doctor: {
+      title: 'My patients',
+      placeholder: 'The prioritised list of your patients will appear here.',
+    },
+    admin: {
+      title: 'Administration',
+      placeholder: 'User and doctor–patient assignment management will be here.',
+    },
   },
 }
