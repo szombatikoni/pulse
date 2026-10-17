@@ -5,7 +5,9 @@ Ez a fejezet dátumozott példákon mutatja be a működési szabályokat: hogya
 az elmaradást, mi történik szabálymódosításkor és adatjavításkor, és hogyan
 pontoz a kérdőív. A példák mesterséges adatokkal készültek. A státusz, a
 küszöbszabály, a deduplikáció és a kérdőív-pontozás a második mérföldkőben
-már működik, és tesztek ellenőrzik; az alkalmak, a riasztáslezárás és a
+már működik, és tesztek ellenőrzik. A beteg teendőlistája (mi esedékes, mi
+kész, mi maradt el, és meddig pótolható) is már az alább leírt szabályokkal
+számolódik, az előírásokból. Az alkalmak tárolása, a riasztáslezárás és a
 javítás a harmadik mérföldkőben készül el. A fejezet végén egy integrációs
 próba szerepel: egy klinikai irányelven alapuló szabály, szabványos adatokon,
 meglévő motorral kiértékelve.

@@ -63,9 +63,9 @@ szabálymotor értékel ki, ugyanazokkal a szabályokkal.
 | Az. | Követelmény | Állapot | Mi bizonyítja, mi hiányzik |
 |-------|----------------------------|-------------|------------------------------|
 | F4 | Mérés rögzítése a törzsadatban szereplő típusokhoz, többértékű méréssel. | bemutatható | `test_measurements.py`, `test_patient_api.py` (teljes folyamat a rögzítéstől az orvosi nézetig); böngészős teszt 4. |
-| F5 | A korábbi mérések listában és grafikonon, típusonként, időszakszűréssel. | részben | a lista kész, a szerver típus szerint is szűr (`test_measurements.py`); a grafikon, a szűrés a felületen és az időszakszűrés: M3 |
-| F6 | Az esedékes teendők listája határidővel; a kirendelt kérdőívek kitöltése. | részben | a kitöltés kész (`test_questionnaire_api.py`, böngészős teszt 5.); a határidős teendőlista az alkalmakkal: M3 |
-| F7 | Hibás mérés javítása újrakiértékeléssel; mérés legfeljebb két napra visszamenőleg; a felület felajánlja a pótolható alkalmat. | részben | a kétnapos határ kész (`test_measurements.py`); a javítás és a pótlás: M3 |
+| F5 | A korábbi mérések listában és grafikonon, típusonként, időszakszűréssel. | részben | a lista napokra bontva és a típus szerinti szűrés kész (`test_measurements.py`, böngészős teszt 4.), típusonként egy kis görbe az utolsó mérésekről; a teljes grafikon és az időszakszűrés: M3 |
+| F6 | Az esedékes teendők listája határidővel; a kirendelt kérdőívek kitöltése. | részben | a kitöltés és a határidős teendőlista kész: mi esedékes, mi kész, mi maradt el, az előírásokból számolva (`test_tasks.py`, böngészős teszt 4. és 5.); az alkalmak tárolása: M3 |
+| F7 | Hibás mérés javítása újrakiértékeléssel; mérés legfeljebb két napra visszamenőleg; a felület felajánlja a pótolható alkalmat. | részben | a kétnapos határ és a pótolható alkalom felajánlása kész (`test_measurements.py`, `test_tasks.py`, böngészős teszt 4.); a javítás: M3 |
 | F8 | Értesítés az esedékes teendőkről (felületen és e-mailben). | terv | M3 |
 
 ### Orvos
@@ -77,7 +77,7 @@ szabálymotor értékel ki, ugyanazokkal a szabályokkal.
 | F11 | Négy, betegenként paraméterezhető szabálytípus: egyszeri küszöbátlépés; időablakos ismétlődés; kérdőív-pontszám határa vagy romló trendje; elmaradt adatküldés. | részben | a küszöbszabály és a kérdőív-sáv kész (`test_rules.py`, `test_questionnaires.py`); az időablakos ismétlődés, a romló trend, az elmaradt adat és a beállító felület: M3 |
 | F12 | Minden szabálymódosítás új, megváltoztathatatlan verziót hoz létre; a riasztás a keletkezéskori verzióra hivatkozik. | részben | az adatbázisban kész, triggerrel védve (`test_rules.py`); a módosító felület: M3 |
 | F13 | Kérdőívszerkesztő (skálás, egy- és többválasztós kérdések, pontozás, kiértékelési sávok); egységes pontozási irány; minden módosítás új verzió. | részben | a pontozás, a sávok és a verziózás kész (`test_questionnaires.py`); a szerkesztő: M3 |
-| F14 | Követési terv: mit, milyen gyakran, milyen határidőre, mettől meddig; az alkalmak külön rögzülnek; a határidőket háttérfolyamat ellenőrzi. | részben | az előírás táblája kész, a kérdőív csak kirendelés alapján tölthető ki (`test_questionnaires.py`); az alkalmak, a háttérfolyamat és a felület: M3 |
+| F14 | Követési terv: mit, milyen gyakran, milyen határidőre, mettől meddig; az alkalmak külön rögzülnek; a határidőket háttérfolyamat ellenőrzi. | részben | az előírás táblája kész, az időszak és a határidő ebből számolódik, a kérdőív csak kirendelés alapján tölthető ki (`test_tasks.py`, `test_questionnaires.py`); az alkalmak tárolása, a háttérfolyamat és az orvosi felület: M3 |
 | F15 | Riasztáskezelés: megtekintés, felelőshöz rendelés, lezárás kötelező indoklással; minden váltás eseményként rögzül; lezáráskor rövid, a betegnek szóló visszajelzés küldhető. | terv | M3 |
 | F16 | Megjegyzés a beteghez. | terv | M3 |
 
@@ -101,7 +101,7 @@ szabálymotor értékel ki, ugyanazokkal a szabályokkal.
 |-------|----------------------------|-------------|------------------------------|
 | NF1 | Biztonság: JWT-alapú hitelesítés, hashelt jelszó, szerveroldali jogosultság, célzott tesztekkel. | bemutatható | Argon2-hash; `test_security.py`, `test_auth_api.py`, `test_access.py`, valamint a követelményekből függetlenül írt tesztek (`independent_*`) |
 | NF2 | Auditálhatóság: a verziók megváltoztathatatlanok, a riasztásokhoz teljes eseménytörténet tartozik. | részben | a verziók és az események adatbázis-triggerrel védettek (`test_rules.py`, `test_questionnaires.py`); a riasztás-életút eseményei: M3 |
-| NF3 | Tesztelés: pytest, legalább 70% lefedettség, kiemelt határesetekkel. | bemutatható | 421 backend-teszt, 98% lefedettség; a CI 70% alatt hibát jelez; a böngészős folyamatteszt is a CI-ban fut |
+| NF3 | Tesztelés: pytest, legalább 70% lefedettség, kiemelt határesetekkel. | bemutatható | 429 backend-teszt, 98% lefedettség; a CI 70% alatt hibát jelez; a böngészős folyamatteszt is a CI-ban fut |
 | NF4 | Teljesítmény: a kiértékelés és a fő végpontok ideje mérve, növekvő adatmennyiségnél. | terv | M4 |
 | NF5 | Telepíthetőség: Docker, GitHub Actions CI/CD, nyilvános demókörnyezet. | részben | Docker és CI kész (a CI a böngészős tesztet a Dockerben indított rendszeren futtatja); a CD és a demókörnyezet: M4 |
 | NF6 | Dokumentáltság: OpenAPI/Swagger, fejlesztői dokumentáció a repóban. | bemutatható | Swagger (`/api/docs`), a README indítási leírása |
