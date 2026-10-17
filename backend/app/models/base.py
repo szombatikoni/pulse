@@ -1,4 +1,6 @@
-from sqlalchemy import MetaData
+from enum import StrEnum
+
+from sqlalchemy import Enum, MetaData
 from sqlalchemy.orm import DeclarativeBase
 
 # Egységes névadás a megszorításoknak (kulcsok, indexek, ellenőrzések). Így az
@@ -15,3 +17,16 @@ NAMING_CONVENTION = {
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+
+def str_enum(enum_cls: type[StrEnum], name: str, length: int = 32) -> Enum:
+    """Felsorolás-oszlop szövegként, ellenőrző megszorítással (nem PostgreSQL
+    enum-típusként), mint a szerepkörnél: új érték felvétele egyszerű migráció."""
+    return Enum(
+        enum_cls,
+        name=name,
+        native_enum=False,
+        create_constraint=True,
+        length=length,
+        values_callable=lambda members: [m.value for m in members],
+    )

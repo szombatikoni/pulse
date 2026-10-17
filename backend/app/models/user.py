@@ -2,11 +2,11 @@ import uuid
 from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, Date, DateTime, Enum, ForeignKey, String, func, text
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, func, text
 from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from app.models.base import Base, str_enum
 
 
 class UserRole(StrEnum):
@@ -29,16 +29,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     # Az adatbázisban szövegként, ellenőrző megszorítással (nem PostgreSQL
     # enum-típusként), így új szerepkör felvétele egyszerű migráció.
-    role: Mapped[UserRole] = mapped_column(
-        Enum(
-            UserRole,
-            name="user_role",
-            native_enum=False,
-            create_constraint=True,
-            length=16,
-            values_callable=lambda roles: [r.value for r in roles],
-        )
-    )
+    role: Mapped[UserRole] = mapped_column(str_enum(UserRole, "user_role", length=16))
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Az utolsó sikeres belépés ideje (az admin-felületen hasznos); NULL = még nem lépett be.
