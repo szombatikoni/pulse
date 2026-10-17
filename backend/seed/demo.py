@@ -12,7 +12,7 @@ Rendben. A „Közérzet" kérdőívet minden demóbeteg megkapja; Szabó János
 legutóbbi kitöltése a figyelmeztető sávba esik.
 """
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
@@ -20,7 +20,9 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models import (
     Assignment,
+    AssignmentTarget,
     DoctorPatient,
+    Frequency,
     Measurement,
     QuestionnaireTemplate,
     Rule,
@@ -30,7 +32,7 @@ from app.models import (
     User,
     UserRole,
 )
-from app.services.measurements import record_measurement
+from app.services.measurements import get_type_by_code, record_measurement
 from app.services.questionnaires import (
     assign_questionnaire,
     create_template,
@@ -38,6 +40,7 @@ from app.services.questionnaires import (
     submit_questionnaire,
 )
 from app.services.rules import create_rule
+from app.services.tasks import assign_measurement
 from app.services.users import create_user, get_user_by_email
 from seed.questionnaires import WELLBEING_CODE, WELLBEING_NAME, WELLBEING_V1
 from seed.reference import seed_measurement_types
@@ -117,6 +120,15 @@ DEMO_RULES = [
         {"questionnaire": WELLBEING_CODE, "bands": ["critical"]},
     ),
 ]
+
+# Mérési előírások (követési terv, F14): (beteg, méréstípus, határidő, ajánlott idő).
+# A vérnyomás minden demóbetegnek naponta, 10:00-ig; Tóth Mária pulzust is mér
+# esténként, de még egyszer sem rögzítette: a teendői között így a tegnapi
+# mérés elmaradtként, pótolhatóként látszik.
+DEMO_MEASUREMENT_PLANS = [
+    (patient_email, "blood_pressure", time(10, 0), time(7, 30))
+    for _doctor, patient_email in ASSIGNMENTS
+] + [("toth.maria@pulse.example", "heart_rate", time(21, 0), time(20, 0))]
 
 # Kérdőív-kitöltések: (hány napja, alvás 1–5, fáradtság 1–5, szédülés).
 # Pontok: alvás 5 − válasz, fáradtság válasz − 1, szédülés 0/2/5.
@@ -200,6 +212,7 @@ def seed_demo_data(db: Session, now: datetime | None = None) -> list[str]:
     db.flush()
     now = now or datetime.now(UTC)
     log += _seed_questionnaire(db, now)
+    log += _seed_measurement_plans(db, now)
     log += _seed_rules(db)
     log += _seed_measurements(db, now)
     log += _seed_submissions(db, now)
@@ -242,6 +255,38 @@ def _seed_questionnaire(db: Session, now: datetime) -> list[str]:
                 start_date=start,
             )
             log.append(f"kirendelés: {WELLBEING_NAME} – {patient.name}")
+    return log
+
+
+def _seed_measurement_plans(db: Session, now: datetime) -> list[str]:
+    """Mérési előírások két hete kezdődő napi időszakokkal (a teendők kártyáihoz)."""
+    log: list[str] = []
+    start = (now.astimezone(settings.tz) - timedelta(days=14)).date()
+    doctors = {patient: doctor for doctor, patient in ASSIGNMENTS}
+    for patient_email, type_code, due_time, suggested_time in DEMO_MEASUREMENT_PLANS:
+        patient = _get(db, patient_email).patient_profile
+        mtype = get_type_by_code(db, type_code)
+        planned = db.scalar(
+            select(
+                exists().where(
+                    Assignment.patient_id == patient.id,
+                    Assignment.target_kind == AssignmentTarget.MEASUREMENT,
+                    Assignment.measurement_type_id == mtype.id,
+                )
+            )
+        )
+        if not planned:
+            assign_measurement(
+                db,
+                patient_id=patient.id,
+                measurement_type=mtype,
+                assigned_by=_get(db, doctors[patient_email]).id,
+                start_date=start,
+                frequency=Frequency.DAILY,
+                due_time=due_time,
+                suggested_time=suggested_time,
+            )
+            log.append(f"mérési előírás: {mtype.name} naponta – {patient.name}")
     return log
 
 
