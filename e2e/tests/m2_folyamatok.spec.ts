@@ -107,10 +107,13 @@ test('mérés-folyamat, beteg: vérnyomás és pulzus rögzítése', async ({ pa
   const pulseTask = page.locator('.pulse-task').filter({ hasText: 'Pulzus' })
   await expect(pulseTask).toContainText('KÉSZ')
   await pulseTask.getByRole('button', { name: 'Pótlás' }).click()
+  // Az űrlap kiírja, hogy pótlás történik, és melyik mérés hiányzik.
+  await expect(page.getByText(/Pótlás: az elmaradt pulzusmérés/)).toBeVisible()
   await expect(page.getByLabel('A mérés ideje')).toBeVisible()
   await page.getByLabel('Pulzus (/perc)').fill('70')
   await page.getByRole('button', { name: 'Mentés' }).click()
   await expect(page.getByText('A mérés elmentve.')).toBeVisible()
+  await expect(page.getByText(/70 \/perc, .*Az elmaradt mérés pótolva\./)).toBeVisible()
   await expect(pulseTask.getByRole('button', { name: 'Pótlás' })).toHaveCount(0)
 })
 
@@ -138,6 +141,11 @@ test('kérdőív-folyamat, beteg: kitöltés és beküldés, a pontszám nem lá
   const text = await mainText(page)
   expect(text).not.toMatch(/\d+\s*(\/\s*\d+\s*)?pont/)
   expect(text).not.toContain('sáv')
+
+  // Újratöltés után nem kínálja fel úgy, mintha még kitöltendő lenne, de újra kitölthető.
+  await page.reload()
+  await expect(page.getByText(/Erre a hétre már kitöltötted/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Mégis kitöltöm újra' })).toBeVisible()
 })
 
 test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a mérés', async ({

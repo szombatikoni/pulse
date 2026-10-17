@@ -1,4 +1,5 @@
 import {
+  Alert,
   Anchor,
   Button,
   Group,
@@ -21,15 +22,22 @@ import {
   useMeasurementTypes,
   useRecordMeasurement,
 } from '../../api/measurements'
-import { componentLabel, formatTime, toLocalInput, unitLabel } from '../../format'
+import {
+  componentLabel,
+  formatMeasurementValue,
+  formatRelative,
+  formatTime,
+  toLocalInput,
+  unitLabel,
+} from '../../format'
 
 const BACKDATE_DAYS = 2 // a szerver is ezt ellenőrzi (F7)
 
 /** Kívülről (a teendők kártyájáról) előre beállított mérés, pl. egy elmaradt alkalom
  * pótlása. A szülő `key`-jel újraindítja az űrlapot, így az a kezdőértékekből indul. */
-export type MeasurementPreset = { typeCode: string; measuredAt?: string }
+export type MeasurementPreset = { typeCode: string; measuredAt?: string; catchUp?: boolean }
 
-type Message = { ok: boolean; text: string }
+type Message = { ok: boolean; title: string; text?: string }
 
 // A gombsor sorrendje: a leggyakoribb mérés elöl (a szerver név szerint rendez).
 const TYPE_ORDER = ['blood_pressure', 'heart_rate', 'body_weight', 'blood_glucose']
@@ -57,6 +65,8 @@ export function MeasurementForm({
   const [timeMode, setTimeMode] = useState<'now' | 'other'>(preset?.measuredAt ? 'other' : 'now')
   const [measuredAt, setMeasuredAt] = useState(() => preset?.measuredAt ?? toLocalInput(new Date()))
   const [message, setMessage] = useState<Message | null>(null)
+  // Pótlás: a teendők kártyájáról, egy elmaradt alkalom időpontjával érkezett.
+  const [catchUp, setCatchUp] = useState(!!preset?.catchUp)
   const [fieldError, setFieldError] = useState<{ component: string; text: string } | null>(null)
   const [now, setNow] = useState(() => new Date())
 
@@ -78,10 +88,10 @@ export function MeasurementForm({
         defaultValue: t('measurements.errors.generic'),
       })
       if (detail.component) setFieldError({ component: detail.component, text })
-      else setMessage({ ok: false, text })
+      else setMessage({ ok: false, title: text })
       return
     }
-    setMessage({ ok: false, text: t('measurements.errors.generic') })
+    setMessage({ ok: false, title: t('measurements.errors.generic') })
   }
 
   const submit = (event: FormEvent) => {
@@ -99,9 +109,18 @@ export function MeasurementForm({
       },
       {
         onSuccess: (measurement) => {
-          setMessage({ ok: true, text: t('measurements.saved') })
+          const detail = t('measurements.savedDetail', {
+            value: formatMeasurementValue(t, measurement),
+            when: formatRelative(t, measurement.measured_at),
+          })
+          setMessage({
+            ok: true,
+            title: t('measurements.saved'),
+            text: catchUp ? `${detail} ${t('measurements.caughtUp')}` : detail,
+          })
           setValues({})
           setTimeMode('now')
+          setCatchUp(false)
           onSaved?.(measurement.id)
         },
         onError: showError,
@@ -114,6 +133,30 @@ export function MeasurementForm({
       <form onSubmit={submit}>
         <Stack gap="md">
           <Title order={3}>{t('measurements.newTitle')}</Title>
+          {catchUp && timeMode === 'other' && (
+            <Alert
+              variant="light"
+              color="yellow"
+              title={t('measurements.catchUpTitle', {
+                type: t(`measurementTypes.${typeCode}`).toLocaleLowerCase('hu'),
+                when: formatRelative(t, new Date(measuredAt).toISOString()),
+              })}
+            >
+              <Group justify="space-between" gap="sm" wrap="wrap">
+                <Text size="sm">{t('measurements.catchUpHint')}</Text>
+                <Button
+                  size="xs"
+                  variant="default"
+                  onClick={() => {
+                    setCatchUp(false)
+                    setTimeMode('now')
+                  }}
+                >
+                  {t('measurements.cancel')}
+                </Button>
+              </Group>
+            </Alert>
+          )}
           <SegmentedControl
             fullWidth
             aria-label={t('measurements.type')}
@@ -227,10 +270,14 @@ export function MeasurementForm({
             <Button type="submit" loading={record.isPending} disabled={!type}>
               {t('measurements.save')}
             </Button>
-            <Text size="sm" role="status" c={message ? (message.ok ? 'green' : 'red') : undefined}>
-              {message?.text}
-            </Text>
           </Group>
+          <div role="status">
+            {message && (
+              <Alert variant="light" color={message.ok ? 'green' : 'red'} title={message.title}>
+                {message.text}
+              </Alert>
+            )}
+          </div>
         </Stack>
       </form>
     </Paper>

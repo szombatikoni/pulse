@@ -73,12 +73,12 @@ export function PatientHomePage() {
         patientId={patientId}
         onRecord={(typeCode) => startMeasurement({ typeCode })}
         onCatchUp={(typeCode, at) =>
-          startMeasurement({ typeCode, measuredAt: toLocalInput(new Date(at)) })
+          startMeasurement({ typeCode, measuredAt: toLocalInput(new Date(at)), catchUp: true })
         }
         onFill={(code) => scrollTo(`kerdoiv-${code}`)}
       />
       <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="xl" verticalSpacing="lg">
-        <Stack gap="lg" maw={720}>
+        <Stack gap="lg" style={{ minWidth: 0 }}>
           <MeasurementForm
             key={preset?.key ?? 0}
             patientId={patientId}
@@ -90,7 +90,7 @@ export function PatientHomePage() {
             <Questionnaires patientId={patientId} />
           </Stack>
         </Stack>
-        <Stack gap="lg" maw={720}>
+        <Stack gap="lg" style={{ minWidth: 0 }}>
           <Stack gap="xs">
             <Title order={3}>{t('measurements.latestTitle')}</Title>
             <LatestValues patientId={patientId} />

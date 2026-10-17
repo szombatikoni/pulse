@@ -10,7 +10,8 @@ import {
   type SubmissionErrorDetail,
   useSubmitQuestionnaire,
 } from '../../api/questionnaires'
-import { formatDateTime } from '../../format'
+import { usePatientTasks } from '../../api/tasks'
+import { formatDateTime, formatRelative } from '../../format'
 
 type Answers = Record<string, string | string[]>
 
@@ -114,6 +115,13 @@ export function QuestionnaireForm({
   const submit = useSubmitQuestionnaire(patientId)
   const [answers, setAnswers] = useState<Answers>({})
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  // Sikeres beküldés után a kérdések helyén nyugta áll (ne tűnjön újra kitöltendőnek).
+  const [receiptAt, setReceiptAt] = useState<string | null>(null)
+  // Ha az aktuális időszakban már kitöltötte, csak egy sor látszik, újrakitöltési
+  // lehetőséggel (a hallgató döntése, 2026-10-17).
+  const [reopened, setReopened] = useState(false)
+  const tasks = usePatientTasks(patientId)
+  const task = tasks.data?.find((x) => x.kind === 'questionnaire' && x.code === questionnaire.code)
 
   // A többválasztós kérdésre az üres válasz is érvényes („egyik sem").
   const isAnswered = (q: Question) =>
@@ -135,9 +143,10 @@ export function QuestionnaireForm({
     submit.mutate(
       { questionnaire_code: questionnaire.code, answers: payload },
       {
-        onSuccess: () => {
+        onSuccess: (receipt) => {
           setAnswers({})
-          setMessage({ ok: true, text: t('questionnaires.submitted') })
+          setMessage(null)
+          setReceiptAt(receipt.submitted_at)
         },
         onError: (error) => {
           if (error instanceof ApiError && error.status === 422 && error.detail) {
@@ -158,6 +167,43 @@ export function QuestionnaireForm({
           }
         },
       },
+    )
+  }
+
+  if (receiptAt) {
+    return (
+      <Paper withBorder p="md" id={`kerdoiv-${questionnaire.code}`}>
+        <Stack gap="sm">
+          <Title order={4}>{questionnaire.name}</Title>
+          <Alert variant="light" color="green" title={t('questionnaires.submitted')} role="status">
+            {t('questionnaires.receipt', { when: formatRelative(t, receiptAt) })}
+          </Alert>
+        </Stack>
+      </Paper>
+    )
+  }
+
+  if (task?.state === 'done' && task.done_at && !reopened) {
+    const key =
+      task.frequency === 'daily'
+        ? 'questionnaires.alreadyDaily'
+        : task.frequency === 'weekly'
+          ? 'questionnaires.alreadyWeekly'
+          : 'questionnaires.alreadyPeriod'
+    return (
+      <Paper withBorder p="md" id={`kerdoiv-${questionnaire.code}`}>
+        <Group justify="space-between" align="center" gap="sm" wrap="wrap">
+          <div>
+            <Title order={4}>{questionnaire.name}</Title>
+            <Text size="sm" c="dimmed">
+              {t(key, { when: formatRelative(t, task.done_at) })}
+            </Text>
+          </div>
+          <Button variant="default" size="xs" onClick={() => setReopened(true)}>
+            {t('questionnaires.refill')}
+          </Button>
+        </Group>
+      </Paper>
     )
   }
 

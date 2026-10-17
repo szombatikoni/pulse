@@ -1,4 +1,4 @@
-import { AppShell, Button, Group, Text } from '@mantine/core'
+import { AppShell, Box, Button, Group, Text } from '@mantine/core'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -40,7 +40,13 @@ export function AppLayout({ user, children }: { user: CurrentUser; children: Rea
           </Group>
         </Group>
       </AppShell.Header>
-      <AppShell.Main>{children}</AppShell.Main>
+      <AppShell.Main>
+        {/* A tartalom legfeljebb 1320 px széles, középre igazítva: nagyon széles
+            képernyőn se szóródjanak szét a hasábok. */}
+        <Box maw={1320} mx="auto">
+          {children}
+        </Box>
+      </AppShell.Main>
     </AppShell>
   )
 }

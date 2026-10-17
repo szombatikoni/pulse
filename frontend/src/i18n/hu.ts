@@ -86,6 +86,12 @@ export const hu = {
     filterLabel: 'Szűrés típus szerint',
     moreDays: 'Korábbi napok ({{count}})',
     noneOfType: 'Ebben a típusban még nincs mérés.',
+    catchUpTitle: 'Pótlás: az elmaradt {{type}}mérés ({{when}})',
+    catchUpHint:
+      'Írd be az értéket, és mentsd el. Az időpontot átírhatod, legfeljebb két napra visszamenőleg.',
+    cancel: 'Mégse',
+    savedDetail: '{{value}}, {{when}}.',
+    caughtUp: 'Az elmaradt mérés pótolva.',
     empty: 'Még nincs rögzített mérés.',
     columns: {
       time: 'A mérés ideje',
@@ -141,6 +147,11 @@ export const hu = {
     questionCount_one: '{{count}} kérdés',
     questionCount_other: '{{count}} kérdés',
     progress: '{{answered}}/{{total}} kérdés megválaszolva',
+    receipt: 'Beküldve: {{when}}. A teendőid között most „Kész” a jelölése.',
+    alreadyDaily: 'Mára már kitöltötted ({{when}}).',
+    alreadyWeekly: 'Erre a hétre már kitöltötted ({{when}}).',
+    alreadyPeriod: 'Erre az időszakra már kitöltötted ({{when}}).',
+    refill: 'Mégis kitöltöm újra',
     error: 'A kitöltést nem sikerült elküldeni.',
     errors: {
       not_assigned: 'Ez a kérdőív már nincs kirendelve neked.',

@@ -89,6 +89,11 @@ export const en: typeof hu = {
     filterLabel: 'Filter by type',
     moreDays: 'Earlier days ({{count}})',
     noneOfType: 'No measurements of this type yet.',
+    catchUpTitle: 'Catching up: the missed {{type}} measurement ({{when}})',
+    catchUpHint: 'Enter the value and save. You can change the time, up to two days back.',
+    cancel: 'Cancel',
+    savedDetail: '{{value}}, {{when}}.',
+    caughtUp: 'The missed measurement has been added.',
     empty: 'No measurements recorded yet.',
     columns: {
       time: 'Measured at',
@@ -144,6 +149,11 @@ export const en: typeof hu = {
     questionCount_one: '{{count}} question',
     questionCount_other: '{{count}} questions',
     progress: '{{answered}}/{{total}} questions answered',
+    receipt: 'Submitted {{when}}. It is now marked “Done” in your tasks.',
+    alreadyDaily: 'You have already completed it today ({{when}}).',
+    alreadyWeekly: 'You have already completed it for this week ({{when}}).',
+    alreadyPeriod: 'You have already completed it for this period ({{when}}).',
+    refill: 'Fill it in again',
     error: 'Your answers could not be submitted.',
     errors: {
       not_assigned: 'This questionnaire is no longer assigned to you.',
