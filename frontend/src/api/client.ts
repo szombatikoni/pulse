@@ -4,10 +4,14 @@ import { clearToken, getToken } from '../auth/token'
 // van token, az `Authorization: Bearer` fejlécben megy.
 export class ApiError extends Error {
   readonly status: number
+  /** A szerver hibaleírása (FastAPI: `detail`), ha volt; pl. érvénytelen
+   * mérésnél `{ code, component }`, amiből a felület a saját nyelvén ír. */
+  readonly detail: unknown
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, detail?: unknown) {
     super(message)
     this.status = status
+    this.detail = detail
   }
 }
 
@@ -37,7 +41,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     handleExpiredSession()
   }
   if (!response.ok) {
-    throw new ApiError(response.status, `${response.status} ${response.statusText}`)
+    const body = (await response.json().catch(() => null)) as { detail?: unknown } | null
+    throw new ApiError(response.status, `${response.status} ${response.statusText}`, body?.detail)
   }
   return (await response.json()) as T
 }

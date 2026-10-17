@@ -10,6 +10,8 @@ export type CurrentUser = {
   email: string
   role: Role
   name: string | null
+  /** Betegnél a betegprofil azonosítója; ezen érhetők el a saját adatai. */
+  patient_id: string | null
 }
 
 type TokenResponse = { access_token: string; token_type: string; expires_in: number }

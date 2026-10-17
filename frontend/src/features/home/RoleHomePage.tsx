@@ -1,11 +1,8 @@
 import { Stack, Text, Title } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 
-import type { Role } from '../../api/auth'
-
-/** Ideiglenes kezdőoldal szerepkörönként; a tartalom a mérés- és a
- * kérdőív-folyamattal érkezik. */
-export function RoleHomePage({ role }: { role: Role }) {
+/** Ideiglenes kezdőoldal; már csak az adminé az (az admin-felület később jön). */
+export function RoleHomePage({ role }: { role: 'admin' }) {
   const { t } = useTranslation()
   return (
     <Stack gap="xs">
