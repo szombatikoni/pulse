@@ -72,8 +72,8 @@ szabálymotor értékel ki, ugyanazokkal a szabályokkal.
 
 | Az. | Követelmény | Állapot | Mi bizonyítja, mi hiányzik |
 |-------|----------------------------|-------------|------------------------------|
-| F9 | Priorizált beteglista öt státusszal (Súlyos, Figyelem, Adathiány, Kezelve, Rendben), egy mondatos indoklással; sem a lezárás, sem az adathiány nem ad Rendben státuszt. | részben | négy státusz indoklással kész (`test_status.py`, böngészős teszt 1. és 6.); a Kezelve a riasztáslezárással: M3 |
-| F10 | A beteg adatlapja: grafikonok küszöbvonalakkal, mérések, kitöltések, riasztások magyarázattal, megjegyzések. | részben | a riasztások magyarázattal, a mérések és a kitöltések kész (böngészős teszt 2. és 6.); a grafikonok és a megjegyzések: M3 |
+| F9 | Priorizált beteglista öt státusszal (Súlyos, Figyelem, Adathiány, Kezelve, Rendben), egy mondatos indoklással; sem a lezárás, sem az adathiány nem ad Rendben státuszt. | részben | négy státusz indoklással, státusz szerinti szűréssel, név szerinti kereséssel és a teendők állapotával kész (`test_status.py`, `test_tasks.py`, böngészős teszt 1. és 6.); a Kezelve a riasztáslezárással: M3 |
+| F10 | A beteg adatlapja: grafikonok küszöbvonalakkal, mérések, kitöltések, riasztások magyarázattal, megjegyzések. | részben | a riasztások magyarázattal és idővonallal, a teendők teljesítése, a mérések (a riasztást kiváltók jelölve) és a kitöltések kész (böngészős teszt 2. és 6.); a grafikonok küszöbvonallal és a megjegyzések: M3 |
 | F11 | Négy, betegenként paraméterezhető szabálytípus: egyszeri küszöbátlépés; időablakos ismétlődés; kérdőív-pontszám határa vagy romló trendje; elmaradt adatküldés. | részben | a küszöbszabály és a kérdőív-sáv kész (`test_rules.py`, `test_questionnaires.py`); az időablakos ismétlődés, a romló trend, az elmaradt adat és a beállító felület: M3 |
 | F12 | Minden szabálymódosítás új, megváltoztathatatlan verziót hoz létre; a riasztás a keletkezéskori verzióra hivatkozik. | részben | az adatbázisban kész, triggerrel védve (`test_rules.py`); a módosító felület: M3 |
 | F13 | Kérdőívszerkesztő (skálás, egy- és többválasztós kérdések, pontozás, kiértékelési sávok); egységes pontozási irány; minden módosítás új verzió. | részben | a pontozás, a sávok és a verziózás kész (`test_questionnaires.py`); a szerkesztő: M3 |
@@ -101,7 +101,7 @@ szabálymotor értékel ki, ugyanazokkal a szabályokkal.
 |-------|----------------------------|-------------|------------------------------|
 | NF1 | Biztonság: JWT-alapú hitelesítés, hashelt jelszó, szerveroldali jogosultság, célzott tesztekkel. | bemutatható | Argon2-hash; `test_security.py`, `test_auth_api.py`, `test_access.py`, valamint a követelményekből függetlenül írt tesztek (`independent_*`) |
 | NF2 | Auditálhatóság: a verziók megváltoztathatatlanok, a riasztásokhoz teljes eseménytörténet tartozik. | részben | a verziók és az események adatbázis-triggerrel védettek (`test_rules.py`, `test_questionnaires.py`); a riasztás-életút eseményei: M3 |
-| NF3 | Tesztelés: pytest, legalább 70% lefedettség, kiemelt határesetekkel. | bemutatható | 429 backend-teszt, 98% lefedettség; a CI 70% alatt hibát jelez; a böngészős folyamatteszt is a CI-ban fut |
+| NF3 | Tesztelés: pytest, legalább 70% lefedettség, kiemelt határesetekkel. | bemutatható | 430 backend-teszt, 98% lefedettség; a CI 70% alatt hibát jelez; a böngészős folyamatteszt is a CI-ban fut |
 | NF4 | Teljesítmény: a kiértékelés és a fő végpontok ideje mérve, növekvő adatmennyiségnél. | terv | M4 |
 | NF5 | Telepíthetőség: Docker, GitHub Actions CI/CD, nyilvános demókörnyezet. | részben | Docker és CI kész (a CI a böngészős tesztet a Dockerben indított rendszeren futtatja); a CD és a demókörnyezet: M4 |
 | NF6 | Dokumentáltság: OpenAPI/Swagger, fejlesztői dokumentáció a repóban. | bemutatható | Swagger (`/api/docs`), a README indítási leírása |
