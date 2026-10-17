@@ -29,21 +29,22 @@ D = ROOT / "docs" / "dolgozat"
 BUILD = D / "build"
 
 # (fájl, kész-e) — a kész fejezetek kerülnek a leadott változatba
+# (2026-10-17: az M2-höz elkészült fejezetek; a többi még csak címsor)
 FEJEZETEK = [
     ("00_elolapok.md", True),
-    ("01_motivacio.md", False),
-    ("02_teruleti_attekintes.md", False),
-    ("03_funkcionalis_specifikacio.md", False),
+    ("01_motivacio.md", True),
+    ("02_teruleti_attekintes.md", True),
+    ("03_funkcionalis_specifikacio.md", True),
     ("04_technologiak.md", False),
-    ("05_architektura.md", False),
-    ("06_adatmodell.md", False),
-    ("07_mukodes.md", False),
+    ("05_architektura.md", True),
+    ("06_adatmodell.md", True),
+    ("07_mukodes.md", True),
     ("08_biztonsag.md", False),
     ("09_kodreszletek.md", False),
     ("10_teszteles.md", False),
     ("11_kiertekeles.md", False),
     ("12_devops.md", False),
-    ("13_ai_hasznalat.md", False),
+    ("13_ai_hasznalat.md", True),
     ("14_tapasztalatok.md", False),
     ("99_zarolapok.md", True),
 ]
@@ -76,6 +77,9 @@ def main(vazlat):
             szoveg.append((D / nev).read_text(encoding="utf-8-sig"))
     t = "\n\n".join(szoveg)
     t = re.sub(r"\{\{include ([^}]+)\}\}", include, t)
+    if not vazlat:
+        # A „> **Jóváhagyandó…**" blokkok belső jegyzetek, a leadott változatba nem kellenek.
+        t = re.sub(r"(?m)^> \*\*Jóváhagyandó.*\n(?:>.*\n)*\n?", "", t)
 
     # Fejezet- és ábraszámozás; a kódblokkok érintetlenek
     out, h1, h2, h3, abra = [], 0, 0, 0, 0
@@ -107,7 +111,17 @@ def main(vazlat):
             out.append(f"![{szam} ábra – {m.group(1)}]({m.group(2)})"); continue
         out.append(s)
     t = "\n".join(out)
-    t = re.sub(r"@(abra:[\w-]+)", lambda m: abrak.get(m.group(1), f"[??{m.group(1)}]"), t)
+    # Ábrahivatkozás: „A @abra:x mutatja" -> „Az 1.1. ábra mutatja"; a névelő a
+    # számtól függ (az 1., az 5., de a 2., a 10.), ezért a generálás állítja be.
+    def abra_hiv(m):
+        szam = abrak.get(m.group(2), f"[??{m.group(2)}]")
+        nevelo = m.group(1)
+        if nevelo:
+            elso = int(re.match(r"\d+", szam).group()) if szam[0].isdigit() else 0
+            uj = "az" if elso in (1, 5) else "a"
+            nevelo = (uj.capitalize() if nevelo[0].isupper() else uj) + " "
+        return f"{nevelo or ''}{szam} ábra"
+    t = re.sub(r"(\b[Aa]z? )?@(abra:[\w-]+)", abra_hiv, t)
 
     # Forráshivatkozások: [@a] vagy [@a; @b] -> [1] / [1, 2]
     f, sorrend = forrasok(), []

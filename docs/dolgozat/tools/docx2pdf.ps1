@@ -2,12 +2,13 @@
 # tartalomjegyzék, táblázatkeretek, oldalszám, majd mentés DOCX formában.
 # PDF csak a -Pdf kapcsolóval készül (a leadott, kész változathoz).
 # Futtatás a repo gyökeréből a build_dolgozat.py után:
-#   powershell -ExecutionPolicy Bypass -File docs/dolgozat/tools/docx2pdf.ps1 [-Pdf]
-param([switch]$Pdf)
+#   powershell -ExecutionPolicy Bypass -File docs/dolgozat/tools/docx2pdf.ps1 [-Pdf] [-PdfNev nev.pdf]
+# (az M2 kezdeti dolgozata: -Pdf -PdfNev PULSE_kezdeti_dolgozat.pdf)
+param([switch]$Pdf, [string]$PdfNev = "PULSE_szakdolgozat.pdf")
 $d = Resolve-Path (Join-Path $PSScriptRoot "..")
 $src = Join-Path $d "build\PULSE_szakdolgozat.docx"
 $docx = Join-Path $d "PULSE_szakdolgozat.docx"
-$pdfFajl = Join-Path $d "PULSE_szakdolgozat.pdf"
+$pdfFajl = Join-Path $d $PdfNev
 $jel = "PULSE_TARTALOMJEGYZEK_HELYE"
 $ujj = Join-Path $d "build\docx.sha256"   # a legutóbb generált docx ujjlenyomata
 
@@ -40,7 +41,7 @@ try {
             $t.Range.ParagraphFormat.SpaceAfter = 2
             continue
         }
-        $t.Borders.Enable = 1
+        # a keretezést a sablon Table-stílusa adja (reference.docx)
         $t.Rows.Item(1).HeadingFormat = -1
         $t.Rows.Item(1).Range.Font.Bold = -1
         $t.Rows.AllowBreakAcrossPages = 0
