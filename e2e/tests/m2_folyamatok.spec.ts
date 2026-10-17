@@ -13,9 +13,9 @@ async function login(page: Page, email: string) {
   await page.getByRole('button', { name: 'Belépés' }).click()
 }
 
-// A táblázatsorok és az oldal szövege egy sorba fűzve, egyszerű szóközökkel.
+// A beteglista sorai és az oldal szövege egy sorba fűzve, egyszerű szóközökkel.
 const rowsText = async (page: Page) =>
-  (await page.locator('tbody tr').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+  (await page.locator('.pulse-prow').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
 // Az előzmények sorai (napokra bontott lista).
 const history = (page: Page) => page.locator('.pulse-history li')
 const mainText = async (page: Page) =>
@@ -29,7 +29,7 @@ test('az orvosi lista minden M2-státuszt mutat, prioritás szerint, idegen bete
 }) => {
   await login(page, 'dr.kovacs@pulse.example')
   await expect(page).toHaveURL(/\/doctor$/)
-  await page.locator('tbody tr').first().waitFor()
+  await page.locator('.pulse-prow').first().waitFor()
   const rows = await rowsText(page)
 
   expect(rows.map((r) => r.split(' ')[0])).toEqual(['Súlyos', 'Figyelem', 'Adathiány', 'Rendben'])
@@ -145,7 +145,7 @@ test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a
 }) => {
   await login(page, 'dr.nagy@pulse.example')
   await expect(page).toHaveURL(/\/doctor$/)
-  await page.locator('tbody tr').first().waitFor()
+  await page.locator('.pulse-prow').first().waitFor()
   const [first] = await rowsText(page)
 
   expect(first.startsWith('Súlyos')).toBe(true)
@@ -157,6 +157,6 @@ test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a
   const main = page.locator('main')
   await expect(main).toContainText('Kérdőívszabály, 1. verzió')
   await expect(main).toContainText('pontszáma a(z) figyelmeztető vagy kritikus sávban')
-  await expect(main).toContainText('13 / 13')
+  await expect(main).toContainText('13/13')
   await expect(main).toContainText('kritikus')
 })

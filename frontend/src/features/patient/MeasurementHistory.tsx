@@ -27,9 +27,12 @@ function groupByDay(t: ReturnType<typeof useTranslation>['t'], list: Measurement
 export function MeasurementHistory({
   patientId,
   highlightId,
+  flaggedIds,
 }: {
   patientId: string
   highlightId?: string | null
+  /** Az orvosi nézetben: a riasztást kiváltó mérések jelölést kapnak. */
+  flaggedIds?: Set<string>
 }) {
   const { t } = useTranslation()
   const measurements = usePatientMeasurements(patientId)
@@ -80,6 +83,13 @@ export function MeasurementHistory({
                 <span className="tm">{formatTime(new Date(m.measured_at))}</span>
                 <span className="ty">{t(`measurementTypes.${m.type_code}`)}</span>
                 <span className="vl">
+                  {flaggedIds?.has(m.id) && (
+                    <i
+                      className="over"
+                      title={t('doctor.flagged')}
+                      aria-label={t('doctor.flagged')}
+                    />
+                  )}
                   {formatMeasurementNumber(m)}{' '}
                   <span className="unit">{unitLabel(t, m.values[0]?.unit ?? '')}</span>
                 </span>

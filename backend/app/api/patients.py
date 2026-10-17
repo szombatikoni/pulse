@@ -6,8 +6,10 @@ from app.api.deps import DoctorUser, ensure_patient_access
 from app.core.db import DbSession
 from app.models import PatientProfile
 from app.schemas.patients import AlertOut, PatientSummaryOut, alert_out, patient_summary_out
+from app.schemas.tasks import task_out
 from app.services.alerts import explain_alert, latest_trigger, list_patient_alerts
 from app.services.status import PatientStatusResult, compute_status, doctor_patient_list
+from app.services.tasks import patient_tasks
 
 router = APIRouter(tags=["patients"])
 
@@ -18,7 +20,9 @@ def _summary(
     db: DbSession, patient: PatientProfile, result: PatientStatusResult
 ) -> PatientSummaryOut:
     triggers = {r.alert.id: latest_trigger(db, r.alert) for r in result.reasons if r.alert}
-    return patient_summary_out(patient, result, triggers)
+    summary = patient_summary_out(patient, result, triggers)
+    summary.tasks = [task_out(t) for t in patient_tasks(db, patient.id)]
+    return summary
 
 
 @router.get("/doctor/patients")

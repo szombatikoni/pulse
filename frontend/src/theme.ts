@@ -19,7 +19,9 @@ const pulseRed: MantineColorsTuple = [
 // 6 = mezők és gombok háttere, 7 = oldalháttér.
 // 2026-10-17: semleges (nem kékes) szürke skála, a megszokott sötét
 // fejlesztői felületekhez hasonló árnyalatokkal; a háttér nem majdnem fekete,
-// a másodlagos szöveg kontrasztosabb.
+// a másodlagos szöveg kontrasztosabb. Az oldalháttér (7) a kártyáknál
+// (index.css --pulse-card) egy árnyalattal sötétebb: így rétegek választják el
+// a részeket, nem keretek.
 const dark: MantineColorsTuple = [
   '#f3f2f1',
   '#c8c6c4',
@@ -28,9 +30,9 @@ const dark: MantineColorsTuple = [
   '#484644',
   '#3b3a39',
   '#323130',
-  '#252423',
   '#201f1e',
   '#1b1a19',
+  '#161514',
 ]
 
 const fontFamily = "'Inter Variable', system-ui, sans-serif"

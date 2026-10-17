@@ -15,6 +15,7 @@ from app.models import (
 )
 from app.schemas.measurements import MeasurementOut, measurement_out
 from app.schemas.questionnaires import SubmissionOut, submission_out
+from app.schemas.tasks import TaskOut
 from app.services.alerts import EventExplanation, TriggerExplanation
 from app.services.status import PatientStatus, PatientStatusResult
 
@@ -80,6 +81,9 @@ class PatientSummaryOut(BaseModel):
     reasons: list[StatusReasonOut]
     # A legutóbbi adat (mérés vagy kitöltés) ideje.
     last_data_at: datetime | None
+    # A beteg teendői az előírásai szerint (mi kész, mi esedékes, mi maradt el):
+    # az orvos ebből látja, követi-e a beteg a tervet.
+    tasks: list[TaskOut] = []
 
 
 def rule_version_out(version: RuleVersion) -> RuleVersionOut:

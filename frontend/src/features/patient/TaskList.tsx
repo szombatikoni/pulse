@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { type Task, usePatientTasks } from '../../api/tasks'
 import { formatSoon, formatUntil } from '../../format'
 
-type Mark = 'done' | 'due' | 'late' | 'missed'
+export type Mark = 'done' | 'due' | 'late' | 'missed'
 
 const MARK_COLOR: Record<Mark, string> = {
   done: 'var(--pulse-ok)',
@@ -14,7 +14,7 @@ const MARK_COLOR: Record<Mark, string> = {
 }
 
 /** Az állapot jele: kész = pipa, esedékes = pöttyös kör, lejárt/elmaradt = szaggatott kör. */
-function TaskIcon({ mark }: { mark: Mark }) {
+export function TaskIcon({ mark }: { mark: Mark }) {
   const color = MARK_COLOR[mark]
   return (
     <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true" style={{ flexShrink: 0 }}>

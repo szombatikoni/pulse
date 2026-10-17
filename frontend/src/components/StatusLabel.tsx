@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import type { PatientStatus } from '../api/patients'
 import { STATUS_COLOR } from './statusColors'
 
-const INK = '#252423' // az ikonon belüli jel színe (az oldal háttere, theme.ts dark[7])
+const INK = '#2b2a29' // az ikonon belüli jel színe (a kártyák háttere, index.css --pulse-card)
 
 const ICONS: Record<PatientStatus, ReactNode> = {
   severe: (

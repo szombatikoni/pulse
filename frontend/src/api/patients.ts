@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiGet } from './client'
 import type { Measurement } from './measurements'
 import type { Submission } from './questionnaires'
+import type { Task } from './tasks'
 
 export type PatientStatus = 'severe' | 'attention' | 'no_data' | 'handled' | 'ok'
 export type Severity = 'moderate' | 'severe'
@@ -69,6 +70,8 @@ export type PatientSummary = {
   reasons: StatusReason[]
   /** A legutóbbi adat (mérés vagy kérdőív-kitöltés) ideje. */
   last_data_at: string | null
+  /** A beteg teendői az előírásai szerint (követi-e a tervet). */
+  tasks: Task[]
 }
 
 export function useDoctorPatients() {

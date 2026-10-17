@@ -1,11 +1,17 @@
-import { Loader, Table, Text, Tooltip } from '@mantine/core'
+import { Loader, Text } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 
 import { usePatientSubmissions } from '../../api/questionnaires'
 import { formatDateTime } from '../../format'
 
-/** A beteg kérdőív-kitöltései pontszámmal és sávval (csak az orvos látja).
- * A pontszám fölé víve a válaszok és a kérdésenkénti pontok látszanak. */
+const BAND_COLOR: Record<string, string> = {
+  normal: 'var(--pulse-ok)',
+  warning: 'var(--pulse-warn)',
+  critical: 'var(--pulse-severe)',
+}
+
+/** A beteg kérdőív-kitöltései (csak az orvos látja): a pontszám sávként a maximumhoz
+ * képest, a sáv neve; a sorra kattintva a válaszok és a kérdésenkénti pontok. */
 export function SubmissionHistory({ patientId }: { patientId: string }) {
   const { t } = useTranslation()
   const submissions = usePatientSubmissions(patientId)
@@ -15,43 +21,48 @@ export function SubmissionHistory({ patientId }: { patientId: string }) {
   if (submissions.data.length === 0) return <Text c="dimmed">{t('questionnaires.empty')}</Text>
 
   return (
-    <Table striped highlightOnHover>
-      <Table.Thead>
-        <Table.Tr>
-          <Table.Th>{t('questionnaires.columns.time')}</Table.Th>
-          <Table.Th>{t('questionnaires.columns.questionnaire')}</Table.Th>
-          <Table.Th>{t('questionnaires.columns.score')}</Table.Th>
-          <Table.Th>{t('questionnaires.columns.band')}</Table.Th>
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {submissions.data.map((s) => (
-          <Table.Tr key={s.id}>
-            <Table.Td>{formatDateTime(s.submitted_at)}</Table.Td>
-            <Table.Td>
-              {s.questionnaire_name}{' '}
-              <Text span size="xs" c="dimmed">
-                {t('questionnaires.version', { version: s.version_no })}
-              </Text>
-            </Table.Td>
-            <Table.Td>
-              <Tooltip
-                multiline
-                w={360}
-                label={s.answers
-                  .map((a) => `${a.order_no}. ${a.text} — ${a.label} (${a.score})`)
-                  .join('\n')}
-                style={{ whiteSpace: 'pre-line' }}
-              >
-                <Text span size="sm" style={{ cursor: 'help' }}>
-                  {s.total_score} / {s.max_score}
+    <div className="pulse-subs">
+      {submissions.data.map((s) => {
+        const share = s.max_score ? (s.total_score / s.max_score) * 100 : 0
+        const band = t(`questionnaires.bands.${s.band}`, { defaultValue: s.band })
+        return (
+          <details key={s.id}>
+            <summary>
+              <span className="when">{formatDateTime(s.submitted_at)}</span>
+              <span className="name">
+                {s.questionnaire_name}{' '}
+                <Text span size="xs" c="dimmed">
+                  {t('questionnaires.version', { version: s.version_no })}
                 </Text>
-              </Tooltip>
-            </Table.Td>
-            <Table.Td>{t(`questionnaires.bands.${s.band}`, { defaultValue: s.band })}</Table.Td>
-          </Table.Tr>
-        ))}
-      </Table.Tbody>
-    </Table>
+              </span>
+              <span className="bar" aria-hidden="true">
+                <i style={{ width: `${share.toFixed(1)}%` }} />
+              </span>
+              <span className="score">
+                {s.total_score}/{s.max_score}
+              </span>
+              <span className="band" style={{ color: BAND_COLOR[s.band] }}>
+                {band}
+              </span>
+            </summary>
+            <ol className="answers" aria-label={t('doctor.answers')}>
+              {s.answers.map((a) => (
+                <li key={a.question_id}>
+                  <span>
+                    {a.order_no}. {a.text}
+                  </span>
+                  <span className="a">
+                    {a.label}{' '}
+                    <Text span c="dimmed">
+                      ({a.score})
+                    </Text>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </details>
+        )
+      })}
+    </div>
   )
 }

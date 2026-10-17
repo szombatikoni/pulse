@@ -127,3 +127,221 @@ body {
   border-top: 1px solid var(--mantine-color-dark-5);
   padding-top: 8px;
 }
+
+/* ---------- Rétegek keretek helyett (2026-10-17) ----------
+   Háttér (dark-7) < kártya (--pulse-card) < kiemelt elem (--pulse-raised).
+   Keret csak a beviteli mezőkön marad; a másodlagos gomb keret nélküli. */
+:root {
+  --pulse-card: #2b2a29;
+  --pulse-raised: #353432;
+  --pulse-severe: #ff4545;
+}
+.mantine-Paper-root {
+  background-color: var(--pulse-card);
+}
+.mantine-Paper-root[data-with-border] {
+  border-color: transparent;
+}
+.mantine-AppShell-header {
+  background-color: var(--mantine-color-dark-8);
+  border-bottom-color: transparent;
+}
+.mantine-Button-root[data-variant='default'] {
+  border-color: transparent;
+  background-color: var(--pulse-raised);
+}
+.mantine-Button-root[data-variant='default']:hover {
+  background-color: var(--mantine-color-dark-5);
+}
+.mantine-Button-root[data-variant='default'][aria-pressed='true'] {
+  background-color: var(--mantine-color-dark-5);
+  box-shadow: inset 0 -2px 0 var(--mantine-color-dark-0);
+}
+.pulse-card {
+  background-color: var(--pulse-card);
+}
+/* A kártyán belüli választógombok és a kártyák a kártya színéhez igazodnak. */
+.mantine-Paper-root .pulse-choice {
+  background: var(--pulse-raised);
+  border-color: transparent;
+}
+.mantine-Paper-root .pulse-choice[aria-checked='true'] {
+  background: var(--mantine-color-dark-0);
+}
+
+/* Orvosi beteglista: rétegzett sorok, az egész sor link. */
+.pulse-ptable {
+  display: grid;
+  gap: 6px;
+}
+.pulse-prow-head,
+.pulse-prow {
+  display: grid;
+  grid-template-columns: 130px minmax(140px, 1.1fr) minmax(0, 2.4fr) minmax(130px, 1fr) 110px;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 16px;
+}
+.pulse-prow-head {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mantine-color-dark-2);
+  padding-block: 2px;
+}
+.pulse-prow {
+  background: var(--pulse-card);
+  color: inherit;
+  text-decoration: none;
+}
+.pulse-prow:hover {
+  background: var(--pulse-raised);
+}
+.pulse-prow:focus-visible {
+  outline: 2px solid var(--mantine-color-dark-0);
+  outline-offset: 2px;
+}
+.pulse-prow > span {
+  min-width: 0;
+}
+@media (max-width: 52em) {
+  .pulse-prow-head {
+    display: none;
+  }
+  .pulse-prow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+  }
+  .pulse-prow .c-status,
+  .pulse-prow .c-reason,
+  .pulse-prow .c-tasks {
+    grid-column: 1 / -1;
+  }
+  .pulse-prow .c-name {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  .pulse-prow .c-fresh {
+    grid-row: 2;
+    grid-column: 2;
+    text-align: right;
+  }
+}
+
+/* Riasztás: kiemelt elem a kártyán belül, idővonallal. */
+.pulse-alert {
+  background: var(--pulse-raised);
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+.pulse-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 2px;
+  display: grid;
+  gap: 6px;
+}
+.pulse-timeline li {
+  display: grid;
+  grid-template-columns: 12px 110px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+.pulse-timeline .dot {
+  width: 8px;
+  height: 8px;
+  background: var(--mantine-color-dark-2);
+  align-self: center;
+}
+.pulse-timeline li:first-child .dot {
+  background: var(--mantine-color-dark-0);
+}
+@media (max-width: 30em) {
+  .pulse-timeline li {
+    grid-template-columns: 12px minmax(0, 1fr);
+  }
+  .pulse-timeline li > :last-child {
+    grid-column: 2;
+  }
+}
+
+/* Kérdőív-kitöltések: pontsáv, sávnév; kattintásra a válaszok. */
+.pulse-subs {
+  display: grid;
+  gap: 4px;
+}
+.pulse-subs summary {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) minmax(60px, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 4px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 14px;
+}
+.pulse-subs summary::-webkit-details-marker {
+  display: none;
+}
+.pulse-subs summary:hover {
+  background: var(--pulse-raised);
+}
+.pulse-subs .when {
+  color: var(--mantine-color-dark-2);
+}
+.pulse-subs .bar {
+  height: 8px;
+  background: var(--mantine-color-dark-7);
+  position: relative;
+}
+.pulse-subs .bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--mantine-color-dark-1);
+}
+.pulse-subs .score {
+  font-weight: 700;
+}
+.pulse-subs .band {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+}
+.pulse-subs .answers {
+  margin: 0 0 8px;
+  padding: 6px 4px 6px 24px;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--mantine-color-dark-1);
+}
+.pulse-subs .answers li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pulse-subs .answers .a {
+  text-align: right;
+}
+@media (max-width: 30em) {
+  .pulse-subs summary {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .pulse-subs .name,
+  .pulse-subs .bar {
+    display: none;
+  }
+}
+
+/* A riasztást kiváltó mérés jele az orvosi előzményekben. */
+.pulse-history .vl .over {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  background: var(--pulse-warn);
+  vertical-align: middle;
+}

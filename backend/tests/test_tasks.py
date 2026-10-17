@@ -208,3 +208,12 @@ def test_tasks_endpoint_for_patient_and_assigned_doctor_only(client, db, setup):
     for user in (other_doctor, other_patient, admin):
         assert client.get(url, headers=auth(user)).status_code == 403
     assert client.get(url).status_code == 401
+
+
+def test_doctor_list_and_detail_include_the_tasks(client, db, setup):
+    """Az orvos a beteglistán és az adatlapon is látja, követi-e a beteg a tervet."""
+    bp_daily(db, setup, start=(datetime.now(settings.tz) - timedelta(days=3)).date())
+    [row] = client.get("/api/doctor/patients", headers=auth(setup["doctor"])).json()
+    assert [t["code"] for t in row["tasks"]] == ["blood_pressure"]
+    detail = client.get(f"/api/patients/{setup['pid']}", headers=auth(setup["doctor"])).json()
+    assert detail["tasks"] == row["tasks"]
