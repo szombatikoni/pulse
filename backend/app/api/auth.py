@@ -36,5 +36,9 @@ def me(user: CurrentUser) -> CurrentUserResponse:
     milyen szerepkörben kell kiszolgálnia)."""
     profile = user.patient_profile or user.doctor_profile
     return CurrentUserResponse(
-        id=user.id, email=user.email, role=user.role, name=profile.name if profile else None
+        id=user.id,
+        email=user.email,
+        role=user.role,
+        name=profile.name if profile else None,
+        patient_id=user.patient_profile.id if user.patient_profile else None,
     )

@@ -9,27 +9,43 @@ Minden betegadatot érintő végpont ezen keresztül ellenőriz:
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import exists, or_, select
+from sqlalchemy import ColumnElement, Select, and_, exists, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import DoctorPatient, User, UserRole
+from app.models import DoctorPatient, PatientProfile, User, UserRole
+
+
+def _valid_at(at: datetime) -> ColumnElement[bool]:
+    """Az összerendelés érvényes az adott pillanatban: valid_from <= at, és
+    valid_to üres vagy későbbi."""
+    return and_(
+        DoctorPatient.valid_from <= at,
+        or_(DoctorPatient.valid_to.is_(None), DoctorPatient.valid_to > at),
+    )
 
 
 def active_assignment_exists(
     db: Session, doctor_id: uuid.UUID, patient_id: uuid.UUID, at: datetime | None = None
 ) -> bool:
-    """Van-e az adott pillanatban érvényes orvos–beteg összerendelés.
-    Érvényes: valid_from <= at, és valid_to üres vagy későbbi."""
+    """Van-e az adott pillanatban érvényes orvos–beteg összerendelés."""
     at = at or datetime.now(UTC)
     query = select(
         exists().where(
             DoctorPatient.doctor_id == doctor_id,
             DoctorPatient.patient_id == patient_id,
-            DoctorPatient.valid_from <= at,
-            or_(DoctorPatient.valid_to.is_(None), DoctorPatient.valid_to > at),
+            _valid_at(at),
         )
     )
     return bool(db.scalar(query))
+
+
+def assigned_patients_query(doctor_id: uuid.UUID, at: datetime) -> Select[tuple[PatientProfile]]:
+    """Az orvoshoz az adott pillanatban rendelt betegek (a beteglistához)."""
+    return (
+        select(PatientProfile)
+        .join(DoctorPatient, DoctorPatient.patient_id == PatientProfile.id)
+        .where(DoctorPatient.doctor_id == doctor_id, _valid_at(at))
+    )
 
 
 def can_access_patient(db: Session, user: User, patient_id: uuid.UUID) -> bool:

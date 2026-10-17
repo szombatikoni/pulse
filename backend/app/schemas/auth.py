@@ -22,3 +22,6 @@ class CurrentUserResponse(BaseModel):
     email: str
     role: UserRole
     name: str | None = Field(description="A profil szerinti név; adminnál nincs.")
+    patient_id: uuid.UUID | None = Field(
+        description="Betegnél a betegprofil azonosítója (a saját adatai ezen érhetők el)."
+    )
