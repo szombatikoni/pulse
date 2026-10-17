@@ -39,14 +39,14 @@ test('az orvosi lista minden M2-státuszt mutat, prioritás szerint, idegen bete
 test('az adatlapon a riasztás magyarázattal és eseménytörténettel látszik', async ({ page }) => {
   await login(page, 'dr.kovacs@pulse.example')
   await page.getByRole('link', { name: 'Szabó János' }).click()
-  await page.getByText('Nyitott riasztások').waitFor()
-  await page.getByText('Küszöbszabály, 1. verzió · közepes').waitFor()
-  const detail = await mainText(page)
-
-  expect(detail).toContain('Feltétel: Szisztolés > 140 Hgmm vagy Diasztolés > 90 Hgmm')
-  expect(detail).toContain('Keletkezett')
-  expect(detail).toContain('Ismételt aktiválódás')
-  expect(detail.includes('86,4 kg') || detail.includes('85,8 kg')).toBe(true)
+  // Az adatlap részei (riasztások, kitöltések, mérések) külön kéréssel töltődnek
+  // be, ezért az ellenőrzés addig vár, amíg a szöveg megjelenik (expect … toContainText).
+  const main = page.locator('main')
+  await expect(main).toContainText('Küszöbszabály, 1. verzió · közepes')
+  await expect(main).toContainText('Feltétel: Szisztolés > 140 Hgmm vagy Diasztolés > 90 Hgmm')
+  await expect(main).toContainText('Keletkezett')
+  await expect(main).toContainText('Ismételt aktiválódás')
+  await expect(main).toContainText(/86,4 kg|85,8 kg/)
 })
 
 test('idegen beteg adatlapja: a szerver 403-at ad, a felület jogosultsági hibát mutat', async ({
@@ -127,10 +127,9 @@ test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a
   expect(first).toContain('Szisztolés 165 Hgmm (> 140)')
 
   await page.getByRole('link', { name: 'Tóth Mária' }).click()
-  await page.getByText('Kérdőív-kitöltések').waitFor()
-  const detail = await mainText(page)
-  expect(detail).toContain('Kérdőívszabály, 1. verzió')
-  expect(detail).toContain('pontszáma a(z) figyelmeztető vagy kritikus sávban')
-  expect(detail).toContain('13 / 13')
-  expect(detail).toContain('kritikus')
+  const main = page.locator('main')
+  await expect(main).toContainText('Kérdőívszabály, 1. verzió')
+  await expect(main).toContainText('pontszáma a(z) figyelmeztető vagy kritikus sávban')
+  await expect(main).toContainText('13 / 13')
+  await expect(main).toContainText('kritikus')
 })
