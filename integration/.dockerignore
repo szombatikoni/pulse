@@ -1,0 +1,4 @@
+# A futtató képbe csak a függőségek leírása kell; a többi fájl kötetként érkezik.
+*
+!package.json
+!package-lock.json
