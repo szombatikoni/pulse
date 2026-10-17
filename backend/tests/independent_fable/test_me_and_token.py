@@ -31,13 +31,20 @@ def test_me_patient(client, db: Session):
     response = client.get(ME_URL, headers=bearer(login_token(client, account)))
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"id", "email", "role", "name"}
+    # 2026-10-12 (M2, mérés-folyamat): a válasz a `patient_id` mezővel bővült — a
+    # betegfelület ebből tudja a saját betegprofil-azonosítóját. Független
+    # átnézés után elfogadva: csak a hívó SAJÁT profiljának azonosítója, idegen
+    # adat nem; orvosnál és adminnál null (lásd a következő két tesztet).
+    assert set(body) == {"id", "email", "role", "name", "patient_id"}
     assert body == {
         "id": str(account.user.id),
         "email": account.email,
         "role": "patient",
         "name": "Kovács Anna",
+        "patient_id": str(account.user.patient_profile.id),
     }
+    # A profil azonosítója nem a felhasználóé (a kettő külön kulcstér).
+    assert body["patient_id"] != body["id"]
 
 
 def test_me_doctor(client, db: Session):
@@ -46,6 +53,7 @@ def test_me_doctor(client, db: Session):
     assert body["role"] == "doctor"
     assert body["name"] == "Dr. Szabó Péter"
     assert body["id"] == str(account.user.id)
+    assert body["patient_id"] is None  # orvosnak nincs betegprofilja
 
 
 def test_me_admin_has_null_name(client, db: Session):
@@ -53,6 +61,7 @@ def test_me_admin_has_null_name(client, db: Session):
     body = client.get(ME_URL, headers=bearer(login_token(client, account))).json()
     assert body["role"] == "admin"
     assert body["name"] is None
+    assert body["patient_id"] is None
 
 
 def test_me_does_not_expose_password_hash(client, db: Session):

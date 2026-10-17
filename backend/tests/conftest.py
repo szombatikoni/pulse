@@ -53,3 +53,11 @@ def client(db: Session) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def measurement_types(db: Session) -> None:
+    """A méréstípus-törzsadatok (a demóadatokkal azonos forrásból)."""
+    from tests.factories import make_measurement_types
+
+    make_measurement_types(db)

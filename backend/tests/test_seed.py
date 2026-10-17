@@ -2,8 +2,18 @@
 
 from sqlalchemy import func, select
 
-from app.models import DoctorPatient, User
+from app.models import (
+    Alert,
+    Assignment,
+    DoctorPatient,
+    Measurement,
+    QuestionnaireTemplate,
+    Rule,
+    Submission,
+    User,
+)
 from app.services.access import can_access_patient
+from app.services.status import PatientStatus, doctor_patient_list
 from app.services.users import get_user_by_email
 from seed.demo import ASSIGNMENTS, DEMO_PASSWORD, USERS, seed_demo_data
 
@@ -21,11 +31,44 @@ def test_seed_creates_demo_accounts_and_assignments(db):
 
 def test_seed_is_idempotent(db):
     seed_demo_data(db)
-    users, links = count(db, User), count(db, DoctorPatient)
+    models = (
+        User,
+        DoctorPatient,
+        Rule,
+        Measurement,
+        Alert,
+        QuestionnaireTemplate,
+        Assignment,
+        Submission,
+    )
+    before = [count(db, m) for m in models]
     second_run = seed_demo_data(db)
-    assert count(db, User) == users
-    assert count(db, DoctorPatient) == links
-    assert not any(line.startswith(("létrehozva", "összerendelve")) for line in second_run)
+    assert [count(db, m) for m in models] == before
+    created = (
+        "létrehozva",
+        "összerendelve",
+        "méréstípus",
+        "szabályok",
+        "mérések",
+        "kérdőív",
+        "kirendelés",
+        "kitöltések",
+    )
+    assert not any(line.startswith(created) for line in second_run)
+
+
+def test_seeded_doctor_list_shows_every_m2_status(db):
+    # A bemutatóhoz: Kovács doktor listáján minden M2-beli státusz megjelenik,
+    # a valódi szabálykiértékelés eredményeként, priorizálva.
+    seed_demo_data(db)
+    kovacs = get_user_by_email(db, "dr.kovacs@pulse.example")
+    rows = doctor_patient_list(db, kovacs.doctor_profile.id)
+    assert [(p.name, r.status) for p, r in rows] == [
+        ("Varga Béla", PatientStatus.SEVERE),
+        ("Szabó János", PatientStatus.ATTENTION),
+        ("Kiss Ilona", PatientStatus.NO_DATA),
+        ("Molnár Katalin", PatientStatus.OK),
+    ]
 
 
 def test_seeded_doctor_sees_only_own_patient(db):
