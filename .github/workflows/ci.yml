@@ -78,9 +78,38 @@ jobs:
         run: npm run build
 
   docker:
-    name: Docker-image-ek építése
+    name: Docker-image-ek és böngészős teszt
     runs-on: ubuntu-latest
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v7
-      - run: docker compose build
+      # Ugyanaz az indítás, mint a README-ben: tiszta adatbázis, majd a demóadat.
+      - name: Az image-ek építése és a rendszer indítása
+        run: docker compose up --build -d --wait
+      - name: Mesterséges demóadat (seed)
+        run: docker compose exec -T api python -m seed
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - name: Playwright és a Chromium telepítése
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Böngészős folyamatteszt (a két M2-folyamat a felületen)
+        working-directory: e2e
+        run: npx playwright test
+      - name: Hiba esetén a képernyőképek és a nyomkövetés feltöltése
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-eredmeny
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 7
+      - name: Hiba esetén a konténerek naplója
+        if: failure()
+        run: docker compose logs --no-color
