@@ -16,6 +16,8 @@ async function login(page: Page, email: string) {
 // A táblázatsorok és az oldal szövege egy sorba fűzve, egyszerű szóközökkel.
 const rowsText = async (page: Page) =>
   (await page.locator('tbody tr').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+// Az előzmények sorai (napokra bontott lista).
+const history = (page: Page) => page.locator('.pulse-history li')
 const mainText = async (page: Page) =>
   (await page.locator('main').innerText()).replace(/\s+/g, ' ')
 
@@ -75,25 +77,49 @@ test('mérés-folyamat, beteg: vérnyomás és pulzus rögzítése', async ({ pa
   await expect(page).toHaveURL(/\/patient$/)
   await page.getByText('Új mérés').waitFor()
 
+  // Elgépelt érték (400 Hgmm): a felület nem írja át csendben 300-ra, hanem a
+  // szerver elutasítja, és a beteg látja, miért; a mező tartalma megmarad.
+  await page.getByLabel('Szisztolés (Hgmm)').fill('400')
+  await page.getByLabel('Diasztolés (Hgmm)').fill('98')
+  await page.getByRole('button', { name: 'Mentés' }).click()
+  await expect(
+    page.getByText('A(z) Szisztolés értéke kívül esik a rögzíthető tartományon.'),
+  ).toBeVisible()
+  await expect(page.getByLabel('Szisztolés (Hgmm)')).toHaveValue('400')
+  await expect(history(page).filter({ hasText: /(300|400)\/98 Hgmm/ })).toHaveCount(0)
+
   // Többértékű mérés: a vérnyomás két értéke egy mérésben.
   await page.getByLabel('Szisztolés (Hgmm)').fill('165')
   await page.getByLabel('Diasztolés (Hgmm)').fill('98')
   await page.getByRole('button', { name: 'Mentés' }).click()
   await expect(page.getByText('A mérés elmentve.')).toBeVisible()
-  await expect(page.getByRole('cell', { name: '165/98 Hgmm' }).first()).toBeVisible()
+  await expect(history(page).filter({ hasText: '165/98 Hgmm' }).first()).toBeVisible()
 
   // Egyértékű mérés: pulzus.
-  await page.locator('input[aria-haspopup="listbox"]').click()
-  await page.getByRole('option', { name: 'Pulzus' }).click()
+  // A méréstípus gombsor (SegmentedControl): a látható feliratra kattintunk.
+  await page.locator('label').filter({ hasText: /^Pulzus$/ }).click()
   await page.getByLabel('Pulzus (/perc)').fill('72')
   await page.getByRole('button', { name: 'Mentés' }).click()
-  await expect(page.getByRole('cell', { name: '72 /perc' }).first()).toBeVisible()
+  await expect(history(page).filter({ hasText: '72 /perc' }).first()).toBeVisible()
+
+  // A teendők kártyái (az előírásokból számolva): a mai pulzus kész, a tegnapi
+  // elmaradt, de pótolható. A „Pótlás" a tegnapi időponttal tölti elő az űrlapot.
+  const pulseTask = page.locator('.pulse-task').filter({ hasText: 'Pulzus' })
+  await expect(pulseTask).toContainText('KÉSZ')
+  await pulseTask.getByRole('button', { name: 'Pótlás' }).click()
+  await expect(page.getByLabel('A mérés ideje')).toBeVisible()
+  await page.getByLabel('Pulzus (/perc)').fill('70')
+  await page.getByRole('button', { name: 'Mentés' }).click()
+  await expect(page.getByText('A mérés elmentve.')).toBeVisible()
+  await expect(pulseTask.getByRole('button', { name: 'Pótlás' })).toHaveCount(0)
 })
 
 test('kérdőív-folyamat, beteg: kitöltés és beküldés, a pontszám nem látszik', async ({ page }) => {
   await login(page, 'toth.maria@pulse.example')
   await expect(page).toHaveURL(/\/patient$/)
   await page.getByText('Kitöltendő kérdőívek').waitFor()
+  const wellbeingTask = page.locator('.pulse-task').filter({ hasText: 'Közérzet' })
+  await expect(wellbeingTask).toContainText('ESEDÉKES')
 
   // Alvás 1, fáradtság 5, szédülés naponta: 4 + 4 + 5 = 13 pont (kritikus sáv).
   await page
@@ -104,9 +130,10 @@ test('kérdőív-folyamat, beteg: kitöltés és beküldés, a pontszám nem lá
     .getByRole('radiogroup', { name: 'Mennyire fáradt ma?' })
     .getByText('5', { exact: true })
     .click()
-  await page.getByLabel('Naponta').check()
+  await page.getByRole('radio', { name: 'Naponta' }).click()
   await page.getByRole('button', { name: 'Beküldés' }).click()
   await expect(page.getByText('Köszönjük, a kitöltés beérkezett.')).toBeVisible()
+  await expect(wellbeingTask).toContainText('KÉSZ')
 
   const text = await mainText(page)
   expect(text).not.toMatch(/\d+\s*(\/\s*\d+\s*)?pont/)

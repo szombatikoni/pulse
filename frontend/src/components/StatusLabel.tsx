@@ -5,19 +5,19 @@ import { useTranslation } from 'react-i18next'
 import type { PatientStatus } from '../api/patients'
 import { STATUS_COLOR } from './statusColors'
 
-const INK = '#101216' // az ikonon belüli jel színe (az oldal háttere)
+const INK = '#252423' // az ikonon belüli jel színe (az oldal háttere, theme.ts dark[7])
 
 const ICONS: Record<PatientStatus, ReactNode> = {
   severe: (
     <>
       <path d="M8 1 15 8 8 15 1 8Z" fill="currentColor" />
-      <path d="M8 4.6v4.2M8 11v.7" stroke={INK} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 4.2v4.6M8 11.4v.4" stroke={INK} strokeWidth="2.2" strokeLinecap="round" />
     </>
   ),
   attention: (
     <>
       <path d="M8 1.5 15 14H1Z" fill="currentColor" />
-      <path d="M8 6v3.6M8 11.5v.6" stroke={INK} strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M8 5.6v4M8 12v.3" stroke={INK} strokeWidth="2.1" strokeLinecap="round" />
     </>
   ),
   no_data: (
@@ -50,7 +50,7 @@ const ICONS: Record<PatientStatus, ReactNode> = {
         d="m4.8 8.2 2.2 2.2 4.2-4.4"
         fill="none"
         stroke={INK}
-        strokeWidth="1.8"
+        strokeWidth="2.1"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -58,7 +58,7 @@ const ICONS: Record<PatientStatus, ReactNode> = {
   ),
 }
 
-export function StatusIcon({ status, size = 16 }: { status: PatientStatus; size?: number }) {
+export function StatusIcon({ status, size = 18 }: { status: PatientStatus; size?: number }) {
   return (
     <svg
       width={size}
@@ -72,14 +72,14 @@ export function StatusIcon({ status, size = 16 }: { status: PatientStatus; size?
   )
 }
 
-/** Státusz = ikon + szín + egy szó, doboz nélkül. */
+/** Státusz = színes ikon + egy szó, doboz nélkül; a szó a normál szövegszínű. */
 export function StatusLabel({ status }: { status: PatientStatus }) {
   const { t } = useTranslation()
   const loud = status === 'severe' || status === 'attention'
   return (
     <Group gap={6} wrap="nowrap">
       <StatusIcon status={status} />
-      <Text span size="sm" fw={loud ? 700 : 500} style={{ color: STATUS_COLOR[status] }}>
+      <Text span size="sm" fw={loud ? 700 : 500}>
         {t(`status.${status}`)}
       </Text>
     </Group>

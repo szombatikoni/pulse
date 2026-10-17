@@ -21,15 +21,9 @@ function StatusCounts({ patients }: { patients: PatientSummary[] }) {
         return (
           <Group key={status} gap={6} opacity={count === 0 ? 0.45 : 1}>
             <StatusIcon status={status} />
-            <Text
-              fw={700}
-              style={{ color: count && LOUD.includes(status) ? STATUS_COLOR[status] : undefined }}
-            >
-              {count}
-            </Text>
-            <Text size="sm" c="dimmed">
-              {t(`status.${status}`)}
-            </Text>
+            {/* Csak az ikon színes, a szám és a szó normál szövegszínű. */}
+            <Text fw={700}>{count}</Text>
+            <Text size="sm">{t(`status.${status}`)}</Text>
           </Group>
         )
       })}
@@ -90,7 +84,7 @@ export function DoctorPatientsPage() {
                       </Text>
                       {others.map((r, i) => (
                         <Group key={i} gap={6} mt={4} wrap="nowrap">
-                          <StatusIcon status={r.status} size={12} />
+                          <StatusIcon status={r.status} size={14} />
                           <Text size="xs" c="dimmed">
                             {reasonText(t, r)}
                           </Text>

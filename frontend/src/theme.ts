@@ -17,17 +17,20 @@ const pulseRed: MantineColorsTuple = [
 // Sötét skála a státuszterv színeiből (docs/design/statusz_javaslat.html).
 // A Mantine sötét témában: 0 = szöveg, 2 = másodlagos szöveg, 4 = keret,
 // 6 = mezők és gombok háttere, 7 = oldalháttér.
+// 2026-10-17: semleges (nem kékes) szürke skála, a megszokott sötét
+// fejlesztői felületekhez hasonló árnyalatokkal; a háttér nem majdnem fekete,
+// a másodlagos szöveg kontrasztosabb.
 const dark: MantineColorsTuple = [
-  '#e8eaed',
-  '#b4b9c1',
-  '#7d848f',
-  '#5c636e',
-  '#2c313b',
-  '#262a32',
-  '#1e222a',
-  '#101216',
-  '#0b0d10',
-  '#07080a',
+  '#f3f2f1',
+  '#c8c6c4',
+  '#a19f9d',
+  '#797775',
+  '#484644',
+  '#3b3a39',
+  '#323130',
+  '#252423',
+  '#201f1e',
+  '#1b1a19',
 ]
 
 const fontFamily = "'Inter Variable', system-ui, sans-serif"

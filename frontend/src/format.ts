@@ -19,6 +19,12 @@ export function unitLabel(t: TFunction, unit: string): string {
   return key ? t(`units.${key}`) : unit
 }
 
+/** A `datetime-local` mező formátuma helyi időben: 2026-10-12T07:30. */
+export function toLocalInput(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(value)
 }
@@ -32,7 +38,7 @@ export function formatDateTime(iso: string): string {
   }).format(new Date(iso))
 }
 
-function formatTime(date: Date): string {
+export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' }).format(date)
 }
 
@@ -69,6 +75,50 @@ export function formatMeasurementValue(t: TFunction, measurement: Measurement): 
     return `${formatNumber(byCode.systolic)}/${formatNumber(byCode.diastolic)} ${unit}`
   }
   return measurement.values.map((v) => `${formatNumber(v.value)} ${unit}`).join(', ')
+}
+
+/** Egy mérés száma egység nélkül: „152/95", „85,8". */
+export function formatMeasurementNumber(measurement: Measurement): string {
+  if (measurement.type_code === 'blood_pressure') {
+    const byCode = Object.fromEntries(measurement.values.map((v) => [v.component, v.value]))
+    return `${formatNumber(byCode.systolic)}/${formatNumber(byCode.diastolic)}`
+  }
+  return measurement.values.map((v) => formatNumber(v.value)).join(', ')
+}
+
+/** A nap felirata az előzményekhez: „Ma, szombat", „Tegnap, péntek", „október 15., csütörtök". */
+export function formatDayLabel(t: TFunction, iso: string, now = new Date()): string {
+  const date = new Date(iso)
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const days = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000)
+  const weekday = new Intl.DateTimeFormat(locale(), { weekday: 'long' }).format(date)
+  if (days === 0) return t('relative.dayToday', { weekday })
+  if (days === 1) return t('relative.dayYesterday', { weekday })
+  const day = new Intl.DateTimeFormat(locale(), { month: 'long', day: 'numeric' }).format(date)
+  return `${day}, ${weekday}`
+}
+
+/** Egy közeli időpont röviden: „ma 10:00", „holnap 21:00", „hétfő 20:00". */
+export function formatSoon(t: TFunction, iso: string, now = new Date()): string {
+  const date = new Date(iso)
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const days = Math.round((startOfDay(date) - startOfDay(now)) / 86_400_000)
+  const time = formatTime(date)
+  if (days === 0) return t('tasks.today', { time })
+  if (days === 1) return t('tasks.tomorrow', { time })
+  const day = new Intl.DateTimeFormat(locale(), { weekday: 'long' }).format(date)
+  return t('tasks.weekday', { day, time })
+}
+
+/** Pótlási határ: éjfélre eső időpontnál „vasárnap éjfélig", különben „hétfő 10:00". */
+export function formatUntil(t: TFunction, iso: string, now = new Date()): string {
+  const date = new Date(iso)
+  if (date.getHours() === 0 && date.getMinutes() === 0) {
+    const dayBefore = new Date(date.getTime() - 60_000)
+    const day = new Intl.DateTimeFormat(locale(), { weekday: 'long' }).format(dayBefore)
+    return t('tasks.untilMidnight', { day })
+  }
+  return formatSoon(t, iso, now)
 }
 
 /** Határátlépés olvashatóan: „Szisztolés 152 Hgmm (> 140)". */

@@ -1,15 +1,4 @@
-import {
-  Alert,
-  Button,
-  Checkbox,
-  Group,
-  Paper,
-  Radio,
-  SegmentedControl,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Paper, Stack, Text, Title } from '@mantine/core'
 import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -25,6 +14,45 @@ import { formatDateTime } from '../../format'
 
 type Answers = Record<string, string | string[]>
 
+/** Egy választás nagy, érintésre is kényelmes gombokkal (skála vagy egy választás). */
+function ChoiceButtons({
+  question,
+  value,
+  onChange,
+  showValue,
+}: {
+  question: Question
+  value: string | undefined
+  onChange: (value: string) => void
+  showValue: boolean
+}) {
+  const n = question.options.length
+  return (
+    <div
+      role="radiogroup"
+      aria-label={question.text}
+      className="pulse-choices"
+      style={{
+        gridTemplateColumns:
+          n <= 5 ? `repeat(${n}, minmax(0, 1fr))` : 'repeat(auto-fit, minmax(96px, 1fr))',
+      }}
+    >
+      {question.options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          className="pulse-choice"
+          onClick={() => onChange(o.value)}
+        >
+          {showValue ? o.value : o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function QuestionInput({
   question,
   value,
@@ -34,23 +62,19 @@ function QuestionInput({
   value: string | string[] | undefined
   onChange: (value: string | string[]) => void
 }) {
+  const single = typeof value === 'string' ? value : undefined
   if (question.question_type === 'scale') {
     // A skála két végének felirata a válaszlehetőségekben van („1 – nagyon rosszul").
     const first = question.options[0]
     const last = question.options[question.options.length - 1]
     return (
       <Stack gap={4}>
-        <SegmentedControl
-          data={question.options.map((o) => ({ value: o.value, label: o.value }))}
-          value={typeof value === 'string' ? value : ''}
-          onChange={onChange}
-          aria-label={question.text}
-        />
-        <Group justify="space-between">
+        <ChoiceButtons question={question} value={single} onChange={onChange} showValue />
+        <Group justify="space-between" wrap="nowrap" gap="md">
           <Text size="xs" c="dimmed">
             {first.label}
           </Text>
-          <Text size="xs" c="dimmed">
+          <Text size="xs" c="dimmed" ta="right">
             {last.label}
           </Text>
         </Group>
@@ -59,17 +83,7 @@ function QuestionInput({
   }
   if (question.question_type === 'single') {
     return (
-      <Radio.Group
-        value={typeof value === 'string' ? value : null}
-        onChange={onChange}
-        aria-label={question.text}
-      >
-        <Group gap="lg">
-          {question.options.map((o) => (
-            <Radio key={o.value} value={o.value} label={o.label} />
-          ))}
-        </Group>
-      </Radio.Group>
+      <ChoiceButtons question={question} value={single} onChange={onChange} showValue={false} />
     )
   }
   return (
@@ -102,9 +116,15 @@ export function QuestionnaireForm({
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
   // A többválasztós kérdésre az üres válasz is érvényes („egyik sem").
-  const complete = questionnaire.questions.every(
-    (q) => q.question_type === 'multi' || typeof answers[q.id] === 'string',
-  )
+  const isAnswered = (q: Question) =>
+    q.question_type === 'multi' || typeof answers[q.id] === 'string'
+  const total = questionnaire.questions.length
+  const answered = questionnaire.questions.filter(
+    (q) =>
+      typeof answers[q.id] === 'string' ||
+      (Array.isArray(answers[q.id]) && answers[q.id].length > 0),
+  ).length
+  const complete = questionnaire.questions.every(isAnswered)
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -142,12 +162,13 @@ export function QuestionnaireForm({
   }
 
   return (
-    <Paper withBorder p="md">
+    <Paper withBorder p="md" id={`kerdoiv-${questionnaire.code}`}>
       <form onSubmit={onSubmit}>
         <Stack gap="md">
           <div>
             <Title order={4}>{questionnaire.name}</Title>
             <Text size="sm" c="dimmed">
+              {t('questionnaires.questionCount', { count: total })} ·{' '}
               {questionnaire.last_submitted_at
                 ? t('questionnaires.lastSubmitted', {
                     when: formatDateTime(questionnaire.last_submitted_at),
@@ -172,10 +193,13 @@ export function QuestionnaireForm({
               />
             </Stack>
           ))}
-          <Group>
+          <Group gap="md">
             <Button type="submit" loading={submit.isPending} disabled={!complete}>
               {t('questionnaires.submit')}
             </Button>
+            <Text size="sm" c="dimmed">
+              {t('questionnaires.progress', { answered, total })}
+            </Text>
           </Group>
         </Stack>
       </form>
