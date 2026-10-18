@@ -16,9 +16,9 @@ PULSE — Patient Understanding through Limits, Signals and Evaluation. Chronic 
 | Leadandó | Hol található |
 |---|---|
 | Feladatkiírás | [PULSE_M1.pdf](docs/M1/PULSE_M1.pdf), 1. fejezet (forrás: [01_feladatkiiras.md](docs/M1/01_feladatkiiras.md)) |
-| Funkcionális specifikáció | [PULSE_M1.pdf](docs/M1/PULSE_M1.pdf), 2–6. fejezet: követelmények, adatmodell, működési szabályok, folyamatábrák, képernyővázlatok; a use-case ábra a kezdeti dolgozat 3. fejezetében |
-| Kezdeti dolgozat | forrás: [docs/dolgozat/](docs/dolgozat/); a PDF-et a témavezetőnek e-mailben küldtem |
-| PoC (működő prototípus) | a kód az `m2` címkénél; indítás: lásd lent; bemutató videó: a témavezetőnek e-mailben küldtem; integrációs próba: [integration/](integration/) |
+| Funkcionális specifikáció | [PULSE_M1.pdf](docs/M1/PULSE_M1.pdf), 2–6. fejezet: követelmények, adatmodell, működési szabályok, folyamatábrák, képernyővázlatok; a use-case ábra a kezdeti dolgozat 3. fejezetében ([images/use_case.png](images/use_case.png)) |
+| Kezdeti dolgozat | PDF: [Google Drive-mappa](https://drive.google.com/drive/folders/1P885HulHbnjETtmCZZ-CA2U3vybnIm5e?usp=sharing); forrás: [docs/dolgozat/](docs/dolgozat/) |
+| PoC (működő prototípus) | a kód az [`m2` címkénél](https://github.com/szombatikoni/pulse/tree/m2); indítás: lásd lent; bemutató videó: [Google Drive-mappa](https://drive.google.com/drive/folders/1P885HulHbnjETtmCZZ-CA2U3vybnIm5e?usp=sharing); integrációs próba: [integration/](integration/) |
 
 ## Indítás Dockerrel
 
