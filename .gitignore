@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -241,3 +241,11 @@ docs/M1/PULSE_M1.docx
 docs/dolgozat/build/
 docs/dolgozat/PULSE_szakdolgozat.docx
 docs/dolgozat/sablon/alap.docx
+
+# Böngészős teszt (e2e/): a futás eredményei és a jelentés
+e2e/test-results/
+e2e/playwright-report/
+
+# A dolgozat PDF-je nem kerül a repóba (versenytárs-képernyőképet tartalmaz);
+# a Google Drive-on érhető el, a README linkjén (2026-10-17-i döntés)
+docs/dolgozat/*.pdf

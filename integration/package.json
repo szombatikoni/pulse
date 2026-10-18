@@ -1,0 +1,18 @@
+{
+  "name": "pulse-cql-proba",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PULSE M2 integrációs próba: NICE NG136 1.2.7 szerinti otthoni vérnyomás-átlag CQL-ben, cql-execution motorral, FHIR R4 betegcsomagon.",
+  "type": "module",
+  "scripts": {
+    "forditas": "node forditas.mjs",
+    "futtatas": "node futtatas.mjs"
+  },
+  "dependencies": {
+    "cql-exec-fhir": "2.2.0",
+    "cql-execution": "3.3.2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

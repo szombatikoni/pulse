@@ -8,6 +8,409 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-10-17–18 — Teendőlista; a beteg- és az orvosi felület átalakítása; M2-levél
+
+- Eszköz: Claude Code; a telefonos nézet ellenőrzéséhez és az M3 tételes
+  bontásához független agent (Fable)
+
+- Az AI szerepe: a beteg teendőlistájának megvalósítása az M1 adatmodellje
+  szerint (mi esedékes, mi kész, mi maradt el, meddig pótolható); a betegoldal
+  és az orvosi nézet terve kattintható mintaoldalként, majd a megvalósítása; a
+  telefonos nézet ellenőrzése; az M3 tételes bontása időbecsléssel; a levél és a
+  bemutató videó forgatókönyvének tervezete.
+
+- Saját döntéseim:
+  - a teendőlista még az M2-be kerül, nem az M3-ba;
+  - a felület a túl sötét változat helyett semleges szürke témát kap; a
+    státusz szövege fehér, csak az ikon színes;
+  - a betegoldal és az orvosi nézet a jóváhagyott mintaoldalak szerint alakul
+    át; az admin-felület az M3 első hetében készül;
+  - ha egy kérdőív az adott időszakra már ki van töltve, a felület ezt jelzi,
+    és csak külön gombra nyílik meg újra;
+  - az M3-at a vállalt tartalommal tartom, ehhez megemelem a heti időmet.
+
+- Ellenőrzés:
+  - a rendszert saját kézzel végigpróbáltam beteg- és orvosszerepben; amit
+    zavarónak találtam (a pótlás és a mentés visszajelzése nem volt egyértelmű,
+    a kérdőív újratöltés után újra kitölthetőnek tűnt), azt javíttattam;
+  - a telefonos ellenőrzés talált egy hibát: az elgépelt mérési értéket a
+    beviteli mező csendben a határra vágta (400 helyett 300 került volna be);
+    javítva, a böngészős teszt ezt az esetet is ellenőrzi;
+  - a teendők számítását 9 új teszt ellenőrzi (napi és heti időszak, pótlási
+    határ, helyi éjfél, visszavont előírás, jogosultság); összesen 430 teszt,
+    98% lefedettség; a CI mindhárom része zöld.
+
+## 2026-10-16–17 — A témavezető M2 előtti levele; böngészős teszt; kódátnézés
+
+- Eszköz: Claude Code; a levél és a projekt összevetéséhez független átnéző
+  agent (Fable)
+
+- Az AI szerepe: a témavezető levelének összevetése a projekt tényleges
+  állapotával (mi teljesül már, mi hiányzik, mi kerül az M3-ba); a böngészős
+  folyamatteszt átvitele a repóba és a CI-ba; a dolgozat PDF-generálásának
+  javítása; a követelménytábla átalakítása.
+
+- Saját döntéseim:
+  - a böngészős folyamatteszt még az M2 előtt bekerül a CI-ba;
+  - a követelménytáblában minden sor három állapot egyikét kapja (bemutatható,
+    részben, terv), mellette a bizonyítékkal vagy a hiányzó résszel;
+  - a Motiváció záró bekezdése nem a kevesebb riasztást ígéri, hanem azt,
+    hogy megmutatom, hol és miért tér el a jelzés az egyszerű határérték-
+    figyeléstől;
+  - az M2 kódját (a mérés- és a kérdőív-folyamat, a böngészős teszt)
+    átnéztem és jóváhagytam a feltöltéshez.
+
+- Ellenőrzés:
+  - a böngészős teszt tiszta, frissen feltöltött példányon 6/6 lépésben zöld;
+    ellenpróbaként a beteg lépései nélkül az utolsó lépés elbukik;
+  - a követelménytábla bizonyítékait a tesztfájlokkal vetettük össze, a
+    tesztek lefutottak (421 teszt, 98% lefedettség);
+  - a generált dokumentumot oldalképen is átnéztük (táblázat, ábrahivatkozások).
+
+## 2026-10-15 — Versenytársak saját újraellenőrzése; Motiváció; működési döntések
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a Motiváció fejezet beillesztése a dolgozatba a saját
+  szövegem megtartásával, a módosítási javaslatok külön jelölve; a saját
+  ellenőrzéseim eredményének átvezetése a Területi áttekintésbe; az
+  összehasonlító ábra és cellánkénti bizonyítéktáblája; a címlap és a
+  táblázatok formázása; a vércukormérés klinikai gyakorlatának felkutatása
+  elsődleges forrásokból (ADA-ajánlás, LOINC-kódok, FHIR-útmutató); a
+  nyitott működési kérdések előkészítése döntésre, alternatívákkal.
+
+- Saját döntéseim:
+  - Motiváció: a kész rendszer helyett szándékként fogalmazom meg
+    („szeretnék megoldást készíteni"); kitérek arra, hogy nemcsak a kiugró
+    értékekre jelez; a forrás nélküli piaci állítás helyére forrásolt adat
+    került; a záró bekezdés leírja, hogyan ellenőrzöm a rendszert;
+  - a PULSE fő különbsége a meglévő megoldásokhoz képest: egy helyen kezeli a
+    mérést, a kérdőívet és a jelzést, a betegnek és az orvosnak is;
+  - a vállalás határai: a gyógyszerelés, az időpontfoglalás és a kétirányú
+    üzenetküldés nem része a rendszernek; helyette az M3-ban egyirányú orvosi
+    visszajelzés kerül a riasztás lezárásához;
+  - a mérés elfogadható értéktartománya „rögzíthető tartomány" néven marad,
+    mert a „referenciatartomány" orvosi jelentésű;
+  - a 7 napos frissességi határt megerősítettem (egyelőre marad);
+  - kérdőívnél nincs pótlás: a kitöltés az aktuális alkalomhoz számít, és a
+    kérdések időszaka igazodik a kirendelés gyakoriságához;
+  - a demó szabálybeállításai bemutató értékként maradnak;
+  - a beteg nem látja a pontszámát és a riasztását, ezeket az orvos értelmezi;
+  - a versenytárs-képernyőképek nem kerülnek a nyilvános repóba;
+  - a bemutató videó a Google Drive-on lesz, linkkel.
+
+- Visszakérdezéseim, amelyek nyomán a terv változott:
+  - miért ne a rögzítés tárolt időpontja döntené el, hogy egy mérés időben
+    vagy késve érkezett: így lett, a háttérfolyamat csak az adat nélküli
+    esetre kell;
+  - kell-e új státusz a követési terv nélküli betegnek: nem, hanem külön
+    címke a beteglistán, az okával együtt (még nincs terv / lejárt /
+    visszavonva);
+  - fontos-e az üzenetküldés: a teljes változat túl nagy, az egyirányú
+    visszajelzés belefér;
+  - alátámasztható-e tényekkel az összehasonlító táblázat: cellánkénti
+    bizonyítéktábla készült, és ahol nem volt forrás, a jelölés „nem
+    szerepel"-re változott.
+
+- Ellenőrzés és javítások:
+  - a mySugr elérhetőségét újra megnéztem a magyar App Store-ban: ma már
+    telepíthető, így a korábbi „Magyarországon nem elérhető" adat elavult; a
+    dolgozatban javítva, a telepített alkalmazásban tett megfigyeléseimmel;
+  - a Tidepoolt újra kipróbáltam: az adatfeltöltés egy telepítendő asztali
+    programot kér, a webes felületen kézi bevitel nincs; a dolgozat csak azt
+    állítja, amit kipróbáltam, a többit a dokumentációra hivatkozza;
+  - az ADA-ajánlás célértékét az eredeti táblázatból ellenőriztük, mert egy
+    keresési összefoglaló eltérő alsó határt adott;
+  - a 09-29-i bejegyzésben pontosítottam a kiértékelési szabálybeállítás
+    eredetét: az átvizsgálás javaslata volt, a kiértékelés előtt
+    döntök róla.
+
+## 2026-10-14 — A dolgozat első fejezeteinek tervezete; forrásellenőrzés
+
+- Eszköz: Claude Code; a források ellenőrzéséhez és a fejezetek két
+  független átnézéséhez további agentek (az átnézésekhez Fable)
+
+- Az AI szerepe: a dolgozat hat fejezetének szövegtervezete az M1-anyag, a
+  kód és a fejlesztői jegyzet alapján (Hasonló rendszerek, Funkcionális
+  specifikáció use-case ábrával, Architektúra, Adatmodell, Működés az
+  integrációs próbával, AI-eszközhasználat); a versenytársakra vonatkozó
+  állítások újraellenőrzése elsődleges forrásokból; a bemutató videó
+  forgatókönyve; a témavezetőnek szóló válaszlevél tervezete.
+
+- Saját döntéseim:
+  - a témavezetőnek írt válaszban vállaltam az integrációs irányt, és jeleztem,
+    hogy a januári záróvizsgáról október 25-ig döntök;
+  - a kódot átnézés előtt nem töltöm fel a repóba; addig helyi mentés
+    készült;
+  - az integrációs próba leírása a Működés fejezet végére kerül, és a
+    követelmények közé egy új sor (NF9) kerül hozzá.
+
+- Ellenőrzés és javítások:
+  - a versenytársakról szóló állításokat egy külön agent elsődleges
+    forrásokból újraellenőrizte, a legfontosabb idézeteket a nyers oldalakból
+    is visszakerestük. Négy adat elavult volt (például az egyik vérnyomásnapló
+    2026 szeptembere óta webes orvosi felületet is kínál); a fejezet ennek
+    megfelelően új érvelést javasol, erről még döntök;
+  - a fejezeteket egy független agent a kóddal, az M1-anyaggal és a
+    forrásokkal vetette össze (23 lelet, kritikus: az adatmodell-ábra
+    mezőnevei elavultak); a szövegszintű leleteket javítottuk, az ábrák
+    frissítése és a jóváhagyandó pontok rám várnak;
+  - az integrációs alfejezet számait és ajánlás-összefoglalóit egy második
+    független átnézés ellenőrizte; a pontosítások (például a 80 éves
+    korhatár, az ajánlás feltételenkénti leképezése) átvezetve.
+  - az adatmodell- és az architektúra-ábra a dolgozathoz a kód jelenlegi
+    állapota szerint frissült (a tervezett részek külön jelölve); egy
+    független átnézés a mezőket a migrációkkal vetette össze, a leletek
+    (például egy számosság és a migrációk helye) javítva.
+
+## 2026-10-12 — A mérés- és a kérdőív-folyamat; a CQL-próba
+
+- Eszköz: Claude Code; a CQL-motor beüzemeléséhez és két független
+  kódátnézéshez további agentek (az átnézésekhez Fable)
+
+- Az AI szerepe: a mérés- és a kérdőív-folyamat kódja (adatmodell és
+  migrációk, szabálykiértékelés, végpontok, felület, demóadatok, tesztek) az
+  M1-ben jóváhagyott terv szerint; a CQL-próba elkészítése (fordítás, motor,
+  kézi összevetés); két független kódátnézés.
+
+- Saját döntéseim:
+  - a határidő miatt a kódot az AI előre elkészíti, én utólag nézem át; a
+    nem jóváhagyott részleteket külön listán gyűjtjük, ezekről később döntök;
+  - minden elkészült részt független agenttel nézettem át;
+  - időzóna: a rendszer egy időzónával (Europe/Budapest) számol, nem
+    mérésenként tárolt eltolással (az átnézés vetette fel).
+
+- Ellenőrzés és javítások:
+  - a CQL-motor eredményét a motortól független kézi számítással vetettük
+    össze: hét paraméterváltozatban egyezik. A próba két hibát tárt fel: a
+    korábbi CQL-vázlat a lekérdezés alapértelmezett ismétlésszűrése miatt
+    hibás átlagot adott volna, a motor pedig egy alapérték nélküli paramétert
+    hibásan kezel (kerülőúttal megoldva);
+  - a független átnézés kritikus hibát nem talált; a fontos leletek közül az
+    időzónáról döntöttem, a többi javítva vagy az M3-ra jelölve;
+  - a teljes folyamatot böngészőben is végigpróbáltuk; ennek során két hibát
+    találtunk (idegen beteg adatlapján félrevezető hibaüzenet, ismétlődő ok a
+    beteglistán), mindkettő javítva;
+  - a státusz-számítás kódját átbeszéltük.
+
+## 2026-10-11 — Független átnézés, javítások, indítási leírás
+
+- Eszköz: Claude Code; a napi munka független átnézéséhez egy további agent
+  (Fable)
+
+- Az AI szerepe: az előző napi munka független átnézése; a leletek javítása;
+  a README Docker-alapú indítási leírása; a méréstípusok
+  nemzetközi kódjainak összegyűjtése ellenőrzésre; a projekt állapotának
+  független összevetése a témavezető M1-lezáró levelével.
+
+- Saját döntéseim:
+  - az egész napi munkát független agenttel nézettem át, mielőtt továbbmentünk;
+  - a leletek közül jóváhagytam: a portok csak a saját gépről legyenek
+    elérhetők; a demóadatok kapjanak tesztet; a dokumentáció elavult részei
+    frissüljenek;
+  - az átnézés terjedelemszűkítést javasolt az M2-re; ezt nem fogadtam el,
+    a levélben kért M2-tartalmat teljesítem;
+  - a CQL-motor futtatását is az M2-be terveztem, október 13-i
+    ellenőrzőponttal: ha addig nem működik, a konkrét akadályt jelzem a
+    témavezetőnek, és egyeztetjük az ütemezést.
+
+- Visszakérdezéseim, amelyek nyomán a terv pontosodott:
+  - honnan származnak a méréstípusok kódjai: ennek nyomán a hat LOINC-kódot
+    (név és státusz) magam ellenőriztem a loinc.org-on.
+
+- Ellenőrzés és javítások:
+  - átnézés közben egy hibát találtunk: ha a szerver nem a lejárt munkamenet
+    jelzésével, hanem más hibával válaszolt, a felület végtelen átirányításba
+    került. Javítva, és mesterséges szerverhibával ellenőrizve;
+  - a portok a gép minden hálózati felületén elérhetők voltak; a szűkítés
+    után a tesztek lelassultak, mert a helyi név előbb IPv6-on próbálkozott.
+    Mérés alapján javítva, a futásidő visszaállt;
+  - a demóadatok tesztet kaptak (ismételt futtatás, belépés, hozzáférés);
+  - a README lépéseit egy üres Docker-környezetben végigpróbáltuk;
+  - az első GitHub-os CI-futás hibát jelzett (egy CI-lépés verziójelölése
+    nem létezett); javítva, a második futás mindhárom része sikeres;
+  - a levélösszevetés a válaszlevél-tervezetemben egy pontatlan indoklást
+    talált (egy technikai előfeltétel, amely a választott futtatási mód
+    mellett nem akadály); javítva. Az átnézés egyik következtetését a
+    git-történet alapján helyesbítettük.
+
+## 2026-10-10 — Bejelentkezés, jogosultság, független tesztelés, CI
+
+- Eszköz: Claude Code; a független tesztíráshoz két további, eltérő modellű
+  agent (Fable, Sonnet)
+
+- Az AI szerepe: a bejelentkezés és a jogosultság backendjének elkészítése
+  (felhasználó, beteg- és orvosprofil, orvos–beteg összerendelés, három
+  migráció, jelszóhash, token, szerepkör- és hozzáférés-ellenőrzés,
+  demóadatok, tesztek); a belépőoldal és a szerepkör szerinti oldalak a
+  felületen, böngészőben végigpróbálva; a CI-konfiguráció; a független
+  tesztírók leleteinek összevetése és a javítások; a kód magyarázata a közös
+  átnézéshez.
+
+- Saját döntéseim:
+  - jelszóhash: Argon2; a token 60 percig érvényes, a megújítás az M3-ban jön;
+  - az M2-ben e-mail + jelszó; a saját JSON-alapú belépés az OAuth2-űrlap
+    helyett (az OAuth2 „password" módját a mai biztonsági ajánlás nem engedi);
+  - aktív fiók = csak kézi letiltás, törlés helyett; a beteg inaktivitása
+    orvosi jelzés, nem letiltási ok;
+  - utolsó belépés idejének tárolása; a jelszó létrehozáskor 10–255 karakter;
+  - a token a böngésző munkamenet-tárolójában; lejáratkor visszairányítás a
+    belépőoldalra;
+  - CI már az M2-ben; develop + main ágmodell, a main pull requesttel kap
+    változást; a commitok logikai egységekre bontva.
+
+- Saját felvetéseim:
+  - a kódot író agent ne egyedül tesztelje a saját kódját: két független
+    agent is írjon és futtasson teszteket a követelményekből, és ezeket
+    közösen nézzük át;
+  - a develop–main ágmodell bevezetése (a CI ehhez igazodik);
+  - továbbfejlesztési jelöltként: kétlépcsős azonosítás „megbízható
+    eszközzel", illetve jelszó nélküli belépés.
+
+- Visszakérdezéseim, amelyek nyomán a terv pontosodott:
+  - érdemes-e jelszó helyett e-mailes megerősítő kóddal belépni: az
+    összevetés (NIST SP 800-63B) után maradt a jelszó;
+  - elegendő-e az adatbázis tartalma: bekerült az utolsó belépés ideje, a
+    belépési próbálkozások korlátozása nyitott pontként szerepel;
+  - mit jelentsen az „aktív fiók" (kézi letiltás vagy inaktivitás): a beteg
+    inaktivitása orvosi jelzés, nem letiltási ok;
+  - miért nem fér hozzá az admin a betegadatokhoz: az indoklás
+    (adattakarékosság, az egészségügyi adat különleges kategória) bekerült a
+    dokumentációba.
+
+- Ellenőrzés és javítások:
+  - az első migráció generált változatában a szerepkör-ellenőrzés háromszor
+    szerepelt, kettő azonos néven: kézzel javítva; a migrációk oda-vissza
+    lefuttatva, a modell és az adatbázis egyezése ellenőrizve;
+  - a jelszóhash paramétereit a telepített csomag forrásában, a belépési mód
+    és a második tényező korlátait elsődleges forrásból (RFC 9700, NIST SP
+    800-63B) ellenőriztük;
+  - az egyik független tesztíró (Fable) első körben négy specifikációs hézagot
+    talált (az e-mail kisbetűssége és az összerendelések átfedése csak a kódban
+    volt biztosítva; a jelszóhossz a létrehozásnál és a belépésnél eltért);
+    ezeket adatbázis- és szolgáltatás-szintű szabállyal javítottuk. A végén 287
+    teszt fut, az alkalmazáskód 100%-os lefedettségével;
+  - a webszerver a backend újraépítése után a régi címre továbbított (502):
+    javítva, és újraépítéssel ellenőrizve.
+
+## 2026-10-10 — Az integrációs irány: kutatás és a NICE-ajánlás
+
+- Eszköz: Claude Code; a kutatás két független, eltérő modellű agenttel
+  (Fable, Opus), az összevetés a fő munkamenetben
+
+- Az AI szerepe: a témavezető javaslatának (NICE NG136, HL7 FHIR R4, LOINC,
+  UCUM, CQL-eszközlánc) tényfeltárása elsődleges forrásokból; a két jelentés
+  összevetése; a megvalósítási lehetőségek és kockázatok összefoglalása;
+  válaszlevél-tervezet.
+
+- Saját döntéseim:
+  - az integrációs irányt vállalom: az M2-be a mesterséges beteg FHIR-csomagja,
+    a CQL-szabály és a kézi számítás kerül, a motor futtatása október 25-ig;
+  - a NICE-ajánlást magam olvastam el böngészőben; a dolgozatba rövid angol
+    idézet és saját magyar összefoglaló kerül, a repóba csak hivatkozás.
+
+- Visszakérdezéseim, amelyek nyomán a terv pontosodott:
+  - mikor érdemes az integrációval foglalkozni az M2 ütemezéséhez képest:
+    két független kutatás indult, és ez alapján döntöttem a szűkített M2-próba
+    mellett;
+  - a szakdolgozat a NICE feltételei szerint „personal research and study"
+    felhasználásnak számít-e: ennek nyomán rögzítettük az idézés módját.
+
+- Ellenőrzés:
+  - a két jelentés egyező és eltérő állításait összevetettük (pl. a
+    ráfordítás-becslés és a javasolt fordítóverzió eltért);
+  - a NICE 1.2.7, 1.2.8, 1.4.15 és 1.4.22 szövegét böngészőben ellenőriztem,
+    egyezett a kutatással; az 1.4.22 utolsó mondatát (gyenge, illetve több
+    betegséggel élő betegeknél orvosi mérlegelés) én találtam meg; a
+    frissítés dátuma 2026. február 26.;
+  - a kutatás kézi példaszámítását újraszámoltuk; az idézési jog (Szjt. 34. §
+    (1)) és a módszerek védelmének hiánya (Szjt. 1. § (6)) szövegét a Nemzeti
+    Jogszabálytárban ellenőriztük;
+  - átláthatóság: a kutató agentek a NICE-oldalt automatikusan is lekérték;
+    mivel a NICE feltételei ezt nem engedik, a dolgozatba csak az általam
+    böngészőben ellenőrzött szöveg kerül.
+
+## 2026-10-10 — A projektváz első indítása Dockerben
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a Docker Desktop indítási hibájának kivizsgálása és a
+  telepítési lépések leírása; a három konténer első felépítése és indítása;
+  a működés ellenőrzése és a backend-teszt futtatása; a védési jegyzet
+  bővítése.
+
+- Saját lépéseim és döntéseim: a két lehetséges futtatókörnyezet (WSL2,
+  Hyper-V) közül a WSL2 mellett döntöttem; rendszergazdaként telepítettem,
+  majd elindítottam a Docker Desktopot.
+
+- Ellenőrzés: mindhárom konténer fut; az állapot-ellenőrző végpont
+  közvetlenül és a webszerveren keresztül is válaszol; a frontend aloldala
+  közvetlen megnyitáskor sem ad hibát; a teszt-adatbázis létrejött; a
+  backend-teszt sikeres (lefedettség 88%). A tesztfuttatás elavulási
+  figyelmeztetést adott (httpx); a javasolt utódcsomagot (httpx2) a PyPI-on
+  ellenőriztük; a cserét később jóváhagytam.
+
+## 2026-10-05 — Védési jegyzet; források ellenőrzése
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a projektváz teljes leírása egy saját, a repóba nem kerülő
+  jegyzetben (használt szoftverek verzióval és indoklással, mappastruktúra,
+  fájlonkénti és függvényenkénti magyarázat, Docker-fogalmak, parancsok,
+  döntések, valószínű védési kérdések); a témavezető október 5-i levelében
+  hivatkozott források (NICE NG136 1.2.7, cql-execution, cql-exec-fhir)
+  felkeresése és összefoglalása.
+
+- Saját döntéseim: a védésre készüléshez kértem a jegyzetet, amely minden
+  kódlépés után bővül; külön jelölés mutatja benne, mit hagytam jóvá, és mit
+  választott az AI (ezeket még átnézem).
+
+- Ellenőrzés: a jegyzetbe a csomagok ténylegesen telepített verziói kerültek
+  a zárolt fájlokból, nem a megadott minimumverziók. A NICE-ajánlás szövegét
+  és a CQL-végrehajtó jellemzőit (Node.js-könyvtár, előre lefordított ELM-et
+  futtat, a nyelv nem minden elemét támogatja) az elsődleges forrásokból
+  ellenőriztük.
+
+## 2026-10-01 — Az M2 projektvázának megtervezése és elkészítése
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a tervezett mappastruktúra bemutatása; a nyitott technikai
+  kérdések összegyűjtése alternatívákkal és javaslattal; az eszközök
+  (uv, Docker, háttérfolyamat, fejlesztői levelezőszerver) összevetése és
+  elmagyarázása a döntéseimhez; a jóváhagyott döntések alapján a projektváz
+  elkészítése: FastAPI-backend állapot-ellenőrző végponttal, adatbázis-kapcsolattal,
+  migrációs keretrendszerrel és első teszttel; React-frontend Mantine-témával
+  (a státuszterv színeiből), lekérdezés- és fordításkezeléssel; Docker-fájlok,
+  webszerver-beállítás és docker-compose.
+
+- Saját döntéseim:
+  - Python-csomagkezelés: uv a pip helyett, zárolt verziókkal (a különbség
+    tisztázása után);
+  - szinkron adatbázis-elérés;
+  - hitelesítés: JWT a kérés fejlécében; a választást a dolgozat biztonsági
+    részében indoklom;
+  - a docker compose a lefordított frontendet indítja webszerverrel,
+    fejlesztéskor a fejlesztői szervert használom;
+  - a háttérfolyamat és a levelezőszerver a követési tervekkel együtt
+    (8. hét) kerül a rendszerbe;
+  - felületi könyvtár: Mantine;
+  - a kisebb alapértelmezéseket (útvonalkezelő, kódellenőrzők, valódi
+    PostgreSQL a tesztekhez, migráció induláskor, image-verziók) egyben
+    hagytam jóvá;
+  - munkamódszer: a vázat az AI egy menetben készítette el; ezután úgy
+    döntöttem, hogy a kódot lépésenként nézem át — minden lépés után
+    megállunk, és a következő csak az átnézés után kezdődik.
+
+- Ellenőrzés: a kódellenőrzők (ruff, ESLint) és a frontend-build hiba nélkül
+  futottak. Az AI által választott további részleteket (image-változatok,
+  portok, szigorú típusellenőrzés, kódstílus) külön listán kaptam meg
+  átnézésre. A telepített felületi könyvtár újabb főverzió volt (Mantine 9),
+  mint amit az AI biztosan ismert, ezért a témát a csomag saját
+  típusdefiníciói és forrása alapján írtuk meg. Az AI jelezte, hogy a
+  .gitignore egyik mintája (lib/) a frontend egy későbbi mappáját is
+  kizárná; a szűkítést jóváhagytam.
+
 ## 2026-10-01 — A szakdolgozat vázának előkészítése
 
 - Eszköz: Claude Code
@@ -62,10 +465,10 @@ A hibák szűrése kétirányú — több esetben én azonosítottam az AI téve
   - az adat nélküli beteg Rendben státuszt kapott volna: a státusza
     Adathiány, és előírás nélkül a 7 napnál régebbi adat sem friss
     (rendszerszintű beállítás);
-  - az egyszeri kiugrásnál a két módszer csak rögzített szabálykonfigurációval
-    tér el: az egyszeri küszöbszabály a kritikus, az időablakos szabály a
-    normál határon fut; hogy az eredmény ettől a választástól függ, a
-    korlátok között szerepel.
+  - az egyszeri kiugrásnál a két módszer csak rögzített szabálybeállítással
+    tér el; a beállításra az átvizsgálás tett javaslatot, erről a kiértékelés
+    előtt döntök (és hogy az eredmény ettől a választástól függ, a korlátok
+    között szerepel).
 
 - Ellenőrzés: az átvizsgálás a megoldásokat is átvezette a fájlokba, ezért a
   változtatásokat két független ellenőrzéssel is átnézettem. Ezek

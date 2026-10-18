@@ -1,0 +1,50 @@
+# A PULSE teljes rendszere: adatbázis, backend (API) és frontend.
+# Indítás a repó gyökeréből: docker compose up --build
+# A jelszavak csak helyi fejlesztésre valók; felülírhatók egy .env fájlban
+# (minta: .env.example).
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulse}
+      POSTGRES_DB: ${POSTGRES_DB:-pulse}
+    volumes:
+      # Az adatok egy elnevezett kötetben maradnak meg újraindítás után is.
+      - pgdata:/var/lib/postgresql/data
+      # Az első indításkor létrehozza a teszt-adatbázist (pulse_test).
+      - ./backend/docker/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      # Csak a saját gépről érhető el (127.0.0.1), hogy a helyben futó tesztek
+      # és az `npm run dev` melletti backend használhassa; a hálózat más gépei nem.
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pulse} -d ${POSTGRES_DB:-pulse}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pulse}:${POSTGRES_PASSWORD:-pulse}@db:5432/${POSTGRES_DB:-pulse}
+      # A tokenek aláírókulcsa; az alapérték csak helyi fejlesztésre való.
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-insecure-secret-change-me-0123456789}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+    depends_on:
+      db:
+        # Csak akkor indul, ha az adatbázis már fogad kapcsolatot.
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:8080:80"
+
+volumes:
+  pgdata:

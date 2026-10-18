@@ -1,0 +1,115 @@
+# Folyamatos integráció (CI) a GitHub saját gépein. Ha bármelyik lépés hibát
+# ad, a commit vagy a pull request mellett piros X jelenik meg.
+#
+# Ágmodell: a napi munka a develop ágon folyik, a main csak pull requesttel
+# kap változást (mérföldkövenként, tagekkel: m2, m3, ...).
+#   - push a developra: azonnali visszajelzés munka közben;
+#   - pull request a mainre: piros CI mellett nem szabad összefésülni
+#     (ezt a GitHub ágvédelmi beállítása kényszeríti ki);
+#   - push a mainre (a merge után): a zöld pipa a stabil állapotot igazolja.
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (ruff, migrációk, pytest)
+    runs-on: ubuntu-latest
+    # A tesztekhez valódi PostgreSQL kell (ugyanaz a verzió, mint a compose-ban).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: pulse
+          POSTGRES_PASSWORD: pulse
+          POSTGRES_DB: pulse_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pulse -d pulse_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+psycopg://pulse:pulse@127.0.0.1:5432/pulse_test
+      TEST_DATABASE_URL: postgresql+psycopg://pulse:pulse@127.0.0.1:5432/pulse_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Függőségek a uv.lock szerint
+        run: uv sync --locked
+      - name: Kódellenőrzés (ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: A migrációk lefutnak, és egyeznek a modellekkel
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+      - name: Tesztek, legalább 70% lefedettséggel
+        run: uv run pytest --cov=app --cov=seed --cov-report=term-missing --cov-fail-under=70
+
+  frontend:
+    name: Frontend (lint, formázás, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - name: Típusellenőrzés és build
+        run: npm run build
+
+  docker:
+    name: Docker-image-ek és böngészős teszt
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v7
+      # Ugyanaz az indítás, mint a README-ben: tiszta adatbázis, majd a demóadat.
+      - name: Az image-ek építése és a rendszer indítása
+        run: docker compose up --build -d --wait
+      - name: Mesterséges demóadat (seed)
+        run: docker compose exec -T api python -m seed
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - name: Playwright és a Chromium telepítése
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Böngészős folyamatteszt (a két M2-folyamat a felületen)
+        working-directory: e2e
+        run: npx playwright test
+      - name: Hiba esetén a képernyőképek és a nyomkövetés feltöltése
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-eredmeny
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 7
+      - name: Hiba esetén a konténerek naplója
+        if: failure()
+        run: docker compose logs --no-color

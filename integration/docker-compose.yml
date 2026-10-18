@@ -1,0 +1,45 @@
+# PULSE M2 integrációs próba: CQL-fordítás és -futtatás Dockerben.
+# Független a gyökér docker-compose.yml-jétől (saját projektnév: pulse-cql).
+#
+# Futtatás az integration/ mappából:
+#   docker compose run --rm forditas   # CQL -> ELM (a fordítószolgáltatással)
+#   docker compose run --rm motor      # a motor futtatása a betegcsomagon
+#   docker compose run --rm ellenorzes # független kézi számítás és összevetés
+#   docker compose down                # a fordítószolgáltatás leállítása
+
+name: pulse-cql
+
+services:
+  # A CQL-fordító HTTP-szolgáltatásként (benne a 4.2.0-s cql-to-elm).
+  # Portot nem nyit a gép felé; csak a forditas szolgáltatás éri el.
+  fordito:
+    image: cqframework/cql-translation-service:v2.8.0
+
+  # Fordítókliens: elküldi a cql/ mappa könyvtárait, és az ELM-et az elm/ mappába írja.
+  forditas:
+    build: .
+    image: pulse-cql-futtato:0.1.0
+    command: ["node", "forditas.mjs"]
+    environment:
+      FORDITO_URL: http://fordito:8080/cql/translator
+    volumes:
+      - ./:/app/work
+    depends_on:
+      - fordito
+
+  # A motor: a lefordított ELM-et futtatja az adat/ mappa FHIR-csomagján.
+  # A fordítóra nincs szüksége (az ELM a repóban van).
+  motor:
+    build: .
+    image: pulse-cql-futtato:0.1.0
+    command: ["node", "futtatas.mjs"]
+    volumes:
+      - ./:/app/work
+
+  # Független ellenőrzés Pythonban (fractions), a motor kimenetével összevetve.
+  ellenorzes:
+    image: python:3.12.10-alpine3.21
+    working_dir: /app/work
+    command: ["python", "-I", "ellenorzes/kezi_szamitas.py"]
+    volumes:
+      - ./:/app/work:ro

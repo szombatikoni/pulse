@@ -1,0 +1,3 @@
+# LF sorvég minden platformon, hogy az ELM és a FHIR-csomag sha256-ja
+# (eredmeny/eredmeny.json) egy friss klónban is egyezzen.
+* text=auto eol=lf

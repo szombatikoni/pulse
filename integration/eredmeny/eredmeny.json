@@ -1,0 +1,491 @@
+{
+  "futtatas": {
+    "motor": "cql-execution 3.3.2",
+    "fhirAdapter": "cql-exec-fhir 2.2.0, PatientSource.FHIRv401()",
+    "node": "v24.21.0",
+    "kiertekelesIdopontja": "2026-10-09T08:00:00.000+02:00",
+    "elm": {
+      "elm/PulseHbpmAverage-0.1.0.json": {
+        "konyvtar": "PulseHbpmAverage 0.1.0",
+        "sha256": "9fbbac64aecdd3d873328bcfa4a0d3a81775733b9ff40dca49c5bf485873dc70"
+      },
+      "elm/FHIRHelpers-4.0.1.json": {
+        "konyvtar": "FHIRHelpers 4.0.1",
+        "sha256": "1b518d4ae7017577cdd9c372b8e7b4390469e1207bef3cb665f522ea18548258"
+      }
+    },
+    "csomag": {
+      "utvonal": "adat/beteg_hbpm_bundle.json",
+      "sha256": "5b55acccb51c6cd479500a3463220e150669c8fe811cfcf84d33575b49ee33b0"
+    }
+  },
+  "forgatokonyvek": [
+    {
+      "id": "A-alap",
+      "leiras": "Alapértékek (a kutatás javaslatai)",
+      "parameterek": {
+        "Series Period": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        }
+      },
+      "beteg": "Patient/pulse-demo-beteg-01",
+      "eredmeny": {
+        "library": "PulseHbpmAverage",
+        "libraryVersion": "0.1.0",
+        "seriesPeriod": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "excludedFirstDay": "2026-10-05",
+        "excludedReadingIds": [
+          "bp-20261005-0730",
+          "bp-20261005-0732",
+          "bp-20261005-2030",
+          "bp-20261005-2032"
+        ],
+        "incompleteReadingIds": [],
+        "includedReadingIds": [
+          "bp-20261006-0730",
+          "bp-20261006-0732",
+          "bp-20261006-2030",
+          "bp-20261006-2032",
+          "bp-20261007-0730",
+          "bp-20261007-0732",
+          "bp-20261007-2030",
+          "bp-20261007-2032",
+          "bp-20261008-0730",
+          "bp-20261008-0732",
+          "bp-20261008-2030",
+          "bp-20261008-2032"
+        ],
+        "includedReadingCount": 12,
+        "includedDays": [
+          "2026-10-06",
+          "2026-10-07",
+          "2026-10-08"
+        ],
+        "includedDayCount": 3,
+        "minIncludedDays": 3,
+        "enoughData": true,
+        "meanSystolic": 135,
+        "meanDiastolic": 84.41666666666667,
+        "comparedSystolic": 135,
+        "comparedDiastolic": 84.41666666666667,
+        "ageInYears": 68,
+        "targetSystolic": 135,
+        "targetDiastolic": 85,
+        "bothComponentsMustBeBelowTarget": true,
+        "systolicBelowTarget": false,
+        "diastolicBelowTarget": true,
+        "targetMet": false
+      },
+      "magyarazat": "Átlag 135,0/84,4 Hgmm, 12 mérésből (2026-10-06 – 2026-10-08, 3 nap); a 2026-10-05-i 4 mérés első napként kiesett; célérték: 135/85 Hgmm alatt (68 éves; mindkét átlagnak a határ alatt kell lennie): a cél NEM teljesül."
+    },
+    {
+      "id": "B-elso-nap-nelkul",
+      "leiras": "Az első nap NEM esik ki",
+      "parameterek": {
+        "Series Period": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "Exclude First Day": false
+      },
+      "beteg": "Patient/pulse-demo-beteg-01",
+      "eredmeny": {
+        "library": "PulseHbpmAverage",
+        "libraryVersion": "0.1.0",
+        "seriesPeriod": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "excludedFirstDay": null,
+        "excludedReadingIds": [],
+        "incompleteReadingIds": [],
+        "includedReadingIds": [
+          "bp-20261005-0730",
+          "bp-20261005-0732",
+          "bp-20261005-2030",
+          "bp-20261005-2032",
+          "bp-20261006-0730",
+          "bp-20261006-0732",
+          "bp-20261006-2030",
+          "bp-20261006-2032",
+          "bp-20261007-0730",
+          "bp-20261007-0732",
+          "bp-20261007-2030",
+          "bp-20261007-2032",
+          "bp-20261008-0730",
+          "bp-20261008-0732",
+          "bp-20261008-2030",
+          "bp-20261008-2032"
+        ],
+        "includedReadingCount": 16,
+        "includedDays": [
+          "2026-10-05",
+          "2026-10-06",
+          "2026-10-07",
+          "2026-10-08"
+        ],
+        "includedDayCount": 4,
+        "minIncludedDays": 3,
+        "enoughData": true,
+        "meanSystolic": 138,
+        "meanDiastolic": 86.625,
+        "comparedSystolic": 138,
+        "comparedDiastolic": 86.625,
+        "ageInYears": 68,
+        "targetSystolic": 135,
+        "targetDiastolic": 85,
+        "bothComponentsMustBeBelowTarget": true,
+        "systolicBelowTarget": false,
+        "diastolicBelowTarget": false,
+        "targetMet": false
+      },
+      "magyarazat": "Átlag 138,0/86,6 Hgmm, 16 mérésből (2026-10-05 – 2026-10-08, 4 nap); első nap nem esett ki; célérték: 135/85 Hgmm alatt (68 éves; mindkét átlagnak a határ alatt kell lennie): a cél NEM teljesül."
+    },
+    {
+      "id": "C-eleg-az-egyik",
+      "leiras": "A cél teljesül, ha legalább az egyik átlag a határ alatt van",
+      "parameterek": {
+        "Series Period": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "Both Components Must Be Below Target": false
+      },
+      "beteg": "Patient/pulse-demo-beteg-01",
+      "eredmeny": {
+        "library": "PulseHbpmAverage",
+        "libraryVersion": "0.1.0",
+        "seriesPeriod": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "excludedFirstDay": "2026-10-05",
+        "excludedReadingIds": [
+          "bp-20261005-0730",
+          "bp-20261005-0732",
+          "bp-20261005-2030",
+          "bp-20261005-2032"
+        ],
+        "incompleteReadingIds": [],
+        "includedReadingIds": [
+          "bp-20261006-0730",
+          "bp-20261006-0732",
+          "bp-20261006-2030",
+          "bp-20261006-2032",
+          "bp-20261007-0730",
+          "bp-20261007-0732",
+          "bp-20261007-2030",
+          "bp-20261007-2032",
+          "bp-20261008-0730",
+          "bp-20261008-0732",
+          "bp-20261008-2030",
+          "bp-20261008-2032"
+        ],
+        "includedReadingCount": 12,
+        "includedDays": [
+          "2026-10-06",
+          "2026-10-07",
+          "2026-10-08"
+        ],
+        "includedDayCount": 3,
+        "minIncludedDays": 3,
+        "enoughData": true,
+        "meanSystolic": 135,
+        "meanDiastolic": 84.41666666666667,
+        "comparedSystolic": 135,
+        "comparedDiastolic": 84.41666666666667,
+        "ageInYears": 68,
+        "targetSystolic": 135,
+        "targetDiastolic": 85,
+        "bothComponentsMustBeBelowTarget": false,
+        "systolicBelowTarget": false,
+        "diastolicBelowTarget": true,
+        "targetMet": true
+      },
+      "magyarazat": "Átlag 135,0/84,4 Hgmm, 12 mérésből (2026-10-06 – 2026-10-08, 3 nap); a 2026-10-05-i 4 mérés első napként kiesett; célérték: 135/85 Hgmm alatt (68 éves; legalább az egyik átlagnak a határ alatt kell lennie): a cél teljesül."
+    },
+    {
+      "id": "D-kerekites-egeszre",
+      "leiras": "Az átlagok egészre kerekítve az összevetés előtt",
+      "parameterek": {
+        "Series Period": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "Comparison Rounding Precision": 0
+      },
+      "beteg": "Patient/pulse-demo-beteg-01",
+      "eredmeny": {
+        "library": "PulseHbpmAverage",
+        "libraryVersion": "0.1.0",
+        "seriesPeriod": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "excludedFirstDay": "2026-10-05",
+        "excludedReadingIds": [
+          "bp-20261005-0730",
+          "bp-20261005-0732",
+          "bp-20261005-2030",
+          "bp-20261005-2032"
+        ],
+        "incompleteReadingIds": [],
+        "includedReadingIds": [
+          "bp-20261006-0730",
+          "bp-20261006-0732",
+          "bp-20261006-2030",
+          "bp-20261006-2032",
+          "bp-20261007-0730",
+          "bp-20261007-0732",
+          "bp-20261007-2030",
+          "bp-20261007-2032",
+          "bp-20261008-0730",
+          "bp-20261008-0732",
+          "bp-20261008-2030",
+          "bp-20261008-2032"
+        ],
+        "includedReadingCount": 12,
+        "includedDays": [
+          "2026-10-06",
+          "2026-10-07",
+          "2026-10-08"
+        ],
+        "includedDayCount": 3,
+        "minIncludedDays": 3,
+        "enoughData": true,
+        "meanSystolic": 135,
+        "meanDiastolic": 84.41666666666667,
+        "comparedSystolic": 135,
+        "comparedDiastolic": 84,
+        "ageInYears": 68,
+        "targetSystolic": 135,
+        "targetDiastolic": 85,
+        "bothComponentsMustBeBelowTarget": true,
+        "systolicBelowTarget": false,
+        "diastolicBelowTarget": true,
+        "targetMet": false
+      },
+      "magyarazat": "Átlag 135,0/84,4 Hgmm, 12 mérésből (2026-10-06 – 2026-10-08, 3 nap); a 2026-10-05-i 4 mérés első napként kiesett; célérték: 135/85 Hgmm alatt (68 éves; mindkét átlagnak a határ alatt kell lennie): a cél NEM teljesül."
+    },
+    {
+      "id": "E-min-4-nap",
+      "leiras": "Legalább 4 értékelhető nap kell (az első nap nélkül)",
+      "parameterek": {
+        "Series Period": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "Min Included Days": 4
+      },
+      "beteg": "Patient/pulse-demo-beteg-01",
+      "eredmeny": {
+        "library": "PulseHbpmAverage",
+        "libraryVersion": "0.1.0",
+        "seriesPeriod": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "excludedFirstDay": "2026-10-05",
+        "excludedReadingIds": [
+          "bp-20261005-0730",
+          "bp-20261005-0732",
+          "bp-20261005-2030",
+          "bp-20261005-2032"
+        ],
+        "incompleteReadingIds": [],
+        "includedReadingIds": [
+          "bp-20261006-0730",
+          "bp-20261006-0732",
+          "bp-20261006-2030",
+          "bp-20261006-2032",
+          "bp-20261007-0730",
+          "bp-20261007-0732",
+          "bp-20261007-2030",
+          "bp-20261007-2032",
+          "bp-20261008-0730",
+          "bp-20261008-0732",
+          "bp-20261008-2030",
+          "bp-20261008-2032"
+        ],
+        "includedReadingCount": 12,
+        "includedDays": [
+          "2026-10-06",
+          "2026-10-07",
+          "2026-10-08"
+        ],
+        "includedDayCount": 3,
+        "minIncludedDays": 4,
+        "enoughData": false,
+        "meanSystolic": 135,
+        "meanDiastolic": 84.41666666666667,
+        "comparedSystolic": 135,
+        "comparedDiastolic": 84.41666666666667,
+        "ageInYears": 68,
+        "targetSystolic": 135,
+        "targetDiastolic": 85,
+        "bothComponentsMustBeBelowTarget": true,
+        "systolicBelowTarget": false,
+        "diastolicBelowTarget": true,
+        "targetMet": null
+      },
+      "magyarazat": "Átlag 135,0/84,4 Hgmm, 12 mérésből (2026-10-06 – 2026-10-08, 3 nap); a 2026-10-05-i 4 mérés első napként kiesett; célérték: 135/85 Hgmm alatt (68 éves; mindkét átlagnak a határ alatt kell lennie): nincs elég adat (3 értékelhető nap, legalább 4 kell)."
+    },
+    {
+      "id": "F-80-ev-feletti",
+      "leiras": "Ugyanezek a mérések egy 80 év feletti betegnél (születési dátum a memóriában átírva: 1944-03-14)",
+      "parameterek": {
+        "Series Period": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        }
+      },
+      "beteg": "Patient/pulse-demo-beteg-01",
+      "eredmeny": {
+        "library": "PulseHbpmAverage",
+        "libraryVersion": "0.1.0",
+        "seriesPeriod": {
+          "low": "2026-10-05T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "excludedFirstDay": "2026-10-05",
+        "excludedReadingIds": [
+          "bp-20261005-0730",
+          "bp-20261005-0732",
+          "bp-20261005-2030",
+          "bp-20261005-2032"
+        ],
+        "incompleteReadingIds": [],
+        "includedReadingIds": [
+          "bp-20261006-0730",
+          "bp-20261006-0732",
+          "bp-20261006-2030",
+          "bp-20261006-2032",
+          "bp-20261007-0730",
+          "bp-20261007-0732",
+          "bp-20261007-2030",
+          "bp-20261007-2032",
+          "bp-20261008-0730",
+          "bp-20261008-0732",
+          "bp-20261008-2030",
+          "bp-20261008-2032"
+        ],
+        "includedReadingCount": 12,
+        "includedDays": [
+          "2026-10-06",
+          "2026-10-07",
+          "2026-10-08"
+        ],
+        "includedDayCount": 3,
+        "minIncludedDays": 3,
+        "enoughData": true,
+        "meanSystolic": 135,
+        "meanDiastolic": 84.41666666666667,
+        "comparedSystolic": 135,
+        "comparedDiastolic": 84.41666666666667,
+        "ageInYears": 82,
+        "targetSystolic": 145,
+        "targetDiastolic": 85,
+        "bothComponentsMustBeBelowTarget": true,
+        "systolicBelowTarget": true,
+        "diastolicBelowTarget": true,
+        "targetMet": true
+      },
+      "magyarazat": "Átlag 135,0/84,4 Hgmm, 12 mérésből (2026-10-06 – 2026-10-08, 3 nap); a 2026-10-05-i 4 mérés első napként kiesett; célérték: 145/85 Hgmm alatt (82 éves; mindkét átlagnak a határ alatt kell lennie): a cél teljesül."
+    },
+    {
+      "id": "G-kirendeles-kezdonapja",
+      "leiras": "Első nap = a sorozat kezdőnapja; a sorozat okt. 4-én indul, de az első mérés okt. 5-i",
+      "parameterek": {
+        "Series Period": {
+          "low": "2026-10-04T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "First Day Definition": "PeriodStartDay"
+      },
+      "beteg": "Patient/pulse-demo-beteg-01",
+      "eredmeny": {
+        "library": "PulseHbpmAverage",
+        "libraryVersion": "0.1.0",
+        "seriesPeriod": {
+          "low": "2026-10-04T00:00:00.000+02:00",
+          "high": "2026-10-09T00:00:00.000+02:00",
+          "lowClosed": true,
+          "highClosed": false
+        },
+        "excludedFirstDay": "2026-10-04",
+        "excludedReadingIds": [],
+        "incompleteReadingIds": [],
+        "includedReadingIds": [
+          "bp-20261005-0730",
+          "bp-20261005-0732",
+          "bp-20261005-2030",
+          "bp-20261005-2032",
+          "bp-20261006-0730",
+          "bp-20261006-0732",
+          "bp-20261006-2030",
+          "bp-20261006-2032",
+          "bp-20261007-0730",
+          "bp-20261007-0732",
+          "bp-20261007-2030",
+          "bp-20261007-2032",
+          "bp-20261008-0730",
+          "bp-20261008-0732",
+          "bp-20261008-2030",
+          "bp-20261008-2032"
+        ],
+        "includedReadingCount": 16,
+        "includedDays": [
+          "2026-10-05",
+          "2026-10-06",
+          "2026-10-07",
+          "2026-10-08"
+        ],
+        "includedDayCount": 4,
+        "minIncludedDays": 3,
+        "enoughData": true,
+        "meanSystolic": 138,
+        "meanDiastolic": 86.625,
+        "comparedSystolic": 138,
+        "comparedDiastolic": 86.625,
+        "ageInYears": 68,
+        "targetSystolic": 135,
+        "targetDiastolic": 85,
+        "bothComponentsMustBeBelowTarget": true,
+        "systolicBelowTarget": false,
+        "diastolicBelowTarget": false,
+        "targetMet": false
+      },
+      "magyarazat": "Átlag 138,0/86,6 Hgmm, 16 mérésből (2026-10-05 – 2026-10-08, 4 nap); az első napnak tekintett 2026-10-04-n nem volt mérés; célérték: 135/85 Hgmm alatt (68 éves; mindkét átlagnak a határ alatt kell lennie): a cél NEM teljesül."
+    }
+  ]
+}
