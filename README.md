@@ -17,8 +17,8 @@ PULSE — Patient Understanding through Limits, Signals and Evaluation. Chronic 
 |---|---|
 | Feladatkiírás | [PULSE_M1.pdf](docs/M1/PULSE_M1.pdf), 1. fejezet (forrás: [01_feladatkiiras.md](docs/M1/01_feladatkiiras.md)) |
 | Funkcionális specifikáció | [PULSE_M1.pdf](docs/M1/PULSE_M1.pdf), 2–6. fejezet: követelmények, adatmodell, működési szabályok, folyamatábrák, képernyővázlatok; a use-case ábra a kezdeti dolgozat 3. fejezetében |
-| Kezdeti dolgozat | [PULSE_kezdeti_dolgozat.pdf](docs/dolgozat/PULSE_kezdeti_dolgozat.pdf) *(október 18-ig kerül ide)* |
-| PoC (működő prototípus) | a kód az `m2` címkénél; indítás: lásd lent; bemutató videó: *(október 18-ig kerül ide)*; integrációs próba: [integration/](integration/) |
+| Kezdeti dolgozat | forrás: [docs/dolgozat/](docs/dolgozat/); a PDF-et a témavezetőnek e-mailben küldtem |
+| PoC (működő prototípus) | a kód az `m2` címkénél; indítás: lásd lent; bemutató videó: a témavezetőnek e-mailben küldtem; integrációs próba: [integration/](integration/) |
 
 ## Indítás Dockerrel
 

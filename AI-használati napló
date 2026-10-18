@@ -8,6 +8,38 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-10-17–18 — Teendőlista; a beteg- és az orvosi felület átalakítása; M2-levél
+
+- Eszköz: Claude Code; a telefonos nézet ellenőrzéséhez és az M3 tételes
+  bontásához független agent (Fable)
+
+- Az AI szerepe: a beteg teendőlistájának megvalósítása az M1 adatmodellje
+  szerint (mi esedékes, mi kész, mi maradt el, meddig pótolható); a betegoldal
+  és az orvosi nézet terve kattintható mintaoldalként, majd a megvalósítása; a
+  telefonos nézet ellenőrzése; az M3 tételes bontása időbecsléssel; a levél és a
+  bemutató videó forgatókönyvének tervezete.
+
+- Saját döntéseim:
+  - a teendőlista még az M2-be kerül, nem az M3-ba;
+  - a felület a túl sötét változat helyett semleges szürke témát kap; a
+    státusz szövege fehér, csak az ikon színes;
+  - a betegoldal és az orvosi nézet a jóváhagyott mintaoldalak szerint alakul
+    át; az admin-felület az M3 első hetében készül;
+  - ha egy kérdőív az adott időszakra már ki van töltve, a felület ezt jelzi,
+    és csak külön gombra nyílik meg újra;
+  - az M3-at a vállalt tartalommal tartom, ehhez megemelem a heti időmet.
+
+- Ellenőrzés:
+  - a rendszert saját kézzel végigpróbáltam beteg- és orvosszerepben; amit
+    zavarónak találtam (a pótlás és a mentés visszajelzése nem volt egyértelmű,
+    a kérdőív újratöltés után újra kitölthetőnek tűnt), azt javíttattam;
+  - a telefonos ellenőrzés talált egy hibát: az elgépelt mérési értéket a
+    beviteli mező csendben a határra vágta (400 helyett 300 került volna be);
+    javítva, a böngészős teszt ezt az esetet is ellenőrzi;
+  - a teendők számítását 9 új teszt ellenőrzi (napi és heti időszak, pótlási
+    határ, helyi éjfél, visszavont előírás, jogosultság); összesen 430 teszt,
+    98% lefedettség; a CI mindhárom része zöld.
+
 ## 2026-10-16–17 — A témavezető M2 előtti levele; böngészős teszt; kódátnézés
 
 - Eszköz: Claude Code; a levél és a projekt összevetéséhez független átnéző
