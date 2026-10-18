@@ -23,7 +23,7 @@ function taskSummary(t: TFunction, tasks: Task[]): { tone: TaskTone; text: strin
   const name = (task: Task) =>
     task.kind === 'measurement' ? t(`measurementTypes.${task.code}`) : task.name
   const late = tasks.filter((x) => x.state === 'late')
-  const missed = tasks.filter((x) => x.state !== 'late' && x.catch_up_until)
+  const missed = tasks.filter((x) => x.state !== 'late' && x.previous_missed)
   const today = new Date().toDateString()
   const dueToday = tasks.filter(
     (x) => x.state === 'due' && new Date(x.due_at).toDateString() === today,
