@@ -18,8 +18,7 @@ const rowsText = async (page: Page) =>
   (await page.locator('.pulse-prow').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
 // Az előzmények sorai (napokra bontott lista).
 const history = (page: Page) => page.locator('.pulse-history li')
-const mainText = async (page: Page) =>
-  (await page.locator('main').innerText()).replace(/\s+/g, ' ')
+const mainText = async (page: Page) => (await page.locator('main').innerText()).replace(/\s+/g, ' ')
 
 // A lépések egymásra épülnek: ha egy elbukik, a többi nem fut tovább.
 test.describe.configure({ mode: 'serial' })
@@ -75,7 +74,14 @@ test('idegen beteg adatlapja: a szerver 403-at ad, a felület jogosultsági hib�
 test('mérés-folyamat, beteg: vérnyomás és pulzus rögzítése', async ({ page }) => {
   await login(page, 'toth.maria@pulse.example')
   await expect(page).toHaveURL(/\/patient$/)
-  await page.getByText('Új mérés').waitFor()
+  await page.locator('.pulse-task').first().waitFor()
+
+  // Előírás nélküli mérés: a teendők alatti gomb nyitja a típusválasztós űrlapot.
+  await page.getByRole('button', { name: 'Előírás nélküli mérés' }).click()
+  await page
+    .locator('label')
+    .filter({ hasText: /^Vérnyomás$/ })
+    .click()
 
   // Elgépelt érték (400 Hgmm): a felület nem írja át csendben 300-ra, hanem a
   // szerver elutasítja, és a beteg látja, miért; a mező tartalma megmarad.
@@ -86,26 +92,26 @@ test('mérés-folyamat, beteg: vérnyomás és pulzus rögzítése', async ({ pa
     page.getByText('A(z) Szisztolés értéke kívül esik a rögzíthető tartományon.'),
   ).toBeVisible()
   await expect(page.getByLabel('Szisztolés (Hgmm)')).toHaveValue('400')
-  await expect(history(page).filter({ hasText: /(300|400)\/98 Hgmm/ })).toHaveCount(0)
 
-  // Többértékű mérés: a vérnyomás két értéke egy mérésben.
+  // Többértékű mérés: a vérnyomás két értéke egy mérésben. Mentés után az űrlap
+  // bezárul, a nyugta a teendők alatt marad.
   await page.getByLabel('Szisztolés (Hgmm)').fill('165')
   await page.getByLabel('Diasztolés (Hgmm)').fill('98')
   await page.getByRole('button', { name: 'Mentés' }).click()
   await expect(page.getByText('A mérés elmentve.')).toBeVisible()
-  await expect(history(page).filter({ hasText: '165/98 Hgmm' }).first()).toBeVisible()
+  await expect(page.getByText(/165\/98 Hgmm/)).toBeVisible()
 
-  // Egyértékű mérés: pulzus.
-  // A méréstípus gombsor (SegmentedControl): a látható feliratra kattintunk.
-  await page.locator('label').filter({ hasText: /^Pulzus$/ }).click()
-  await page.getByLabel('Pulzus (/perc)').fill('72')
-  await page.getByRole('button', { name: 'Mentés' }).click()
-  await expect(history(page).filter({ hasText: '72 /perc' }).first()).toBeVisible()
-
-  // A teendők kártyái (az előírásokból számolva): a mai pulzus kész, a tegnapi
-  // elmaradt, de pótolható. A „Pótlás" a tegnapi időponttal tölti elő az űrlapot.
+  // Egyértékű mérés a teendő kártyájáról: a „Rögzítés” a kártyán belül nyitja az
+  // űrlapot, típusválasztó nélkül.
   const pulseTask = page.locator('.pulse-task').filter({ hasText: 'Pulzus' })
-  await expect(pulseTask).toContainText('KÉSZ')
+  await pulseTask.getByRole('button', { name: 'Rögzítés' }).click()
+  await pulseTask.getByLabel('Pulzus (/perc)').fill('72')
+  await pulseTask.getByRole('button', { name: 'Mentés' }).click()
+  await expect(page.getByText(/72 \/perc/)).toBeVisible()
+
+  // A mai pulzus kész, a tegnapi elmaradt, de pótolható. A „Pótlás” a tegnapi
+  // időponttal nyitja ki az űrlapot a kártyán.
+  await expect(pulseTask).toContainText('Kész.')
   await pulseTask.getByRole('button', { name: 'Pótlás' }).click()
   // Az űrlap kiírja, hogy pótlás történik, és melyik mérés hiányzik.
   await expect(page.getByText(/Pótlás: az elmaradt pulzusmérés/)).toBeVisible()
@@ -115,14 +121,26 @@ test('mérés-folyamat, beteg: vérnyomás és pulzus rögzítése', async ({ pa
   await expect(page.getByText('A mérés elmentve.')).toBeVisible()
   await expect(page.getByText(/70 \/perc, .*Az elmaradt mérés pótolva\./)).toBeVisible()
   await expect(pulseTask.getByRole('button', { name: 'Pótlás' })).toHaveCount(0)
+
+  // Az Előzményeim oldal mérési naplójában mindhárom mérés ott van, a hibás nincs.
+  await page.getByRole('link', { name: 'Előzményeim', exact: true }).click()
+  await expect(page).toHaveURL(/\/patient\/history$/)
+  await expect(history(page).filter({ hasText: '165/98 Hgmm' }).first()).toBeVisible()
+  await expect(history(page).filter({ hasText: '72 /perc' }).first()).toBeVisible()
+  await expect(history(page).filter({ hasText: '70 /perc' }).first()).toBeVisible()
+  await expect(history(page).filter({ hasText: /(300|400)\/98 Hgmm/ })).toHaveCount(0)
 })
 
 test('kérdőív-folyamat, beteg: kitöltés és beküldés, a pontszám nem látszik', async ({ page }) => {
   await login(page, 'toth.maria@pulse.example')
   await expect(page).toHaveURL(/\/patient$/)
-  await page.getByText('Kitöltendő kérdőívek').waitFor()
   const wellbeingTask = page.locator('.pulse-task').filter({ hasText: 'Közérzet' })
-  await expect(wellbeingTask).toContainText('ESEDÉKES')
+  await expect(wellbeingTask).toContainText('Esedékes.')
+
+  // A „Kitöltés” a kérdőív saját oldalára visz.
+  await wellbeingTask.getByRole('button', { name: 'Kitöltés' }).click()
+  await expect(page).toHaveURL(/\/patient\/questionnaires\/[^/]+$/)
+  const fillUrl = page.url()
 
   // Alvás 1, fáradtság 5, szédülés naponta: 4 + 4 + 5 = 13 pont (kritikus sáv).
   await page
@@ -135,22 +153,24 @@ test('kérdőív-folyamat, beteg: kitöltés és beküldés, a pontszám nem lá
     .click()
   await page.getByRole('radio', { name: 'Naponta' }).click()
   await page.getByRole('button', { name: 'Beküldés' }).click()
+
+  // Beküldés után vissza a teendőkhöz, a nyugtával; a teendő kész.
+  await expect(page).toHaveURL(/\/patient$/)
   await expect(page.getByText('Köszönjük, a kitöltés beérkezett.')).toBeVisible()
-  await expect(wellbeingTask).toContainText('KÉSZ')
+  await expect(wellbeingTask).toContainText('Kész.')
 
   const text = await mainText(page)
   expect(text).not.toMatch(/\d+\s*(\/\s*\d+\s*)?pont/)
   expect(text).not.toContain('sáv')
 
-  // Újratöltés után nem kínálja fel úgy, mintha még kitöltendő lenne, de újra kitölthető.
-  await page.reload()
+  // A kérdőív oldala ezután nem kínálja fel úgy, mintha még kitöltendő lenne, de
+  // újra kitölthető.
+  await page.goto(fillUrl)
   await expect(page.getByText(/Erre a hétre már kitöltötted/)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Mégis kitöltöm újra' })).toBeVisible()
 })
 
-test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a mérés', async ({
-  page,
-}) => {
+test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a mérés', async ({ page }) => {
   await login(page, 'dr.nagy@pulse.example')
   await expect(page).toHaveURL(/\/doctor$/)
   await page.locator('.pulse-prow').first().waitFor()
