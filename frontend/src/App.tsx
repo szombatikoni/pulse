@@ -5,7 +5,9 @@ import { LoginPage } from './features/auth/LoginPage'
 import { DoctorPatientsPage } from './features/doctor/DoctorPatientsPage'
 import { PatientDetailPage } from './features/doctor/PatientDetailPage'
 import { RoleHomePage } from './features/home/RoleHomePage'
+import { PatientHistoryPage } from './features/patient/PatientHistoryPage'
 import { PatientHomePage } from './features/patient/PatientHomePage'
+import { QuestionnairePage } from './features/patient/QuestionnairePage'
 
 export default function App() {
   return (
@@ -15,6 +17,8 @@ export default function App() {
         <Route path="/" element={<RootRedirect />} />
         <Route element={<RequireAuth role="patient" />}>
           <Route path="/patient" element={<PatientHomePage />} />
+          <Route path="/patient/questionnaires/:code" element={<QuestionnairePage />} />
+          <Route path="/patient/history" element={<PatientHistoryPage />} />
         </Route>
         <Route element={<RequireAuth role="doctor" />}>
           <Route path="/doctor" element={<DoctorPatientsPage />} />

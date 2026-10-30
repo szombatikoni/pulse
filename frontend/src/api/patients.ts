@@ -74,10 +74,12 @@ export type PatientSummary = {
   tasks: Task[]
 }
 
-export function useDoctorPatients() {
+export function useDoctorPatients({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['doctor', 'patients'],
     queryFn: () => apiGet<PatientSummary[]>('/doctor/patients'),
+    // Az oldalsáv számlálója is ezt használja; nem orvosnál ne kérdezze le.
+    enabled,
   })
 }
 

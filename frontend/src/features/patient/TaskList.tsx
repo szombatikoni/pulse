@@ -1,7 +1,10 @@
-import { Button, Group, Paper, SimpleGrid, Stack, Text } from '@mantine/core'
+import { Button } from '@mantine/core'
+import { Check, ClipboardText, Drop, Gauge, Heart, type Icon, Scales } from '@phosphor-icons/react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { type Task, usePatientTasks } from '../../api/tasks'
+import { StatusIcon } from '../../components/StatusLabel'
 import { formatSoon, formatUntil } from '../../format'
 
 export type Mark = 'done' | 'due' | 'late' | 'missed'
@@ -13,7 +16,8 @@ const MARK_COLOR: Record<Mark, string> = {
   missed: 'var(--pulse-warn)',
 }
 
-/** Az állapot jele: kész = pipa, esedékes = pöttyös kör, lejárt/elmaradt = szaggatott kör. */
+/** Az állapot jele (az orvosi adatlap teendőinél): kész = pipa, esedékes = pöttyös
+ * kör, lejárt/elmaradt = szaggatott kör. */
 export function TaskIcon({ mark }: { mark: Mark }) {
   const color = MARK_COLOR[mark]
   return (
@@ -52,22 +56,25 @@ export function TaskIcon({ mark }: { mark: Mark }) {
   )
 }
 
-function Chip({ mark }: { mark: Mark }) {
-  const { t } = useTranslation()
-  return (
-    <Text span size="xs" fw={700} className="pulse-task-chip" style={{ color: MARK_COLOR[mark] }}>
-      {t(`tasks.state.${mark}`).toUpperCase()}
-    </Text>
-  )
+// A teendő jele: a méréstípus vagy a kérdőív ikonja (Phosphor), kész állapotban pipa.
+const KIND_ICON: Record<string, Icon> = {
+  blood_pressure: Gauge,
+  heart_rate: Heart,
+  body_weight: Scales,
+  blood_glucose: Drop,
 }
+const ICON_CLASS: Record<Task['state'], string> = { done: 'ok', due: 'due', late: 'late' }
 
 function TaskCard({
   task,
+  form,
   onRecord,
   onCatchUp,
   onFill,
 }: {
   task: Task
+  /** A kártyán belül kinyitott rögzítés (ha ennél a teendőnél nyitott). */
+  form: ReactNode
   onRecord: (typeCode: string) => void
   onCatchUp: (typeCode: string, measuredAt: string) => void
   onFill: (questionnaireCode: string) => void
@@ -78,7 +85,8 @@ function TaskCard({
     ? t(`measurementTypes.${task.code}`, { defaultValue: task.name })
     : task.name
   const frequency = t(`tasks.frequency.${task.frequency}`, { count: task.interval_days ?? 0 })
-  const canCatchUp = measurement && task.catch_up_until && task.catch_up_suggested_at
+  const open = !!form
+  const canCatchUp = !open && measurement && task.catch_up_until && task.catch_up_suggested_at
 
   let text: string
   if (task.state === 'done' && task.done_at) {
@@ -99,53 +107,53 @@ function TaskCard({
           : 'tasks.dueQuestionnaire',
     )
   }
-  const mark: Mark = task.state === 'done' ? 'done' : task.state
+  const Glyph =
+    task.state === 'done' ? Check : measurement ? (KIND_ICON[task.code] ?? Gauge) : ClipboardText
 
   const action =
-    task.state === 'done' ? null : measurement ? (
-      <Button size="xs" onClick={() => onRecord(task.code)}>
+    task.state === 'done' || open ? null : measurement ? (
+      <Button size="lg" onClick={() => onRecord(task.code)}>
         {t('tasks.record')}
       </Button>
     ) : (
-      <Button size="xs" onClick={() => onFill(task.code)}>
+      <Button size="lg" onClick={() => onFill(task.code)}>
         {t('tasks.fill')}
       </Button>
     )
 
+  // Vízszintes sor: ikon, szöveg, jobb szélen a gomb; az elmaradt alkalom külön alsó
+  // sávban; a rögzítés a kártyán belül nyílik ki (felületterv, 2026-10-30, 2. változat).
   return (
-    <Paper withBorder p="sm" className="pulse-task" data-state={task.state}>
-      <Stack gap={8}>
-        <Group gap="sm" wrap="nowrap" align="flex-start">
-          <TaskIcon mark={mark} />
-          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-            <Text fw={600}>{title}</Text>
-            <Text size="xs" c="dimmed">
-              {frequency} · {t('tasks.deadline', { when: formatSoon(t, task.due_at) })}
-            </Text>
-            <Text size="sm">
-              <Chip mark={mark} /> {text}
-            </Text>
-          </Stack>
-          {action}
-        </Group>
-        {canCatchUp && (
-          <Group gap="sm" wrap="nowrap" align="flex-start" className="pulse-task-missed">
-            <TaskIcon mark="missed" />
-            <Text size="sm" style={{ flex: 1, minWidth: 0 }}>
-              <Chip mark="missed" />{' '}
-              {t('tasks.missed', { until: formatUntil(t, task.catch_up_until!) })}
-            </Text>
-            <Button
-              size="xs"
-              variant="default"
-              onClick={() => onCatchUp(task.code, task.catch_up_suggested_at!)}
-            >
-              {t('tasks.catchUp')}
-            </Button>
-          </Group>
-        )}
-      </Stack>
-    </Paper>
+    <article className={open ? 'pulse-task is-open' : 'pulse-task'} data-state={task.state}>
+      <span className={`pulse-tico ${ICON_CLASS[task.state]}`} aria-hidden="true">
+        <Glyph size={24} weight={task.state === 'done' ? 'bold' : 'regular'} />
+      </span>
+      <div className="pulse-task-body">
+        <h3>
+          {title}
+          <span className="tm">
+            {frequency} · {t('tasks.deadline', { when: formatSoon(t, task.due_at) })}
+          </span>
+        </h3>
+        <p className="ts">
+          <b>{t(`tasks.state.${task.state}`)}.</b> {text}
+        </p>
+      </div>
+      {action && <div className="pulse-task-actions">{action}</div>}
+      {canCatchUp && (
+        <div className="pulse-task-missed">
+          <StatusIcon status="attention" size={22} />
+          <span>{t('tasks.missed', { until: formatUntil(t, task.catch_up_until!) })}</span>
+          <Button
+            variant="default"
+            onClick={() => onCatchUp(task.code, task.catch_up_suggested_at!)}
+          >
+            {t('tasks.catchUp')}
+          </Button>
+        </div>
+      )}
+      {open && <div className="pulse-task-form">{form}</div>}
+    </article>
   )
 }
 
@@ -154,11 +162,14 @@ function TaskCard({
  * tárolt alkalmak). Ha nincs előírás, nem jelenik meg. */
 export function TaskList({
   patientId,
+  renderForm,
   onRecord,
   onCatchUp,
   onFill,
 }: {
   patientId: string
+  /** A teendőhöz tartozó nyitott űrlap, vagy null, ha a kártya csukva van. */
+  renderForm: (task: Task) => ReactNode
   onRecord: (typeCode: string) => void
   onCatchUp: (typeCode: string, measuredAt: string) => void
   onFill: (questionnaireCode: string) => void
@@ -167,21 +178,17 @@ export function TaskList({
   const tasks = usePatientTasks(patientId)
   if (!tasks.data || tasks.data.length === 0) return null
   return (
-    <SimpleGrid
-      cols={{ base: 1, sm: 2, lg: 3 }}
-      spacing="sm"
-      component="section"
-      aria-label={t('tasks.label')}
-    >
+    <section className="pulse-tasks" aria-label={t('tasks.label')}>
       {tasks.data.map((task) => (
         <TaskCard
           key={`${task.kind}-${task.code}`}
           task={task}
+          form={renderForm(task)}
           onRecord={onRecord}
           onCatchUp={onCatchUp}
           onFill={onFill}
         />
       ))}
-    </SimpleGrid>
+    </section>
   )
 }

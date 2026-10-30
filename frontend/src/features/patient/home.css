@@ -1,0 +1,535 @@
+/* Betegoldal, felületterv 2026-10-30, 2. változat (docs/design/felulet_2026-10-30:
+   vHome, vFill, vHistory). Teendőim: köszönés, a mai haladás, a teendők egymás alatt,
+   vízszintes kártyákon; a rögzítés a kártyán belül nyílik ki. A kérdőív saját,
+   keskeny oldalon; a grafikonok és a napló az Előzményeim oldalon. */
+.pulse-patient {
+  display: grid;
+  gap: 28px;
+}
+.pulse-patient .pulse-sec {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.pulse-patient .pulse-h-sec {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--pulse-ink-1);
+  letter-spacing: 0.003em;
+}
+.pulse-patient .pulse-meta {
+  font-size: 13px;
+  color: var(--pulse-ink-3);
+  font-weight: 500;
+}
+.pulse-patient .pulse-hint {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--pulse-ink-3);
+  font-weight: 500;
+}
+
+/* Fejléc */
+.pulse-ph {
+  display: grid;
+  gap: 8px;
+}
+.pulse-eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pulse-ink-3);
+}
+.pulse-display {
+  margin: 0;
+  font-family: var(--pulse-serif);
+  font-weight: 500;
+  font-size: 34px;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  color: var(--pulse-ink-1);
+  text-wrap: balance;
+}
+.pulse-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.pulse-pbar {
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  gap: 4px;
+  width: 160px;
+}
+.pulse-pbar i {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--pulse-raised);
+}
+.pulse-pbar i.on {
+  background: var(--pulse-ok);
+}
+
+/* Kártya */
+.pulse-pcard {
+  background: var(--pulse-card);
+  border: 1px solid var(--pulse-line);
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 0;
+}
+
+/* Teendők: egymás alatt, vízszintesen nyúló sorok */
+.pulse-tasks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.pulse-task {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: center;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: var(--pulse-card);
+  border: 1px solid var(--pulse-line);
+}
+.pulse-task[data-state='done'] {
+  padding-block: 12px;
+}
+.pulse-tico {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  background: var(--pulse-fill);
+  color: #fff;
+  flex: none;
+}
+.pulse-tico.ok {
+  background: var(--pulse-ok);
+}
+.pulse-tico.due {
+  /* inverz akcentus: a világos kitöltésen sötét a jel */
+  background: var(--pulse-accent);
+  color: var(--pulse-on-accent);
+}
+.pulse-tico.late {
+  background: var(--pulse-warn);
+}
+.pulse-task-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.pulse-task h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--pulse-ink-1);
+}
+.pulse-task h3 .tm {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--pulse-ink-3);
+}
+.pulse-task .ts {
+  margin: 0;
+  font-size: 15px;
+  color: var(--pulse-ink-2);
+}
+.pulse-task .ts b {
+  font-weight: 700;
+}
+.pulse-task[data-state='done'] .ts b {
+  color: var(--pulse-ink-1);
+}
+.pulse-task-actions {
+  display: flex;
+  gap: 8px;
+}
+.pulse-task-actions .mantine-Button-root,
+.pulse-task-missed .mantine-Button-root {
+  min-width: 150px;
+}
+.pulse-task-missed {
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pulse-line);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--pulse-ink-2);
+}
+
+/* Két hasáb */
+.pulse-grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.pulse-stack-lg {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+  align-content: start;
+}
+
+/* Mérés rögzítése */
+.pulse-mform {
+  display: grid;
+  gap: 18px;
+}
+.pulse-typeseg {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.pulse-typeseg label {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 1px solid var(--pulse-line-2);
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-2);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pulse-typeseg label svg {
+  color: var(--pulse-ink-3);
+}
+.pulse-typeseg label:hover {
+  border-color: #7b736a;
+  color: var(--pulse-ink-1);
+}
+.pulse-typeseg input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.pulse-typeseg label:has(input:checked) {
+  background: var(--pulse-accent);
+  border-color: var(--pulse-accent);
+  color: var(--pulse-on-accent);
+}
+.pulse-typeseg label:has(input:checked) svg {
+  color: var(--pulse-on-accent);
+}
+.pulse-typeseg label:has(input:focus-visible) {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 2px;
+}
+.pulse-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.pulse-mform .pulse-input-big {
+  height: 64px;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.pulse-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pulse-ink-2);
+}
+.pulse-row-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+}
+.pulse-timechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+}
+.pulse-timechip svg {
+  color: var(--pulse-ink-3);
+}
+.pulse-linkbtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--pulse-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+/* Nyugta: siker, pótlás, hiba */
+.pulse-receipt {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-2);
+}
+.pulse-receipt b {
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+}
+
+/* Kérdőív */
+.pulse-qs {
+  display: grid;
+  gap: 22px;
+}
+.pulse-q {
+  display: grid;
+  gap: 10px;
+}
+.pulse-q-text {
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+}
+.pulse-hchoices {
+  display: grid;
+  gap: 8px;
+}
+.pulse-hchoice {
+  min-height: 52px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--pulse-line-2);
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-1);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.pulse-hchoice.txt {
+  font-size: 16px;
+}
+.pulse-hchoice:hover {
+  border-color: #7b736a;
+}
+.pulse-hchoice[aria-checked='true'] {
+  background: var(--pulse-accent);
+  border-color: var(--pulse-accent);
+  color: var(--pulse-on-accent);
+}
+.pulse-hchoice:focus-visible {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 2px;
+}
+.pulse-scale-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--pulse-ink-3);
+}
+.pulse-q-foot {
+  display: flex;
+  flex-wrap: wrap;
+  /* balra a haladás, jobbra a Beküldés (a fő gomb a terület jobb szélén) */
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px 16px;
+}
+
+/* Legutóbbi értékek: egymás alatt, jobbra a kis görbe (küszöb nélkül) */
+.pulse-latest {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.pulse-lt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: var(--pulse-card);
+  border: 1px solid var(--pulse-line);
+}
+.pulse-lt .pulse-lspark {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  display: block;
+  overflow: visible;
+}
+.pulse-lt .k {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--pulse-ink-3);
+}
+.pulse-lt .v {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--pulse-ink-1);
+}
+.pulse-lt .v small {
+  margin-left: 4px;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--pulse-ink-3);
+}
+.pulse-lt .w {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pulse-ink-3);
+}
+.pulse-lspark .line {
+  fill: none;
+  stroke: var(--pulse-ink-2);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.pulse-lspark .end {
+  fill: var(--pulse-ink-1);
+  stroke: var(--pulse-card);
+  stroke-width: 2;
+}
+
+@media (max-width: 1180px) {
+  .pulse-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .pulse-display {
+    font-size: 28px;
+  }
+  .pulse-task {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 14px 16px;
+  }
+  .pulse-task-actions,
+  .pulse-task-missed {
+    grid-column: 1 / -1;
+  }
+  .pulse-task-actions .mantine-Button-root {
+    flex: 1;
+    min-width: 0;
+  }
+  .pulse-task-missed {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .pulse-task-missed .mantine-Button-root {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .pulse-typeseg {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pulse-pcard {
+    padding: 16px;
+  }
+}
+
+/* Mérés alja: balra a mérés ideje, jobbra a Mentés (keskeny képernyőn alá tör). */
+.pulse-form-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 16px;
+}
+.pulse-form-time {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.pulse-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* ---------- 2. változat: a rögzítés a teendőből nyílik ---------- */
+.pulse-task.is-open {
+  border-color: var(--pulse-line-2);
+}
+.pulse-task-form {
+  grid-column: 1 / -1;
+  margin-top: 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--pulse-line);
+}
+.pulse-one {
+  max-width: 320px;
+}
+.pulse-form-time input[type='datetime-local'] {
+  max-width: 320px;
+}
+.pulse-home-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+.pulse-patient > [role='status']:empty {
+  display: none;
+}
+
+/* Kérdőív saját oldalon: keskeny, középre zárt hasáb, felül vissza a teendőkhöz. */
+.pulse-narrow {
+  max-width: 760px;
+  width: 100%;
+  margin-inline: auto;
+}
+.pulse-crumbs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--pulse-ink-3);
+  text-decoration: none;
+}
+.pulse-crumbs a:hover {
+  color: var(--pulse-ink-1);
+}
+
+/* Előzményeim: a legutóbbi értékek egy sorban. */
+.pulse-history-page .pulse-latest {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}

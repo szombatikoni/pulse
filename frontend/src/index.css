@@ -1,6 +1,255 @@
-/* Táblázatos számjegyek: a mérési értékek oszlopban egymás alá esnek. */
+/* ---------- Felületterv, 2026-10-30 (docs/design/felulet_2026-10-30) ----------
+   Csak sötét téma, meleg szürke rétegek. A kártya egy árnyalattal világosabb a
+   háttérnél, a határt hajszálvonal adja. Szín csak jelentéssel: akció, státusz,
+   határérték. Ember = serif (nevek, oldalcímek), adat = groteszk. */
+:root {
+  --pulse-bg: #1a1816;
+  --pulse-sunk: #141210;
+  --pulse-card: #221f1c;
+  --pulse-raised: #2a2724;
+  --pulse-fill: #3a3531; /* semleges, teli másodlagos gomb */
+  --pulse-fill-hover: #46403b;
+  --pulse-line: #2f2b27;
+  --pulse-line-2: #413b36;
+  --pulse-ink-1: #f4efe9;
+  --pulse-ink-2: #d6cec5;
+  --pulse-ink-3: #aaa198;
+  --pulse-accent: #f2ede6; /* a fő gomb: teli törtfehér */
+  --pulse-accent-hover: #ffffff;
+  --pulse-on-accent: #141210;
+  --pulse-severe: #cf2c55;
+  --pulse-warn: #b88300;
+  --pulse-warn-pill: #9a6c00; /* a teli címkén: fehér felirat 4,6:1 */
+  --pulse-nodata: #7a736b;
+  --pulse-handled: #3d74c2;
+  --pulse-ok: #2e8540;
+  --pulse-serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+}
+
 body {
+  background: var(--pulse-bg);
+  color: var(--pulse-ink-2);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Táblázatos számjegyek: a mérési értékek oszlopban egymás alá esnek. */
   font-variant-numeric: tabular-nums;
+}
+::selection {
+  background: rgba(242, 237, 230, 0.16);
+}
+.mantine-Title-root {
+  color: var(--pulse-ink-1);
+  letter-spacing: -0.015em;
+}
+/* Halvány szöveg egy fokkal vastagabban: sötét háttéren így jól olvasható. */
+.mantine-Text-root[data-c='dimmed'],
+[style*='--text-color: var(--mantine-color-dimmed)'] {
+  font-weight: 500;
+}
+
+/* Gombok: teli kitöltés. A fő gomb törtfehér, sötét felirattal; a másodlagos
+   semleges szürke, fehér felirattal; a harmadlagos csak szöveg. */
+.mantine-Button-root {
+  font-weight: 600;
+}
+.mantine-Button-root:not([data-variant]) {
+  /* a Mantine a változót a gombon soron belül fehérre állítja, ezért !important */
+  --button-color: var(--pulse-on-accent) !important;
+  color: var(--pulse-on-accent);
+}
+.mantine-Button-root:not([data-variant]):hover {
+  background: var(--pulse-accent-hover);
+}
+.mantine-Button-root:not([data-variant])[data-disabled] {
+  background: var(--pulse-raised);
+  color: var(--mantine-color-dark-3);
+}
+
+/* Státusz: teli kör, fehér jel (StatusIcon); teli címke (StatusLabel). */
+.pulse-si {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  color: #fff;
+}
+.pulse-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px 0 5px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.pulse-pill-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+/* Keret: oldalsáv, telefonon felső sáv */
+.pulse-side {
+  background: var(--pulse-sunk);
+  border-right: 1px solid var(--pulse-line);
+  padding: 20px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.pulse-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--pulse-sunk);
+  border-bottom: 1px solid var(--pulse-line);
+}
+.pulse-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--pulse-ink-1);
+}
+.pulse-brand-link {
+  padding: 2px 8px;
+  text-decoration: none;
+}
+.pulse-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--pulse-accent);
+  color: var(--pulse-on-accent);
+}
+.pulse-brand-mark svg {
+  width: 20px;
+  height: 20px;
+}
+.pulse-brand-name {
+  font-family: var(--pulse-serif);
+  font-weight: 600;
+  font-size: 21px;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+.pulse-nav {
+  display: grid;
+  gap: 2px;
+}
+.pulse-nav a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--pulse-ink-2);
+  text-decoration: none;
+  font-weight: 500;
+}
+.pulse-nav a svg {
+  color: var(--pulse-ink-3);
+  flex: none;
+}
+.pulse-nav a:hover {
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-1);
+}
+.pulse-nav a.active {
+  background: var(--pulse-accent);
+  color: var(--pulse-on-accent);
+  font-weight: 600;
+}
+.pulse-nav a.active svg {
+  color: var(--pulse-on-accent);
+}
+.pulse-count {
+  margin-left: auto;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--pulse-fill);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.pulse-count.hot {
+  background: var(--pulse-severe);
+}
+.pulse-nav a.active .pulse-count:not(.hot) {
+  background: rgba(20, 18, 16, 0.14);
+  color: var(--pulse-on-accent);
+}
+.pulse-me {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--pulse-card);
+  border: 1px solid var(--pulse-line);
+}
+.pulse-avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--pulse-fill);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.pulse-me-text {
+  min-width: 0;
+  display: grid;
+  line-height: 1.3;
+}
+.pulse-me-name {
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pulse-me-role {
+  color: var(--pulse-ink-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+.pulse-ibtn {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--pulse-ink-3);
+}
+.pulse-ibtn:hover {
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-1);
+}
+.pulse-main {
+  /* az oldalsáv és a felső sáv eltolását az AppShell adja; mi csak a térközt */
+  padding-top: calc(var(--app-shell-header-offset, 0rem) + 30px);
+  padding-bottom: 96px;
 }
 
 /* Telefonon a mezők betűje legalább 16 px: ennél kisebbnél az iOS Safari
@@ -12,51 +261,7 @@ body {
   }
 }
 
-/* Mérés: nagy, jól olvasható szám a mezőben (az egység a mező jobb szélén). */
-.pulse-number-input {
-  font-size: 22px;
-  font-weight: 600;
-}
-.pulse-time-chip {
-  border: 1px solid var(--mantine-color-dark-3);
-  padding: 4px 10px;
-  font-weight: 600;
-}
-
-/* Kérdőív: érintésre is kényelmes válaszgombok. */
-.pulse-choices {
-  display: grid;
-  gap: 6px;
-}
-.pulse-choice {
-  min-height: 44px;
-  padding: 6px 8px;
-  background: var(--mantine-color-dark-6);
-  border: 1px solid var(--mantine-color-dark-4);
-  color: var(--mantine-color-dark-1);
-  font: inherit;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.pulse-choice:hover {
-  background: var(--mantine-color-dark-5);
-}
-.pulse-choice[aria-checked='true'] {
-  background: var(--mantine-color-dark-0);
-  border-color: var(--mantine-color-dark-0);
-  color: var(--mantine-color-dark-7);
-}
-.pulse-choice:focus-visible {
-  outline: 2px solid var(--mantine-color-dark-0);
-  outline-offset: 2px;
-}
-
 /* Előzmények: napokra bontott lista, az érték jobbra igazítva. */
-.pulse-filter [aria-pressed='true'] {
-  background: var(--mantine-color-dark-5);
-  border-color: var(--mantine-color-dark-2);
-}
 .pulse-history {
   list-style: none;
   margin: 0;
@@ -90,39 +295,12 @@ body {
   color: var(--mantine-color-dark-2);
 }
 
-/* Legutóbbi értékek: kis görbe küszöbvonal nélkül. */
-.pulse-spark {
-  display: block;
-  margin-top: 6px;
-}
-.pulse-spark .area {
-  fill: rgba(200, 198, 196, 0.1);
-}
-.pulse-spark .line {
-  fill: none;
-  stroke: var(--mantine-color-dark-1);
-  stroke-width: 1.6;
-}
-.pulse-spark .dot {
-  fill: var(--mantine-color-dark-0);
-}
 @media (prefers-reduced-motion: reduce) {
   .pulse-history li {
     transition: none;
   }
 }
 
-/* Teendők kártyái: az állapot színe (a státuszszínekkel egyező árnyalat). */
-:root {
-  --pulse-ok: #2fcb4a;
-  --pulse-warn: #ffb020;
-}
-.pulse-task-chip {
-  border: 1px solid currentColor;
-  padding: 0 5px;
-  margin-right: 4px;
-  letter-spacing: 0.02em;
-}
 .pulse-task-missed {
   border-top: 1px solid var(--mantine-color-dark-5);
   padding-top: 8px;
@@ -131,16 +309,11 @@ body {
 /* ---------- Rétegek keretek helyett (2026-10-17) ----------
    Háttér (dark-7) < kártya (--pulse-card) < kiemelt elem (--pulse-raised).
    Keret csak a beviteli mezőkön marad; a másodlagos gomb keret nélküli. */
-:root {
-  --pulse-card: #2b2a29;
-  --pulse-raised: #353432;
-  --pulse-severe: #ff4545;
-}
 .mantine-Paper-root {
   background-color: var(--pulse-card);
 }
 .mantine-Paper-root[data-with-border] {
-  border-color: transparent;
+  border-color: var(--pulse-line);
 }
 .mantine-AppShell-header {
   background-color: var(--mantine-color-dark-8);
@@ -148,194 +321,16 @@ body {
 }
 .mantine-Button-root[data-variant='default'] {
   border-color: transparent;
-  background-color: var(--pulse-raised);
+  background-color: var(--pulse-fill);
+  color: #fff;
 }
 .mantine-Button-root[data-variant='default']:hover {
-  background-color: var(--mantine-color-dark-5);
+  background-color: var(--pulse-fill-hover);
 }
 .mantine-Button-root[data-variant='default'][aria-pressed='true'] {
   background-color: var(--mantine-color-dark-5);
   box-shadow: inset 0 -2px 0 var(--mantine-color-dark-0);
 }
-.pulse-card {
-  background-color: var(--pulse-card);
-}
-/* A kártyán belüli választógombok és a kártyák a kártya színéhez igazodnak. */
-.mantine-Paper-root .pulse-choice {
-  background: var(--pulse-raised);
-  border-color: transparent;
-}
-.mantine-Paper-root .pulse-choice[aria-checked='true'] {
-  background: var(--mantine-color-dark-0);
-}
-
-/* Orvosi beteglista: rétegzett sorok, az egész sor link. */
-.pulse-ptable {
-  display: grid;
-  gap: 6px;
-}
-.pulse-prow-head,
-.pulse-prow {
-  display: grid;
-  grid-template-columns: 130px minmax(140px, 1.1fr) minmax(0, 2.4fr) minmax(130px, 1fr) 110px;
-  gap: 16px;
-  align-items: center;
-  padding: 10px 16px;
-}
-.pulse-prow-head {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--mantine-color-dark-2);
-  padding-block: 2px;
-}
-.pulse-prow {
-  background: var(--pulse-card);
-  color: inherit;
-  text-decoration: none;
-}
-.pulse-prow:hover {
-  background: var(--pulse-raised);
-}
-.pulse-prow:focus-visible {
-  outline: 2px solid var(--mantine-color-dark-0);
-  outline-offset: 2px;
-}
-.pulse-prow > span {
-  min-width: 0;
-}
-@media (max-width: 52em) {
-  .pulse-prow-head {
-    display: none;
-  }
-  .pulse-prow {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 6px 12px;
-  }
-  .pulse-prow .c-status,
-  .pulse-prow .c-reason,
-  .pulse-prow .c-tasks {
-    grid-column: 1 / -1;
-  }
-  .pulse-prow .c-name {
-    grid-row: 2;
-    grid-column: 1;
-  }
-  .pulse-prow .c-fresh {
-    grid-row: 2;
-    grid-column: 2;
-    text-align: right;
-  }
-}
-
-/* Riasztás: kiemelt elem a kártyán belül, idővonallal. */
-.pulse-alert {
-  background: var(--pulse-raised);
-  padding: 14px 16px;
-  display: grid;
-  gap: 10px;
-}
-.pulse-timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 0 2px;
-  display: grid;
-  gap: 6px;
-}
-.pulse-timeline li {
-  display: grid;
-  grid-template-columns: 12px 110px minmax(0, 1fr);
-  gap: 10px;
-  align-items: baseline;
-}
-.pulse-timeline .dot {
-  width: 8px;
-  height: 8px;
-  background: var(--mantine-color-dark-2);
-  align-self: center;
-}
-.pulse-timeline li:first-child .dot {
-  background: var(--mantine-color-dark-0);
-}
-@media (max-width: 30em) {
-  .pulse-timeline li {
-    grid-template-columns: 12px minmax(0, 1fr);
-  }
-  .pulse-timeline li > :last-child {
-    grid-column: 2;
-  }
-}
-
-/* Kérdőív-kitöltések: pontsáv, sávnév; kattintásra a válaszok. */
-.pulse-subs {
-  display: grid;
-  gap: 4px;
-}
-.pulse-subs summary {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) minmax(60px, 1fr) auto auto;
-  gap: 12px;
-  align-items: center;
-  padding: 8px 4px;
-  cursor: pointer;
-  list-style: none;
-  font-size: 14px;
-}
-.pulse-subs summary::-webkit-details-marker {
-  display: none;
-}
-.pulse-subs summary:hover {
-  background: var(--pulse-raised);
-}
-.pulse-subs .when {
-  color: var(--mantine-color-dark-2);
-}
-.pulse-subs .bar {
-  height: 8px;
-  background: var(--mantine-color-dark-7);
-  position: relative;
-}
-.pulse-subs .bar i {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: var(--mantine-color-dark-1);
-}
-.pulse-subs .score {
-  font-weight: 700;
-}
-.pulse-subs .band {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border: 1px solid currentColor;
-}
-.pulse-subs .answers {
-  margin: 0 0 8px;
-  padding: 6px 4px 6px 24px;
-  display: grid;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--mantine-color-dark-1);
-}
-.pulse-subs .answers li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-.pulse-subs .answers .a {
-  text-align: right;
-}
-@media (max-width: 30em) {
-  .pulse-subs summary {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-  .pulse-subs .name,
-  .pulse-subs .bar {
-    display: none;
-  }
-}
-
 /* A riasztást kiváltó mérés jele az orvosi előzményekben. */
 .pulse-history .vl .over {
   display: inline-block;

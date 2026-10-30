@@ -1,47 +1,48 @@
 import { createTheme, type MantineColorsTuple } from '@mantine/core'
 
-// Piros akcentus; a 6. árnyalat az alapszín (#e5484d).
-const pulseRed: MantineColorsTuple = [
-  '#ffeaeb',
-  '#fdd4d5',
-  '#f6a7a9',
-  '#f0777b',
-  '#eb5a5e',
-  '#e84f54',
-  '#e5484d',
-  '#cb393e',
-  '#b53136',
-  '#9e262c',
+// Felületterv, 2026-10-30 (docs/design/felulet_2026-10-30): csak sötét téma,
+// meleg szürke rétegek; a fő gomb teli fehér, sötét felirattal.
+
+// Az akciószín: törtfehér; a 6. árnyalat az alap (#f2ede6). A felirat színét az
+// index.css adja (--on-accent), mert a Mantine alapból fehér szöveget tenne rá.
+const paper: MantineColorsTuple = [
+  '#ffffff',
+  '#fdfcfa',
+  '#faf8f5',
+  '#f7f4ef',
+  '#f5f1eb',
+  '#f3efe8',
+  '#f2ede6',
+  '#ddd6cc',
+  '#c8c0b5',
+  '#b3ab9f',
 ]
 
-// Sötét skála a státuszterv színeiből (docs/design/statusz_javaslat.html).
-// A Mantine sötét témában: 0 = szöveg, 2 = másodlagos szöveg, 4 = keret,
-// 6 = mezők és gombok háttere, 7 = oldalháttér.
-// 2026-10-17: semleges (nem kékes) szürke skála, a megszokott sötét
-// fejlesztői felületekhez hasonló árnyalatokkal; a háttér nem majdnem fekete,
-// a másodlagos szöveg kontrasztosabb. Az oldalháttér (7) a kártyáknál
-// (index.css --pulse-card) egy árnyalattal sötétebb: így rétegek választják el
-// a részeket, nem keretek.
+// A Mantine sötét skálája a terv tokenjeiből: 0 = szöveg, 2 = halvány szöveg,
+// 4 = keret, 5 = semleges gomb, 6 = kiemelt felület és mezők, 7 = oldalháttér,
+// 8 = oldalsáv.
 const dark: MantineColorsTuple = [
-  '#f3f2f1',
-  '#c8c6c4',
-  '#a19f9d',
-  '#797775',
-  '#484644',
-  '#3b3a39',
-  '#323130',
-  '#201f1e',
-  '#1b1a19',
-  '#161514',
+  '#f4efe9',
+  '#d6cec5',
+  '#aaa198',
+  '#7b736a',
+  '#413b36',
+  '#3a3531',
+  '#2a2724',
+  '#1a1816',
+  '#141210',
+  '#100e0d',
 ]
 
-const fontFamily = "'Inter Variable', system-ui, sans-serif"
+const fontFamily = "'Instrument Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif"
+const serif = "'Source Serif 4 Variable', Georgia, 'Times New Roman', serif"
 
 export const theme = createTheme({
-  primaryColor: 'pulseRed',
+  primaryColor: 'paper',
   primaryShade: 6,
-  colors: { pulseRed, dark },
-  defaultRadius: 0,
+  colors: { paper, dark },
+  defaultRadius: 'md',
+  radius: { xs: '4px', sm: '6px', md: '8px', lg: '12px', xl: '16px' },
   fontFamily,
-  headings: { fontFamily },
+  headings: { fontFamily: serif, fontWeight: '500' },
 })

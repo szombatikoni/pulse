@@ -1,0 +1,172 @@
+/* Belépés, felületterv 2026-10-30: balra a márka (mélyebb háttéren), jobbra az űrlap;
+   telefonon egymás alatt. */
+.lg {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+}
+.lg-brand {
+  display: flex;
+  flex-direction: column;
+  padding-block: 44px;
+  padding-left: max(56px, env(safe-area-inset-left, 0px));
+  padding-right: 56px;
+  background: var(--pulse-sunk);
+  border-right: 1px solid var(--pulse-line);
+}
+.lg-hero {
+  display: grid;
+  gap: 22px;
+  margin-block: auto;
+}
+.lg-word {
+  margin: 0;
+  font-family: var(--pulse-serif);
+  font-weight: 500;
+  font-size: clamp(64px, 9vw, 128px);
+  line-height: 0.92;
+  letter-spacing: 0.03em;
+  color: var(--pulse-ink-1);
+}
+.lg-acro {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--pulse-ink-3);
+  white-space: nowrap;
+}
+.lg-acro b {
+  color: var(--pulse-ink-1);
+  font-weight: 700;
+}
+.lg-tag {
+  margin: 0;
+  max-width: 22ch;
+  font-family: var(--pulse-serif);
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--pulse-ink-2);
+  text-wrap: balance;
+}
+.lg-main {
+  display: grid;
+  place-items: center;
+  padding-block: 48px;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+.lg-card {
+  width: min(400px, 100%);
+  display: grid;
+  gap: 22px;
+}
+.lg-title {
+  display: grid;
+  gap: 6px;
+}
+.lg-title .mantine-Title-root {
+  font-size: 30px;
+}
+.lg-meta,
+.lg-hint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pulse-ink-3);
+}
+.lg-demo {
+  display: grid;
+  gap: 6px;
+}
+.lg-demo-label {
+  margin-bottom: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pulse-ink-2);
+}
+.lg-hint {
+  margin-left: 6px;
+  font-size: 12.5px;
+}
+.lg-demo button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--pulse-line);
+  background: var(--pulse-card);
+  color: var(--pulse-ink-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.lg-demo button:hover {
+  border-color: var(--pulse-line-2);
+  background: var(--pulse-raised);
+}
+.lg-demo button:focus-visible {
+  outline: 2px solid var(--pulse-ink-1);
+  outline-offset: 2px;
+}
+.lg-who {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+.lg-who b {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.lg-who span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--pulse-ink-3);
+}
+.lg-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.lg-disclaimer {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--pulse-ink-3);
+}
+
+@media (max-width: 900px) {
+  .lg {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lg-brand {
+    padding-block: 32px;
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+    border-right: 0;
+    border-bottom: 1px solid var(--pulse-line);
+  }
+  .lg-word {
+    font-size: 64px;
+  }
+  .lg-acro {
+    white-space: normal;
+  }
+}

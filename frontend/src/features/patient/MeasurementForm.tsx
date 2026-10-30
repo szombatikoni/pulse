@@ -1,18 +1,5 @@
-import {
-  Alert,
-  Anchor,
-  Button,
-  Group,
-  NumberInput,
-  Paper,
-  SegmentedControl,
-  SimpleGrid,
-  Stack,
-  Text,
-  TextInput,
-  Title,
-  VisuallyHidden,
-} from '@mantine/core'
+import { Button, NumberInput, Stack, Text, TextInput, VisuallyHidden } from '@mantine/core'
+import { Clock, Drop, Gauge, Heart, type Icon, Scales } from '@phosphor-icons/react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -22,6 +9,7 @@ import {
   useMeasurementTypes,
   useRecordMeasurement,
 } from '../../api/measurements'
+import { StatusIcon } from '../../components/StatusLabel'
 import {
   componentLabel,
   formatMeasurementValue,
@@ -37,24 +25,36 @@ const BACKDATE_DAYS = 2 // a szerver is ezt ellenőrzi (F7)
  * pótlása. A szülő `key`-jel újraindítja az űrlapot, így az a kezdőértékekből indul. */
 export type MeasurementPreset = { typeCode: string; measuredAt?: string; catchUp?: boolean }
 
-type Message = { ok: boolean; title: string; text?: string }
+export type Message = { ok: boolean; title: string; text?: string }
 
 // A gombsor sorrendje: a leggyakoribb mérés elöl (a szerver név szerint rendez).
 const TYPE_ORDER = ['blood_pressure', 'heart_rate', 'body_weight', 'blood_glucose']
+const TYPE_ICON: Record<string, Icon> = {
+  blood_pressure: Gauge,
+  heart_rate: Heart,
+  body_weight: Scales,
+  blood_glucose: Drop,
+}
 const byTypeOrder = (a: { code: string }, b: { code: string }) => {
   const rank = (code: string) => (TYPE_ORDER.includes(code) ? TYPE_ORDER.indexOf(code) : 99)
   return rank(a.code) - rank(b.code)
 }
 
-/** Mérés rögzítése (F4): típus, értékek komponensenként, a mérés ideje (alapból most). */
+/** Mérés rögzítése (F4): típus, értékek komponensenként, a mérés ideje (alapból most).
+ * A teendő kártyáján (`inTask`) a típust a teendő adja, ezért nincs típusválasztó és cím;
+ * a mentés nyugtáját a szülő mutatja (`onSaved`), mert az űrlap ilyenkor bezárul. */
 export function MeasurementForm({
   patientId,
   preset,
+  inTask = false,
   onSaved,
+  onClose,
 }: {
   patientId: string
   preset?: MeasurementPreset | null
-  onSaved?: (measurementId: string) => void
+  inTask?: boolean
+  onSaved?: (measurementId: string, receipt: Message) => void
+  onClose?: () => void
 }) {
   const { t, i18n } = useTranslation()
   const types = useMeasurementTypes()
@@ -113,173 +113,202 @@ export function MeasurementForm({
             value: formatMeasurementValue(t, measurement),
             when: formatRelative(t, measurement.measured_at),
           })
-          setMessage({
+          const receipt = {
             ok: true,
             title: t('measurements.saved'),
             text: catchUp ? `${detail} ${t('measurements.caughtUp')}` : detail,
-          })
+          }
           setValues({})
           setTimeMode('now')
           setCatchUp(false)
-          onSaved?.(measurement.id)
+          if (onSaved) onSaved(measurement.id, receipt)
+          else setMessage(receipt)
         },
         onError: showError,
       },
     )
   }
 
-  return (
-    <Paper withBorder p="md" id="meres-urlap">
-      <form onSubmit={submit}>
-        <Stack gap="md">
-          <Title order={3}>{t('measurements.newTitle')}</Title>
-          {catchUp && timeMode === 'other' && (
-            <Alert
-              variant="light"
-              color="yellow"
-              title={t('measurements.catchUpTitle', {
+  const cancelCatchUp = () => {
+    setCatchUp(false)
+    setTimeMode('now')
+  }
+  const sortedTypes = [...(types.data ?? [])].sort(byTypeOrder)
+
+  const form = (
+    <form onSubmit={submit} className="pulse-mform">
+      {!inTask && (
+        <div>
+          <h2 className="pulse-h-sec" id="meres-cim">
+            {t('measurements.freeTitle')}
+          </h2>
+          <span className="pulse-meta">{t('measurements.freeHint')}</span>
+        </div>
+      )}
+      {catchUp && timeMode === 'other' && (
+        <div className="pulse-receipt">
+          <StatusIcon status="attention" size={22} />
+          <div>
+            <b>
+              {t('measurements.catchUpTitle', {
                 type: t(`measurementTypes.${typeCode}`).toLocaleLowerCase('hu'),
                 when: formatRelative(t, new Date(measuredAt).toISOString()),
               })}
-            >
-              <Group justify="space-between" gap="sm" wrap="wrap">
-                <Text size="sm">{t('measurements.catchUpHint')}</Text>
-                <Button
-                  size="xs"
-                  variant="default"
-                  onClick={() => {
-                    setCatchUp(false)
-                    setTimeMode('now')
+            </b>
+            <p className="pulse-hint">{t('measurements.catchUpHint')}</p>
+          </div>
+        </div>
+      )}
+      {/* Méréstípus: rádiógombok címkével; a címke maga a nagy, ikonos gomb. */}
+      {!inTask && (
+        <div className="pulse-typeseg" role="radiogroup" aria-label={t('measurements.type')}>
+          {sortedTypes.map((x) => {
+            const Glyph = TYPE_ICON[x.code] ?? Gauge
+            return (
+              <label key={x.code}>
+                <input
+                  type="radio"
+                  name="meres-tipus"
+                  value={x.code}
+                  checked={typeCode === x.code}
+                  onChange={() => {
+                    setTypeCode(x.code)
+                    setValues({})
+                    setMessage(null)
+                    setFieldError(null)
                   }}
-                >
-                  {t('measurements.cancel')}
-                </Button>
-              </Group>
-            </Alert>
-          )}
-          <SegmentedControl
-            fullWidth
-            aria-label={t('measurements.type')}
-            data={[...(types.data ?? [])].sort(byTypeOrder).map((x) => ({
-              value: x.code,
-              label: t(`measurementTypes.${x.code}`, { defaultValue: x.name }),
-            }))}
-            value={typeCode}
-            onChange={(value) => {
-              setTypeCode(value)
-              setValues({})
-              setMessage(null)
-              setFieldError(null)
-            }}
-          />
-          <SimpleGrid cols={{ base: type && type.components.length > 1 ? 2 : 1, xs: 2 }}>
-            {type?.components.map((c, i) => {
-              const unit = unitLabel(t, c.unit)
-              return (
-                <NumberInput
-                  key={c.code}
-                  // A teendők kártyájáról (pl. „Pótlás”) érkezve rögtön ide kerül a fókusz.
-                  autoFocus={i === 0 && !!preset}
-                  // Az egység a mező jobb szélén látszik; a felolvasó a címkében is hallja.
-                  label={
-                    <>
-                      {componentLabel(t, type.code, c.code)}
-                      <VisuallyHidden> ({unit})</VisuallyHidden>
-                    </>
-                  }
-                  rightSection={
-                    <Text size="sm" c="dimmed" pr="xs">
-                      {unit}
-                    </Text>
-                  }
-                  rightSectionWidth={64}
-                  rightSectionPointerEvents="none"
-                  classNames={{ input: 'pulse-number-input' }}
-                  hideControls
-                  inputMode={c.unit === 'mm[Hg]' || c.unit === '/min' ? 'numeric' : 'decimal'}
-                  value={values[c.code] ?? ''}
-                  onChange={(value) => {
-                    setValues((v) => ({ ...v, [c.code]: value }))
-                    if (fieldError?.component === c.code) setFieldError(null)
-                  }}
-                  min={c.min_value}
-                  max={c.max_value}
-                  // Ne írja át csendben a tartományon kívüli értéket (pl. 400 → 300):
-                  // a szerver utasítsa el, és a beteg lássa, miért.
-                  clampBehavior="none"
-                  allowNegative={false}
-                  decimalScale={c.unit === 'mm[Hg]' || c.unit === '/min' ? 0 : 1}
-                  decimalSeparator={i18n.language === 'en' ? '.' : ','}
-                  error={fieldError?.component === c.code ? fieldError.text : undefined}
-                  required
                 />
-              )
-            })}
-          </SimpleGrid>
-          {timeMode === 'now' ? (
-            <Stack gap={6}>
-              <Text size="sm" fw={500}>
-                {t('measurements.measuredAt')}
-              </Text>
-              <Group gap="md">
-                <Text size="sm" className="pulse-time-chip">
-                  {t('measurements.now', { time: formatTime(now) })}
+                <Glyph size={20} aria-hidden="true" />
+                {t(`measurementTypes.${x.code}`, { defaultValue: x.name })}
+              </label>
+            )
+          })}
+        </div>
+      )}
+      <div className={type && type.components.length > 1 ? 'pulse-two' : 'pulse-one'}>
+        {type?.components.map((c, i) => {
+          const unit = unitLabel(t, c.unit)
+          return (
+            <NumberInput
+              key={c.code}
+              // A teendők kártyájáról (pl. „Pótlás”) érkezve rögtön ide kerül a fókusz.
+              autoFocus={i === 0 && !!preset}
+              // Az egység a mező jobb szélén látszik; a felolvasó a címkében is hallja.
+              label={
+                <>
+                  {componentLabel(t, type.code, c.code)}
+                  <VisuallyHidden> ({unit})</VisuallyHidden>
+                </>
+              }
+              rightSection={
+                <Text size="sm" c="dimmed" pr="xs">
+                  {unit}
                 </Text>
-                <Anchor
-                  component="button"
+              }
+              rightSectionWidth={68}
+              rightSectionPointerEvents="none"
+              classNames={{ input: 'pulse-input-big', label: 'pulse-field-label' }}
+              hideControls
+              inputMode={c.unit === 'mm[Hg]' || c.unit === '/min' ? 'numeric' : 'decimal'}
+              value={values[c.code] ?? ''}
+              onChange={(value) => {
+                setValues((v) => ({ ...v, [c.code]: value }))
+                if (fieldError?.component === c.code) setFieldError(null)
+              }}
+              min={c.min_value}
+              max={c.max_value}
+              // Ne írja át csendben a tartományon kívüli értéket (pl. 400 → 300):
+              // a szerver utasítsa el, és a beteg lássa, miért.
+              clampBehavior="none"
+              allowNegative={false}
+              decimalScale={c.unit === 'mm[Hg]' || c.unit === '/min' ? 0 : 1}
+              decimalSeparator={i18n.language === 'en' ? '.' : ','}
+              error={fieldError?.component === c.code ? fieldError.text : undefined}
+              required
+            />
+          )
+        })}
+      </div>
+      {/* A mérés ideje balra, a Mentés vele egy sorban a jobb szélen (a fő gomb
+            mindig a terület jobb szélén áll). */}
+      <div className="pulse-form-foot">
+        <div className="pulse-form-time">
+          {timeMode === 'now' ? (
+            <Stack gap={7}>
+              <span className="pulse-field-label">{t('measurements.measuredAt')}</span>
+              <div className="pulse-row-wrap">
+                <span className="pulse-timechip">
+                  <Clock size={16} aria-hidden="true" />
+                  {t('measurements.now', { time: formatTime(now) })}
+                </span>
+                <button
                   type="button"
-                  size="sm"
-                  c="dimmed"
-                  td="underline"
+                  className="pulse-linkbtn"
                   onClick={() => {
                     setMeasuredAt(toLocalInput(new Date()))
                     setTimeMode('other')
                   }}
                 >
                   {t('measurements.otherTime')}
-                </Anchor>
-              </Group>
+                </button>
+              </div>
             </Stack>
           ) : (
-            <Group align="flex-end" gap="md" wrap="wrap">
-              <TextInput
-                type="datetime-local"
-                label={t('measurements.measuredAt')}
-                description={t('measurements.measuredAtHint')}
-                value={measuredAt}
-                onChange={(e) => setMeasuredAt(e.currentTarget.value)}
-                min={toLocalInput(earliest)}
-                max={toLocalInput(now)}
-                required
-                style={{ flex: '1 1 240px' }}
-              />
-              <Anchor
-                component="button"
-                type="button"
-                size="sm"
-                c="dimmed"
-                td="underline"
-                mb={10}
-                onClick={() => setTimeMode('now')}
-              >
-                {t('measurements.useNow')}
-              </Anchor>
-            </Group>
+            <TextInput
+              type="datetime-local"
+              label={t('measurements.measuredAt')}
+              classNames={{ label: 'pulse-field-label' }}
+              value={measuredAt}
+              onChange={(e) => setMeasuredAt(e.currentTarget.value)}
+              min={toLocalInput(earliest)}
+              max={toLocalInput(now)}
+              required
+            />
           )}
-          <Group gap="md">
-            <Button type="submit" loading={record.isPending} disabled={!type}>
-              {t('measurements.save')}
+        </div>
+        <div className="pulse-form-actions">
+          {onClose ? (
+            <Button variant="subtle" color="gray" size="md" onClick={onClose}>
+              {t('measurements.cancel')}
             </Button>
-          </Group>
-          <div role="status">
-            {message && (
-              <Alert variant="light" color={message.ok ? 'green' : 'red'} title={message.title}>
-                {message.text}
-              </Alert>
-            )}
+          ) : (
+            catchUp &&
+            timeMode === 'other' && (
+              <Button variant="subtle" color="gray" size="md" onClick={cancelCatchUp}>
+                {t('measurements.cancel')}
+              </Button>
+            )
+          )}
+          <Button type="submit" size="md" loading={record.isPending} disabled={!type}>
+            {t('measurements.save')}
+          </Button>
+        </div>
+      </div>
+      {timeMode === 'other' && (
+        <div className="pulse-row-wrap">
+          <span className="pulse-hint">{t('measurements.measuredAtHint')}</span>
+          <button type="button" className="pulse-linkbtn" onClick={() => setTimeMode('now')}>
+            {t('measurements.useNow')}
+          </button>
+        </div>
+      )}
+      <div role="status">
+        {message && (
+          <div className="pulse-receipt">
+            <StatusIcon status={message.ok ? 'ok' : 'severe'} size={22} />
+            <div>
+              <b>{message.title}</b>
+              {message.text && <p className="pulse-hint">{message.text}</p>}
+            </div>
           </div>
-        </Stack>
-      </form>
-    </Paper>
+        )}
+      </div>
+    </form>
+  )
+  if (inTask) return form
+  return (
+    <section className="pulse-pcard" id="meres-urlap" aria-labelledby="meres-cim">
+      {form}
+    </section>
   )
 }

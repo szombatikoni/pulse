@@ -1,87 +1,43 @@
-import { Group, Text } from '@mantine/core'
-import type { ReactNode } from 'react'
+import { Check, CloudSlash, type Icon, Siren, UserCheck, Warning } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 
 import type { PatientStatus } from '../api/patients'
-import { STATUS_COLOR } from './statusColors'
+import { STATUS_COLOR, STATUS_PILL } from './statusColors'
 
-const INK = '#2b2a29' // az ikonon belüli jel színe (a kártyák háttere, index.css --pulse-card)
-
-const ICONS: Record<PatientStatus, ReactNode> = {
-  severe: (
-    <>
-      <path d="M8 1 15 8 8 15 1 8Z" fill="currentColor" />
-      <path d="M8 4.2v4.6M8 11.4v.4" stroke={INK} strokeWidth="2.2" strokeLinecap="round" />
-    </>
-  ),
-  attention: (
-    <>
-      <path d="M8 1.5 15 14H1Z" fill="currentColor" />
-      <path d="M8 5.6v4M8 12v.3" stroke={INK} strokeWidth="2.1" strokeLinecap="round" />
-    </>
-  ),
-  no_data: (
-    <circle
-      cx="8"
-      cy="8"
-      r="6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeDasharray="2.6 2"
-    />
-  ),
-  handled: (
-    <>
-      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.8" />
-      <path
-        d="M8 4.6V8l2.4 1.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </>
-  ),
-  ok: (
-    <>
-      <circle cx="8" cy="8" r="7" fill="currentColor" />
-      <path
-        d="m4.8 8.2 2.2 2.2 4.2-4.4"
-        fill="none"
-        stroke={INK}
-        strokeWidth="2.1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </>
-  ),
+// A jel is különbözik, így szín nélkül is felismerhető: sziréna, figyelmeztető
+// háromszög, áthúzott felhő (nincs friss adat), pipás alak (felelősnél), pipa.
+const GLYPH: Record<PatientStatus, Icon> = {
+  severe: Siren,
+  attention: Warning,
+  no_data: CloudSlash,
+  handled: UserCheck,
+  ok: Check,
 }
 
-export function StatusIcon({ status, size = 18 }: { status: PatientStatus; size?: number }) {
+/** Teli kör a státusz színében, benne fehér jel. */
+export function StatusIcon({ status, size = 22 }: { status: PatientStatus; size?: number }) {
+  const Glyph = GLYPH[status]
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
+    <span
+      className="pulse-si"
       aria-hidden="true"
-      style={{ color: STATUS_COLOR[status], flexShrink: 0 }}
+      style={{ width: size, height: size, background: STATUS_COLOR[status] }}
     >
-      {ICONS[status]}
-    </svg>
+      <Glyph size={Math.round(size * 0.62)} weight="bold" />
+    </span>
   )
 }
 
-/** Státusz = színes ikon + egy szó, doboz nélkül; a szó a normál szövegszínű. */
+/** Státusz = teli címke a saját színében: fehér jel és szó (felületterv, 2026-10-30). */
 export function StatusLabel({ status }: { status: PatientStatus }) {
   const { t } = useTranslation()
-  const loud = status === 'severe' || status === 'attention'
+  const Glyph = GLYPH[status]
   return (
-    <Group gap={6} wrap="nowrap">
-      <StatusIcon status={status} />
-      <Text span size="sm" fw={loud ? 700 : 500}>
-        {t(`status.${status}`)}
-      </Text>
-    </Group>
+    <span className="pulse-pill" style={{ background: STATUS_PILL[status] }}>
+      <span className="pulse-pill-mark" aria-hidden="true" style={{ color: STATUS_PILL[status] }}>
+        <Glyph size={12} weight="bold" />
+      </span>
+      {t(`status.${status}`)}
+    </span>
   )
 }

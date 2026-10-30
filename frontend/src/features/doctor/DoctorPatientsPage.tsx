@@ -1,18 +1,32 @@
-import { Button, Group, Loader, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Button, Loader, Text, Title } from '@mantine/core'
+import { ArrowRight, CaretRight, MagnifyingGlass, Users } from '@phosphor-icons/react'
 import type { TFunction } from 'i18next'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 
 import { type PatientStatus, type PatientSummary, useDoctorPatients } from '../../api/patients'
 import type { Task } from '../../api/tasks'
 import { StatusIcon, StatusLabel } from '../../components/StatusLabel'
-import { STATUS_COLOR } from '../../components/statusColors'
-import { ageInYears, formatRelative, formatSoon } from '../../format'
+import { ageInYears, formatRelative, formatSoon, formatTime } from '../../format'
 import { reasonText, uniqueReasons } from './reasons'
+import './patientList.css'
 
-const KPI_ORDER: PatientStatus[] = ['severe', 'attention', 'no_data', 'handled', 'ok']
-const LOUD: PatientStatus[] = ['severe', 'attention']
+const STATUS_ORDER: PatientStatus[] = ['severe', 'attention', 'no_data', 'handled', 'ok']
+
+// A lista négy csoportja (felületterv, 2026-10-30): ami orvosi döntést kér, külön
+// kártyákon áll; a többi egy közös listában.
+const GROUPS: { key: string; statuses: PatientStatus[]; loud?: boolean }[] = [
+  { key: 'decide', statuses: ['severe', 'attention'], loud: true },
+  { key: 'watch', statuses: ['no_data'] },
+  { key: 'handled', statuses: ['handled'] },
+  { key: 'ok', statuses: ['ok'] },
+]
+
+/** Sürgősség szerint: előbb a státusz, azon belül a frissebb adat. */
+const byUrgency = (a: PatientSummary, b: PatientSummary) =>
+  STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
+  (b.last_data_at ?? '').localeCompare(a.last_data_at ?? '')
 
 type TaskTone = 'ok' | 'due' | 'late' | 'none'
 
@@ -45,15 +59,8 @@ function taskSummary(t: TFunction, tasks: Task[]): { tone: TaskTone; text: strin
   return { tone: 'ok', text: t('doctor.tasks.onTrack') }
 }
 
-const TONE_COLOR: Record<TaskTone, string | undefined> = {
-  ok: 'var(--pulse-ok)',
-  due: undefined,
-  late: 'var(--pulse-warn)',
-  none: 'var(--mantine-color-dark-2)',
-}
-
-/** Státuszonkénti darabszám, egyben szűrő; a nullás tételek halványak és nem kattinthatók. */
-function StatusFilter({
+/** Szűrőcsempék: státuszonként a darabszám; a nullás csempe halvány és nem kattintható. */
+function StatusTiles({
   patients,
   value,
   onChange,
@@ -63,93 +70,87 @@ function StatusFilter({
   onChange: (value: PatientStatus | 'all') => void
 }) {
   const { t } = useTranslation()
+  const tile = (key: PatientStatus | 'all', count: number, label: string, glyph: ReactNode) => (
+    <button
+      key={key}
+      type="button"
+      className={count ? 'pl-tile' : 'pl-tile zero'}
+      aria-pressed={value === key}
+      aria-disabled={count === 0 || undefined}
+      onClick={() => count && onChange(value === key ? 'all' : key)}
+    >
+      {glyph}
+      <span className="pl-tile-n">{count}</span>
+      <span className="pl-tile-l">{label}</span>
+    </button>
+  )
   return (
-    <Group gap={6} role="group" aria-label={t('doctor.filterLabel')} className="pulse-counts">
-      <Button
-        variant="default"
-        size="sm"
-        aria-pressed={value === 'all'}
-        onClick={() => onChange('all')}
-      >
-        <Text span fw={700} mr={6}>
-          {patients.length}
-        </Text>
-        {t('doctor.filterAll')}
-      </Button>
-      {KPI_ORDER.map((status) => {
-        const count = patients.filter((p) => p.status === status).length
-        return (
-          <Button
-            key={status}
-            variant="default"
-            size="sm"
-            disabled={count === 0}
-            aria-pressed={value === status}
-            onClick={() => onChange(value === status ? 'all' : status)}
-            leftSection={<StatusIcon status={status} />}
-          >
-            <Text span fw={700} mr={6}>
-              {count}
-            </Text>
-            {t(`status.${status}`)}
-          </Button>
-        )
-      })}
-    </Group>
+    <div className="pl-tiles" role="group" aria-label={t('doctor.filterLabel')}>
+      {tile(
+        'all',
+        patients.length,
+        t('doctor.filterAll'),
+        <span className="pl-tile-all" aria-hidden="true">
+          <Users size={15} weight="bold" />
+        </span>,
+      )}
+      {STATUS_ORDER.map((status) =>
+        tile(
+          status,
+          patients.filter((p) => p.status === status).length,
+          t(`status.${status}`),
+          <StatusIcon status={status} size={26} />,
+        ),
+      )}
+    </div>
   )
 }
 
-/** Egy beteg sora: az egész sor link az adatlapra. */
-function PatientRow({ p }: { p: PatientSummary }) {
+/** Egy beteg sora: az egész sor link az adatlapra; a státuszcímke az első szöveg. */
+function PatientRow({ p, loud }: { p: PatientSummary; loud?: boolean }) {
   const { t } = useTranslation()
   const [primary, ...others] = uniqueReasons(p.reasons)
-  const loud = LOUD.includes(p.status)
   const tasks = taskSummary(t, p.tasks ?? [])
   return (
     <Link
       to={`/doctor/patients/${p.id}`}
-      className="pulse-prow"
-      // Színcsík csak az orvosi döntést igénylő (Súlyos, Figyelem) soroknál.
-      style={loud ? { boxShadow: `inset 3px 0 0 ${STATUS_COLOR[p.status]}` } : undefined}
+      className={loud ? 'pulse-prow pl-row pl-cols loud' : 'pulse-prow pl-row pl-cols'}
+      data-s={p.status}
     >
       <span className="c-status">
         <StatusLabel status={p.status} />
       </span>
       <span className="c-name">
-        <Text span fw={600} display="block">
-          {p.name}
-        </Text>
-        <Text span size="xs" c="dimmed">
-          {t('doctor.age', { age: ageInYears(p.birth_date) })}
-        </Text>
+        <span className="pl-name">{p.name}</span>
+        <span className="pl-age">{t('doctor.age', { age: ageInYears(p.birth_date) })}</span>
       </span>
       <span className="c-reason">
-        <Text span size="sm" display="block" c={p.status === 'ok' ? 'dimmed' : undefined}>
+        <span className={p.status === 'ok' ? 'pl-r-main calm' : 'pl-r-main'}>
           {reasonText(t, primary)}
-        </Text>
+        </span>
         {others.map((r, i) => (
-          <Group key={i} gap={6} mt={3} wrap="nowrap" component="span">
-            <StatusIcon status={r.status} size={14} />
-            <Text span size="xs" c="dimmed">
-              {reasonText(t, r)}
-            </Text>
-          </Group>
+          <span key={i} className="pl-r-sub">
+            <StatusIcon status={r.status} size={16} />
+            <span>{reasonText(t, r)}</span>
+          </span>
         ))}
       </span>
-      <Text span size="sm" className="c-tasks" style={{ color: TONE_COLOR[tasks.tone] }}>
-        {tasks.text}
-      </Text>
-      <Text span size="sm" c="dimmed" className="c-fresh">
+      <span className={tasks.tone === 'late' ? 'c-tasks late' : 'c-tasks'}>{tasks.text}</span>
+      <span className="c-fresh">
         {p.last_data_at ? formatRelative(t, p.last_data_at) : t('doctor.noData')}
-      </Text>
+      </span>
+      <span className="c-chev" aria-hidden="true">
+        <CaretRight size={16} weight="bold" />
+      </span>
     </Link>
   )
 }
 
-/** Az orvos priorizált beteglistája (F9): elöl a Súlyos, a végén a Rendben;
- * státusz szerint szűrhető, név szerint kereshető. */
+/** Az orvos priorizált beteglistája (F9), felületterv 2026-10-30: csoportok
+ * (Döntésre vár, Figyelendő, Kezelés alatt, Rendben), szűrőcsempék, keresés. */
 export function DoctorPatientsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const patients = useDoctorPatients()
   const [filter, setFilter] = useState<PatientStatus | 'all'>('all')
   const [query, setQuery] = useState('')
@@ -157,62 +158,100 @@ export function DoctorPatientsPage() {
   if (patients.isPending) return <Loader />
   if (patients.isError) return <Text c="red">{t('errors.unavailable')}</Text>
 
+  const all = patients.data
   const q = query.trim().toLocaleLowerCase('hu')
-  const rows = patients.data.filter(
+  const visible = all.filter(
     (p) =>
       (filter === 'all' || p.status === filter) &&
       (!q || p.name.toLocaleLowerCase('hu').includes(q)),
   )
+  const decide = all.filter((p) => p.status === 'severe' || p.status === 'attention')
+  const urgent = [...decide].sort(byUrgency)[0]
+  const today = new Date().toLocaleDateString(i18n.language, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  })
 
   return (
-    <Stack gap="md">
-      <Group justify="space-between" align="center" wrap="wrap" gap="sm">
-        <Title order={2}>{t('home.doctor.title')}</Title>
-        {patients.data.length > 0 && (
-          <TextInput
-            type="search"
-            aria-label={t('doctor.search')}
-            placeholder={t('doctor.search')}
-            value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
-            w={{ base: '100%', xs: 260 }}
-            leftSection={
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                <path
-                  d="m10.5 10.5 3.5 3.5"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-              </svg>
-            }
-          />
+    <div className="pl-page">
+      <header className="pl-ph">
+        <div className="pl-ph-text">
+          <span className="pl-eyebrow">{today}</span>
+          <Title order={1} className="pl-title">
+            {t('home.doctor.title')}
+          </Title>
+          <div className="pl-ph-meta">
+            <span>{t('doctor.list.count', { count: all.length })}</span>
+            <span>{t('doctor.list.decide', { count: decide.length })}</span>
+            <span>
+              {t('doctor.list.updated', { time: formatTime(new Date(patients.dataUpdatedAt)) })}
+            </span>
+          </div>
+        </div>
+        {all.length > 0 && (
+          <div className="pl-ph-actions">
+            <label className="pl-search">
+              <MagnifyingGlass size={16} aria-hidden="true" />
+              <input
+                type="search"
+                className="pl-input"
+                aria-label={t('doctor.search')}
+                placeholder={t('doctor.search')}
+                autoComplete="off"
+                value={query}
+                onChange={(e) => setQuery(e.currentTarget.value)}
+              />
+            </label>
+            {urgent && (
+              // Gomb, nem link: a beteg nevére szóló link a listában egyedi marad.
+              <Button
+                onClick={() => navigate(`/doctor/patients/${urgent.id}`)}
+                rightSection={<ArrowRight size={16} weight="bold" />}
+              >
+                {t('doctor.list.urgent', { name: urgent.name })}
+              </Button>
+            )}
+          </div>
         )}
-      </Group>
-      {patients.data.length === 0 ? (
+      </header>
+
+      {all.length === 0 ? (
         <Text c="dimmed">{t('doctor.empty')}</Text>
       ) : (
         <>
-          <StatusFilter patients={patients.data} value={filter} onChange={setFilter} />
-          <div className="pulse-ptable">
-            <div className="pulse-prow-head" aria-hidden="true">
+          <StatusTiles patients={all} value={filter} onChange={setFilter} />
+          <div className="pl-stack">
+            <div className="pl-cols pl-cols-head" aria-hidden="true">
               <span>{t('doctor.columns.status')}</span>
               <span>{t('doctor.columns.patient')}</span>
               <span>{t('doctor.columns.reason')}</span>
               <span>{t('doctor.columns.tasks')}</span>
-              <span>{t('doctor.columns.lastData')}</span>
+              <span className="r">{t('doctor.columns.lastData')}</span>
+              <span />
             </div>
-            {rows.length === 0 ? (
-              <Text c="dimmed" p="md" className="pulse-card">
-                {t('doctor.noMatch')}
-              </Text>
-            ) : (
-              rows.map((p) => <PatientRow key={p.id} p={p} />)
-            )}
+            {GROUPS.map((g) => {
+              const list = visible.filter((p) => g.statuses.includes(p.status)).sort(byUrgency)
+              if (!list.length) return null
+              const title = t(`doctor.list.groups.${g.key}`)
+              return (
+                <section key={g.key} className="pl-group" aria-label={title}>
+                  <div className="pl-group-head">
+                    <h2>{title}</h2>
+                    <span className="pl-group-n">{list.length}</span>
+                  </div>
+                  <div className={g.loud ? 'pl-loud' : 'pl-plist'}>
+                    {list.map((p) => (
+                      <PatientRow key={p.id} p={p} loud={g.loud} />
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
+            {visible.length === 0 && <p className="pl-no-match">{t('doctor.noMatch')}</p>}
           </div>
         </>
       )}
-    </Stack>
+    </div>
   )
 }
