@@ -23,7 +23,8 @@ class QuestionOut(BaseModel):
 
 
 class QuestionnaireOut(BaseModel):
-    """Egy kirendelt kérdőív az aktuális verziójával (ezt tölti ki a beteg)."""
+    """Egy kirendelt kérdőív a kitöltendő verziójával: az aktuális időszak
+    alkalmához rögzített verzióval (ezt tölti ki a beteg)."""
 
     code: str
     name: str

@@ -4,10 +4,16 @@ beteg kitöltésétől az orvosi megjelenítésig (M2)."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 
 from app.core.security import create_access_token
-from app.models import RuleType, Severity
-from app.services.questionnaires import assign_questionnaire, create_template
+from app.models import QuestionnaireTemplate, RuleType, Severity
+from app.services.questionnaires import (
+    VersionSpec,
+    add_version,
+    assign_questionnaire,
+    create_template,
+)
 from app.services.rules import create_rule
 from seed.questionnaires import WELLBEING_CODE, WELLBEING_NAME, WELLBEING_V1
 from tests.factories import PASSWORD, assign, make_admin, make_doctor, make_patient
@@ -184,3 +190,35 @@ def test_others_cannot_list_a_patients_questionnaires(client, setup, role):
 def test_questionnaire_endpoints_require_login(client, setup, path):
     url = f"/api/patients/{pid(setup['patient'])}/{path}"
     assert client.get(url).status_code == 401
+
+
+def test_questionnaire_version_stays_pinned_for_the_period(client, db, setup):
+    """A sablon a kitöltési időszak közben új verziót kap: a beteg továbbra is az
+    alkalom verzióját kapja kitöltésre, és a beküldés is azzal pontoz (M3)."""
+    patient, doctor = setup["patient"], setup["doctor"]
+    # Az első lekérés megnyitja az időszak alkalmát (v1).
+    body = answers(client, patient, patient, "4", "4", "rarely")
+
+    # v2: a szédülés „Ritkán" válasza 4 pontot ér (v1-ben 2).
+    spec = WELLBEING_V1.model_copy(deep=True)
+    spec.questions[2].options[1].score = 4
+    spec.scoring_thresholds[0].max = 3
+    spec.scoring_thresholds[1].min = 4
+    template = db.scalar(
+        select(QuestionnaireTemplate).where(QuestionnaireTemplate.code == WELLBEING_CODE)
+    )
+    add_version(db, template, VersionSpec.model_validate(spec.model_dump()))
+
+    url = f"/api/patients/{pid(patient)}/questionnaires"
+    [questionnaire] = client.get(url, headers=auth(patient)).json()
+    assert questionnaire["version_no"] == 1
+    assert answers(client, patient, patient, "4", "4", "rarely") == body
+
+    created = client.post(
+        f"/api/patients/{pid(patient)}/submissions", json=body, headers=auth(patient)
+    )
+    assert created.status_code == 201
+    [submission] = client.get(
+        f"/api/patients/{pid(patient)}/submissions", headers=auth(doctor)
+    ).json()
+    assert (submission["version_no"], submission["total_score"]) == (1, 6)

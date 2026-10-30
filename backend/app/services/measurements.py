@@ -94,6 +94,10 @@ def record_measurement(
     )
     db.add(measurement)
     db.flush()
+    # Az előírás alkalmának teljesítése (M3); körkörös import elkerülése.
+    from app.services.occurrences import fulfil_with_measurement
+
+    fulfil_with_measurement(db, measurement)
     alerts = evaluate_measurement(db, measurement, now=now)
     return measurement, alerts
 

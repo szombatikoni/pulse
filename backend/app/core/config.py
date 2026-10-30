@@ -2,6 +2,7 @@
 
 from zoneinfo import ZoneInfo
 
+from pydantic import PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +30,13 @@ class Settings(BaseSettings):
     # ideje ebből számítódik — a mérés helyi napja (M3: alkalmak) és a FHIR-export
     # időeltolása. Az adatbázis az időpontokat időzónával (UTC-ben) tárolja.
     timezone: str = "Europe/Budapest"
+
+    # A háttérfolyamat (worker) két alkalom-ellenőrzése közti idő másodpercben
+    # (OCCURRENCE_CHECK_INTERVAL_SECONDS). Alapból óránként (a hallgató döntése,
+    # 2026-10-30): a határidők napi léptékűek, a pontosságot az idempotencia és
+    # az „ellenőrzés most" végpont adja, nem az ütem. A demóhoz és a
+    # teljesítményméréshez állítható.
+    occurrence_check_interval_seconds: PositiveInt = 3600
 
     @property
     def tz(self) -> ZoneInfo:

@@ -6,9 +6,9 @@ létrejöttük után nem módosulhatnak (az adatbázis is tiltja). Minden kitöl
 a kitöltéskori verzióra hivatkozik, így a régi kitöltések jelentése és
 pontszáma utólag nem változik.
 
-Az M2-ben az alkalmak (AssignmentOccurrence) még nincsenek: a beteg a neki
-kirendelt kérdőív aktuális verzióját tölti ki. Az alkalmak, a határidők és a
-háttérfolyamat az M3-ban jönnek.
+Az előírás egyes alkalmai (AssignmentOccurrence, M3) a határidőt, a
+teljesítést és kérdőívnél a létrehozáskori verziót tárolják; a nyitásuk és a
+lezárásuk szabályai a services/occurrences.py-ban vannak.
 """
 
 import uuid
@@ -56,6 +56,13 @@ class Frequency(StrEnum):
     DAILY = "daily"
     WEEKLY = "weekly"
     EVERY_N_DAYS = "every_n_days"
+
+
+class OccurrenceStatus(StrEnum):
+    DUE = "due"  # esedékes: még nem érkezett adat
+    FULFILLED = "fulfilled"  # a határidőig rögzítve
+    FULFILLED_LATE = "fulfilled_late"  # a határidő után, de az időszakban (pótlással)
+    MISSED = "missed"  # elmulasztva: a pótlási lehetőség is lejárt
 
 
 class QuestionnaireTemplate(Base):
@@ -128,8 +135,7 @@ class Question(Base):
 
 class Assignment(Base):
     """Az orvos előírása (követési terv eleme, F14): mit, milyen gyakran,
-    mettől meddig. Az M2-ben csak a kérdőív kirendelése használja; az alkalmak
-    és a határidők az M3-ban jönnek."""
+    mettől meddig. Az egyes időszakai az AssignmentOccurrence sorok."""
 
     __tablename__ = "assignments"
 
@@ -169,6 +175,44 @@ class Assignment(Base):
     )
 
 
+class AssignmentOccurrence(Base):
+    """Az előírás egy alkalma: egy időszak a határidejével és a teljesítéssel
+    (03_adatmodell.md, „Előírás és alkalom"). Az időszak vége nem tárolt: a
+    határidő napját követő helyi éjfél, a period_start-tal együtt az előírásból
+    számolható."""
+
+    __tablename__ = "assignment_occurrences"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    assignment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("assignments.id"))
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[OccurrenceStatus] = mapped_column(
+        str_enum(OccurrenceStatus, "occurrence_status", length=16), default=OccurrenceStatus.DUE
+    )
+    # A teljesítő mérés; kérdőívnél a kitöltés a Submission.occurrence_id-vel hivatkozik ide.
+    measurement_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("measurements.id"))
+    # Kérdőívnél az alkalom létrehozásakor aktuális verzió; később nem változik.
+    questionnaire_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("questionnaire_versions.id")
+    )
+    fulfilled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    assignment: Mapped[Assignment] = relationship()
+
+    __table_args__ = (
+        # Egy időszakhoz egy alkalom: a háttérfolyamat és a mentés ismételt
+        # vagy egyidejű futása sem hozhat létre duplát.
+        UniqueConstraint("assignment_id", "due_at"),
+        # A teljesítés ideje pontosan a teljesített alkalmaknál van kitöltve.
+        CheckConstraint(
+            "(status IN ('fulfilled', 'fulfilled_late')) = (fulfilled_at IS NOT NULL)",
+            name="fulfilled_at_iff_fulfilled",
+        ),
+    )
+
+
 class Submission(Base):
     """Egy kérdőív-kitöltés. A verzió a kitöltéskori; a pontszám egész (a
     klinikai kérdőívek konvenciója, 03_adatmodell.md)."""
@@ -180,6 +224,9 @@ class Submission(Base):
     version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("questionnaire_versions.id"))
     total_score: Mapped[int] = mapped_column(SmallInteger)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Az alkalom, amelynek időszakában a kitöltés érkezett. A régi sorok miatt
+    # nullable: az alkalmak bevezetése (M3) előtti kitöltéseknél üres.
+    occurrence_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("assignment_occurrences.id"))
 
     version: Mapped[QuestionnaireVersion] = relationship()
     answers: Mapped[list["Answer"]] = relationship(

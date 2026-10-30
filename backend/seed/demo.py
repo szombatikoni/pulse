@@ -9,7 +9,8 @@ időpontok a futtatás idejéhez képest relatívak, hogy a bemutatón mindig fr
 adat legyen. Kovács doktor listáján így minden M2-beli státusz megjelenik:
 Varga Béla Súlyos, Szabó János Figyelem, Kiss Ilona Adathiány, Molnár Katalin
 Rendben. A „Közérzet" kérdőívet minden demóbeteg megkapja; Szabó János
-legutóbbi kitöltése a figyelmeztető sávba esik.
+legutóbbi kitöltése a figyelmeztető sávba esik. A végén egy alkalom-ellenőrzés
+megnyitja és lezárja az előírások múltbeli alkalmait, mint a háttérfolyamat.
 """
 
 from datetime import UTC, date, datetime, time, timedelta
@@ -33,6 +34,7 @@ from app.models import (
     UserRole,
 )
 from app.services.measurements import get_type_by_code, record_measurement
+from app.services.occurrences import run_occurrence_check
 from app.services.questionnaires import (
     assign_questionnaire,
     create_template,
@@ -216,8 +218,18 @@ def seed_demo_data(db: Session, now: datetime | None = None) -> list[str]:
     log += _seed_rules(db)
     log += _seed_measurements(db, now)
     log += _seed_submissions(db, now)
+    log += _check_occurrences(db, now)
     db.commit()
     return log
+
+
+def _check_occurrences(db: Session, now: datetime) -> list[str]:
+    """Egy alkalom-ellenőrzés, ugyanaz, amit a háttérfolyamat futtat: a frissen
+    betöltött adatbázis így azonnal a helyes alkalmakat és elmulasztásokat
+    mutatja, nem kell az első worker-futásra várni. Ismételt futásnál nem nyit
+    és nem zár újat (az ellenőrzés idempotens)."""
+    check = run_occurrence_check(db, now)
+    return [f"alkalom-ellenőrzés: {check.opened} megnyitva, {check.missed} elmulasztva"]
 
 
 def _seed_questionnaire(db: Session, now: datetime) -> list[str]:

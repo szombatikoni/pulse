@@ -1,0 +1,629 @@
+{
+  "futtatas": {
+    "motor": "cql-execution 3.3.2",
+    "fhirAdapter": "cql-exec-fhir 2.2.0, PatientSource.FHIRv401()",
+    "node": "v20.20.2",
+    "kiertekelesIdopontja": "2026-10-30T13:58:02.500+01:00",
+    "elm": {
+      "elm/PulseHbpmAverage-0.1.0.json": {
+        "sha256": "9fbbac64aecdd3d873328bcfa4a0d3a81775733b9ff40dca49c5bf485873dc70"
+      },
+      "elm/FHIRHelpers-4.0.1.json": {
+        "sha256": "1b518d4ae7017577cdd9c372b8e7b4390469e1207bef3cb665f522ea18548258"
+      }
+    },
+    "csomag": {
+      "utvonal": "adat/pulse_kiadas_bundle.json",
+      "sha256": "47c1e45cf65e96d7135b32a866ccffbab02d0b12a9391b53987ff024f6d7844c"
+    }
+  },
+  "beolvasas": {
+    "beteg": {
+      "id": "79bd425f-787d-41fe-bb01-0049eaa8e026",
+      "szuletesiDatum": "1958-03-14"
+    },
+    "observation": [
+      {
+        "id": "34258a4b-9314-4827-9603-0518b0b330c2",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-21T07:30:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-21"
+        },
+        "issued": {
+          "ertek": "2026-10-21T07:32:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-21"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 132,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 84,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "8bf1a3a2-c0d0-4c79-b4ed-39897e32e3d3",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-22T07:30:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-22"
+        },
+        "issued": {
+          "ertek": "2026-10-22T07:32:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-22"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 128,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 82,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "80552577-1b59-4417-a621-8a51d7c1297e",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-23T07:30:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-23"
+        },
+        "issued": {
+          "ertek": "2026-10-23T07:32:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-23"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 135,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 86,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "1dfa8b19-9513-4351-8f41-8d0a5402c72e",
+        "statusz": "final",
+        "kod": "29463-7",
+        "effective": {
+          "ertek": "2026-10-24T07:30:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-24"
+        },
+        "issued": {
+          "ertek": "2026-10-24T07:32:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-24"
+        },
+        "ertekek": [
+          {
+            "kod": "29463-7",
+            "ertek": 86.4,
+            "egysegKod": "kg",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "8dae5bcf-7213-41bb-8ba1-12b4b38cdf4a",
+        "statusz": "final",
+        "kod": "8867-4",
+        "effective": {
+          "ertek": "2026-10-24T07:30:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-24"
+        },
+        "issued": {
+          "ertek": "2026-10-24T07:32:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-24"
+        },
+        "ertekek": [
+          {
+            "kod": "8867-4",
+            "ertek": 74,
+            "egysegKod": "/min",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "c521fc83-985c-4047-9394-4b6155efd39b",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-24T07:30:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-24"
+        },
+        "issued": {
+          "ertek": "2026-10-24T07:32:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-24"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 130,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 83,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "60543428-c299-4655-afd5-2ab8b5f32800",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-25T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-25"
+        },
+        "issued": {
+          "ertek": "2026-10-25T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-25"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 134,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 85,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "59eb8713-6fbc-457d-acd7-89648ab022ba",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-26T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-26"
+        },
+        "issued": {
+          "ertek": "2026-10-26T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-26"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 129,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 81,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "6720f91d-7347-484c-ab9e-341cd6874519",
+        "statusz": "final",
+        "kod": "8867-4",
+        "effective": {
+          "ertek": "2026-10-26T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-26"
+        },
+        "issued": {
+          "ertek": "2026-10-26T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-26"
+        },
+        "ertekek": [
+          {
+            "kod": "8867-4",
+            "ertek": 71,
+            "egysegKod": "/min",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "6445c3d5-2d02-4d2d-9ee3-c6cff4f8d22e",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-27T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-27"
+        },
+        "issued": {
+          "ertek": "2026-10-27T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-27"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 146,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 92,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "f941e780-6dba-44fe-994a-c906a92b5e45",
+        "statusz": "final",
+        "kod": "29463-7",
+        "effective": {
+          "ertek": "2026-10-27T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-27"
+        },
+        "issued": {
+          "ertek": "2026-10-27T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-27"
+        },
+        "ertekek": [
+          {
+            "kod": "29463-7",
+            "ertek": 86.1,
+            "egysegKod": "kg",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "660adcef-6197-4818-8c58-db8a44401871",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-28T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-28"
+        },
+        "issued": {
+          "ertek": "2026-10-28T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-28"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 138,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 88,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "6f8fe269-0488-4dcd-962b-262f6164ca43",
+        "statusz": "final",
+        "kod": "8867-4",
+        "effective": {
+          "ertek": "2026-10-28T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-28"
+        },
+        "issued": {
+          "ertek": "2026-10-28T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-28"
+        },
+        "ertekek": [
+          {
+            "kod": "8867-4",
+            "ertek": 76,
+            "egysegKod": "/min",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "4605a551-f038-4486-8fe6-8ef6423dc0ad",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-29T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-29"
+        },
+        "issued": {
+          "ertek": "2026-10-29T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-29"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 136,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 86,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "0587e6c2-bfb9-4b36-8dc3-99832d784d5c",
+        "statusz": "final",
+        "kod": "8867-4",
+        "effective": {
+          "ertek": "2026-10-30T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-30"
+        },
+        "issued": {
+          "ertek": "2026-10-30T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-30"
+        },
+        "ertekek": [
+          {
+            "kod": "8867-4",
+            "ertek": 78,
+            "egysegKod": "/min",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "53e2ad91-7d1a-45c1-8e3d-629113c08503",
+        "statusz": "final",
+        "kod": "85354-9",
+        "effective": {
+          "ertek": "2026-10-30T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-30"
+        },
+        "issued": {
+          "ertek": "2026-10-30T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-30"
+        },
+        "ertekek": [
+          {
+            "kod": "8480-6",
+            "ertek": 152,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          },
+          {
+            "kod": "8462-4",
+            "ertek": 95,
+            "egysegKod": "mm[Hg]",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      },
+      {
+        "id": "6eb766ca-c121-4fd1-8054-6639a20b5d58",
+        "statusz": "final",
+        "kod": "29463-7",
+        "effective": {
+          "ertek": "2026-10-30T07:30:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-30"
+        },
+        "issued": {
+          "ertek": "2026-10-30T07:32:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-30"
+        },
+        "ertekek": [
+          {
+            "kod": "29463-7",
+            "ertek": 85.8,
+            "egysegKod": "kg",
+            "rendszer": "http://unitsofmeasure.org"
+          }
+        ]
+      }
+    ],
+    "questionnaire": [
+      {
+        "id": "600d628f-d0d0-416c-84f6-350bb56ee99a",
+        "url": "https://example.org/pulse/fhir/Questionnaire/wellbeing",
+        "verzio": "1",
+        "statusz": "active",
+        "kerdesek": [
+          {
+            "linkId": "086acde4-f155-4f3a-b2c2-b6ae7a2c20a0",
+            "valaszlehetosegek": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ]
+          },
+          {
+            "linkId": "e36bfb0c-9401-42bf-a126-2d55231291ec",
+            "valaszlehetosegek": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ]
+          },
+          {
+            "linkId": "82c4cbdf-f34d-4374-96ae-cea6f9482fc2",
+            "valaszlehetosegek": [
+              "never",
+              "rarely",
+              "daily"
+            ]
+          }
+        ]
+      }
+    ],
+    "questionnaireResponse": [
+      {
+        "id": "13317d5e-ba55-4a09-9119-341777a3fa3d",
+        "kerdoiv": "https://example.org/pulse/fhir/Questionnaire/wellbeing|1",
+        "statusz": "completed",
+        "authored": {
+          "ertek": "2026-10-19T19:00:00+02:00",
+          "eltolasOra": 2,
+          "helyiNap": "2026-10-19"
+        },
+        "valaszok": [
+          {
+            "linkId": "086acde4-f155-4f3a-b2c2-b6ae7a2c20a0",
+            "kodok": [
+              "4"
+            ]
+          },
+          {
+            "linkId": "e36bfb0c-9401-42bf-a126-2d55231291ec",
+            "kodok": [
+              "2"
+            ]
+          },
+          {
+            "linkId": "82c4cbdf-f34d-4374-96ae-cea6f9482fc2",
+            "kodok": [
+              "never"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "23de5e9c-3607-4821-8ca2-64c438879021",
+        "kerdoiv": "https://example.org/pulse/fhir/Questionnaire/wellbeing|1",
+        "statusz": "completed",
+        "authored": {
+          "ertek": "2026-10-26T19:00:00+01:00",
+          "eltolasOra": 1,
+          "helyiNap": "2026-10-26"
+        },
+        "valaszok": [
+          {
+            "linkId": "086acde4-f155-4f3a-b2c2-b6ae7a2c20a0",
+            "kodok": [
+              "3"
+            ]
+          },
+          {
+            "linkId": "e36bfb0c-9401-42bf-a126-2d55231291ec",
+            "kodok": [
+              "3"
+            ]
+          },
+          {
+            "linkId": "82c4cbdf-f34d-4374-96ae-cea6f9482fc2",
+            "kodok": [
+              "rarely"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "nice": {
+    "parameterek": "alapértékek, Series Period nélkül (a teljes sorozat)",
+    "eredmeny": {
+      "library": "PulseHbpmAverage",
+      "libraryVersion": "0.1.0",
+      "seriesPeriod": null,
+      "excludedFirstDay": "2026-10-21",
+      "excludedReadingIds": [
+        "34258a4b-9314-4827-9603-0518b0b330c2"
+      ],
+      "incompleteReadingIds": [],
+      "includedReadingIds": [
+        "8bf1a3a2-c0d0-4c79-b4ed-39897e32e3d3",
+        "80552577-1b59-4417-a621-8a51d7c1297e",
+        "c521fc83-985c-4047-9394-4b6155efd39b",
+        "60543428-c299-4655-afd5-2ab8b5f32800",
+        "59eb8713-6fbc-457d-acd7-89648ab022ba",
+        "6445c3d5-2d02-4d2d-9ee3-c6cff4f8d22e",
+        "660adcef-6197-4818-8c58-db8a44401871",
+        "4605a551-f038-4486-8fe6-8ef6423dc0ad",
+        "53e2ad91-7d1a-45c1-8e3d-629113c08503"
+      ],
+      "includedReadingCount": 9,
+      "includedDays": [
+        "2026-10-22",
+        "2026-10-23",
+        "2026-10-24",
+        "2026-10-25",
+        "2026-10-26",
+        "2026-10-27",
+        "2026-10-28",
+        "2026-10-29",
+        "2026-10-30"
+      ],
+      "includedDayCount": 9,
+      "minIncludedDays": 3,
+      "enoughData": true,
+      "meanSystolic": 136.44444444444446,
+      "meanDiastolic": 86.44444444444444,
+      "comparedSystolic": 136.44444444444446,
+      "comparedDiastolic": 86.44444444444444,
+      "ageInYears": 68,
+      "targetSystolic": 135,
+      "targetDiastolic": 85,
+      "bothComponentsMustBeBelowTarget": true,
+      "systolicBelowTarget": false,
+      "diastolicBelowTarget": false,
+      "targetMet": false
+    }
+  }
+}

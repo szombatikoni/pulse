@@ -269,7 +269,9 @@ def submit_questionnaire(
 ) -> tuple[Submission, list[Alert]]:
     """Kitöltés ellenőrzése, pontozása és mentése, majd kiértékelés a beteg
     szabályaival (egy tranzakcióban; a commitot a hívó végzi)."""
-    from app.services.rules import evaluate_submission  # körkörös import elkerülése
+    # körkörös import elkerülése
+    from app.services.occurrences import fill_version, fulfil_with_submission
+    from app.services.rules import evaluate_submission
 
     now = now or datetime.now(UTC)
     local_today = now.astimezone(settings.tz).date()
@@ -277,7 +279,8 @@ def submit_questionnaire(
     template = templates.get(template_code)
     if template is None:
         raise SubmissionError("not_assigned")
-    version = current_version(db, template.id)
+    # Az aktuális időszak alkalmának verziója, nem a sablon legújabb verziója (M3).
+    version = fill_version(db, patient_id, template.id, local_today)
 
     by_id = {str(q.id): q for q in version.questions}
     for qid in answers:
@@ -301,6 +304,7 @@ def submit_questionnaire(
     )
     db.add(submission)
     db.flush()
+    fulfil_with_submission(db, submission)  # az aktuális időszak alkalma (M3)
     return submission, evaluate_submission(db, submission, now=now)
 
 

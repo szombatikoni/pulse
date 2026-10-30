@@ -1,4 +1,4 @@
-# A PULSE teljes rendszere: adatbázis, backend (API) és frontend.
+# A PULSE teljes rendszere: adatbázis, backend (API), háttérfolyamat (worker) és frontend.
 # Indítás a repó gyökeréből: docker compose up --build
 # A jelszavak csak helyi fejlesztésre valók; felülírhatók egy .env fájlban
 # (minta: .env.example).
@@ -38,6 +38,28 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:8000:8000"
+    healthcheck:
+      # Az API az indításkor előbb lefuttatja a migrációkat, utána válaszol: ha az
+      # /api/health elérhető, a séma is naprakész (erre vár a worker). A slim
+      # image-ben nincs curl, ezért Pythonnal kérdezzük le.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    # Háttérfolyamat (M3): az előírások alkalmainak nyitása és az elmulasztottak
+    # lezárása. Ugyanaz az image, mint az API-é, csak más indítóparanccsal.
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pulse}:${POSTGRES_PASSWORD:-pulse}@db:5432/${POSTGRES_DB:-pulse}
+      # Két ellenőrzés közti idő másodpercben (alapból óránként).
+      OCCURRENCE_CHECK_INTERVAL_SECONDS: ${OCCURRENCE_CHECK_INTERVAL_SECONDS:-3600}
+    depends_on:
+      api:
+        # A migrációkat az API futtatja; a worker csak utána indul.
+        condition: service_healthy
 
   frontend:
     build: ./frontend

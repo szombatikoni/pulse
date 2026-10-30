@@ -191,6 +191,92 @@ CQL-paraméter lett belőlük (`cql/PulseHbpmAverage.cql`).
   alapján kell majd felvenni.
 - A NICE-ajánlások értelmezése (lásd a feltételezéseket).
 
+## FHIR-kiadás a PULSE-ból (M3, K1)
+
+A próba második része már nem kézzel írt csomagot használ, hanem azt, amit a
+PULSE ad ki: `GET /api/patients/{id}/fhir` (`backend/app/services/fhir.py`). A
+csomag felépítése:
+- `collection` Bundle, `meta.tag` = HTEST (mesterséges adat); elöl a Patient
+  (azonosító, név, születési dátum), utána a kitöltések által hivatkozott
+  kérdőívverziók, a mérések és a kitöltések, időrendben;
+- Observation mérésenként, az azonosítója a mérés azonosítója. A kód a
+  méréstípus LOINC-kódja, az egység UCUM-kód (a törzsadatból). A vérnyomás
+  panel (85354-9) két componenttel (8480-6, 8462-4), ugyanúgy, mint a fenti
+  kézi csomagban. Az egyértékű méréseknek (pulzus, testsúly, vércukor)
+  `valueQuantity`-jük van. A vitális jel profilt és kategóriát a vérnyomás, a
+  pulzus és a testsúly kap, a vércukor nem;
+- `effectiveDateTime` (mérés) és `issued` (rögzítés) a rendszer időzónájának
+  helyi eltolásával (`Europe/Budapest`, nyáron `+02:00`, télen `+01:00`), a fenti
+  3. akadály tanulsága szerint. Tört másodperc legfeljebb ezredmásodpercig: a
+  `cql-execution` a mikroszekundumot levágja (kipróbálva);
+- Questionnaire kérdőívverziónként: `url` a sablon kódjából, `version` a
+  verziószám, a `linkId` a kérdés azonosítója, a válaszlehetőség Coding (`code`
+  = a tárolt érték, `display` = a felirat). QuestionnaireResponse
+  kitöltésenként, `questionnaire` = `<url>|<verziószám>`, vagyis a kitöltéskori
+  verzióra hivatkozik. Pontszám és kiértékelési sáv nem kerül a csomagba.
+
+A beteg a saját csomagját, az orvos a hozzá rendelt betegéét töltheti le, az
+admin semmilyet (backend-tesztek: `backend/tests/test_fhir.py`).
+
+### Futtatás
+
+Kell hozzá egy futó PULSE a demóadatokkal (`docker compose -p pulse-e2e up -d`
+a repó gyökeréből, majd `docker compose -p pulse-e2e exec api python -m seed`).
+Az `integration/` mappából:
+
+```sh
+python -I kiadas/letoltes.py                     # 1. a csomag letöltése (adat/pulse_kiadas_bundle.json)
+docker compose run --rm kiadas-feldolgozas       # 2. a motor beolvassa, és lefut rajta az M2-es szabály
+uv run --project ../backend python -I ellenorzes/kiadas_ellenorzes.py   # 3. összevetés az adatbázissal
+```
+
+- Az 1. lépés orvosként lép be (alapból `dr.kovacs@pulse.example`, a beteg
+  Szabó János), és a 8000-es porton éri el az API-t. Más beteg:
+  `--beteg "Varga Béla"`, más cím: `--api`.
+- A 2. lépés helyben is fut: `npm ci && node kiadas_feldolgozas.mjs`.
+- A 3. lépésnek a `psycopg` kell, ezért a backend környezetével fut. Az
+  adatbázis címe a `PULSE_DB_URL` változóból jön, alapból `127.0.0.1:5432/pulse`
+  (a pulse-e2e példány). Más beteg: `--beteg varga.bela@pulse.example`.
+- A demóadat a futtatás idejéhez képest relatív, ezért a csomag és az eredmény
+  minden seed után más. A repóban lévő példány a 2026-10-30-i futásé.
+
+### Mit ellenőriz
+
+A `kiadas_feldolgozas.mjs` két dolgot csinál ugyanazon a csomagon:
+1. A motor FHIR-adapterével (`cql-exec-fhir`) beolvas minden Observationt,
+   Questionnaire-t és QuestionnaireResponse-t. Kiírja, amit a motor lát: az
+   értékeket, a UCUM-kódokat és az időpontokat a motor saját DateTime-jaként,
+   a belőle számolt helyi nappal együtt.
+2. Változtatás nélkül lefuttatja az M2-es NICE-szabályt (alapparaméterek,
+   `Series Period` nélkül). A kiértékelés időpontja a csomag időbélyege.
+
+A `ellenorzes/kiadas_ellenorzes.py` nem a csomagból indul, hanem az
+**adatbázis soraiból**: nyers SQL-lel olvassa ki a beteg méréseit, kitöltéseit
+és a hivatkozott kérdőívverziókat. Nem használja a PULSE kiadó kódját. A helyi
+időt és a helyi napot a PostgreSQL számolja (`SET TIME ZONE`, `to_char`,
+`AT TIME ZONE`), nem a Python `zoneinfo`, amellyel a kiadó dolgozik. Összeveti:
+- mérésenként a kódot, az értékeket, a UCUM-egységkódot, a mérés és a rögzítés
+  idejét (szövegként, eltolással), az eltolást, a helyi napot és a pillanatot
+  (epoch); azt is, hogy nincs hiányzó vagy fölös mérés;
+- kitöltésenként a verzióhivatkozást (`<url>|<verziószám>` az adatbázis
+  verziószámából), a kitöltés idejét és a válaszokat; a hivatkozott verziók
+  kérdéseit és válaszlehetőségeit;
+- a NICE-szabály eredményét az M2-es kézi számítás logikájával, pontos
+  törtekkel: a kizárt első nap, a figyelembe vett és a kizárt mérésazonosítók,
+  a napok, az átlagok, az életkor, a célérték és a `targetMet`.
+
+Eredmény (2026-10-30, Szabó János): 17 Observation (27 érték, `+02:00` és
+`+01:00` eltolással is, mert a demóadat átnyúlik az okt. 25-i
+óraátállításon), 2 kitöltés, 1 kérdőívverzió, NICE: 9 mérés, átlag 1228/9 /
+778/9, kizárt nap 2026-10-21: **minden egyezik**. Varga Bélával is egyezik.
+
+Próba szándékosan elrontott csomaggal: egy UTC-ben (`Z`) kiírt, de ugyanazt a
+pillanatot jelentő időpont, egy átírt érték és egy rossz verzióhivatkozás. Az
+ellenőrzés mind a hármat jelezte, a kilépési kód 1 lett.
+
+Nem ellenőrzött: a csomag profilmegfelelése (HL7-validátor), és a Docker-változat
+2. lépése (helyben, Node 20.20.2-vel futott).
+
 ## Fájlok
 
 | Fájl | Tartalom |
@@ -203,5 +289,10 @@ CQL-paraméter lett belőlük (`cql/PulseHbpmAverage.cql`).
 | `futtatas.mjs` | a motor futtatása, a forgatókönyvek, JSON-kimenet |
 | `eredmeny/eredmeny.json` | a motor kimenete (verziók, sha256, 7 forgatókönyv) |
 | `ellenorzes/kezi_szamitas.py` | a motortól független, azonos feltevésekkel végzett kézi számítás és összevetés |
+| `kiadas/letoltes.py` | M3: a PULSE FHIR-kiadásának letöltése a futó API-ból |
+| `adat/pulse_kiadas_bundle.json` | M3: a kiadott csomag (mesterséges demóadat) |
+| `kiadas_feldolgozas.mjs` | M3: a kiadott csomag beolvasása a motorral és az M2-es szabály futtatása rajta |
+| `eredmeny/kiadas_feldolgozas.json` | M3: a motor kimenete a kiadott csomagon |
+| `ellenorzes/kiadas_ellenorzes.py` | M3: összevetés az adatbázis soraival (nem a csomaggal) |
 | `docker-compose.yml`, `Dockerfile`, `package*.json` | a futtatókörnyezet rögzítése |
 | `.gitattributes` | LF sorvég, hogy a rögzített sha256 egy friss klónban is egyezzen |

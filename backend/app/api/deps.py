@@ -61,6 +61,7 @@ def require_roles(*roles: UserRole) -> Callable[[User], User]:
 
 DoctorUser = Annotated[User, Depends(require_roles(UserRole.DOCTOR))]
 PatientUser = Annotated[User, Depends(require_roles(UserRole.PATIENT))]
+AdminUser = Annotated[User, Depends(require_roles(UserRole.ADMIN))]
 
 
 def ensure_patient_access(db: Session, user: User, patient_id: uuid.UUID) -> None:

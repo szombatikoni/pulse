@@ -8,6 +8,67 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-10-30 — M3 indul: tárolt alkalmak, worker, FHIR-kiadás
+
+- Eszköz: Claude Code; a kódot külön Opus agentek írták, a fő munkamenetben a
+  tervezés, a döntés-előkészítés és az átnézés folyt (az én döntésem, hogy a
+  kódírás külön agentben megy)
+
+- Az AI szerepe: az A2 tervjavaslata (alkalmak tárolása, háttérfolyamat); a
+  megvalósítás három lépésben: az alkalom-tábla migrációval és
+  szolgáltatással, a worker-konténer az admin „ellenőrzés most" végponttal,
+  majd a K1 FHIR-kiadás a háromlépcsős független ellenőrzéssel; a védési
+  jegyzet új fejezetei.
+
+- Saját döntéseim:
+  - az előírás módosítása lezárás + új előírás, a felületen a váltás
+    jelzésével (a múltbeli alkalmak értelmezése nem változhat meg utólag);
+  - a worker óránként fut, az intervallum környezeti változóból állítható; az
+    AI eredetileg 10 percet javasolt, rákérdeztem az indokára, és mivel
+    követelményből nem volt levezethető, az óránkéntit választottam;
+  - a háttérfolyamat visszamenőleg is megnyitja a kihagyott időszakok
+    alkalmait, és a seed végén lefut egy ellenőrzés, hogy a friss demó azonnal
+    helyes múltat mutasson;
+  - a kitöltés az alkalomhoz rögzített kérdőívverzióval történik (az M1
+    adatmodell szerint);
+  - a pontszám és a kiértékelési sáv nem kerül a FHIR-csomagba, mert a beteg
+    is letöltheti, és a felületen sem látja a saját pontjait.
+
+- Ellenőrzés:
+  - a tesztkészletet minden lépés után a fő munkamenetben is lefuttattuk
+    (430-ról 500 tesztre nőtt, 99% lefedettség), az e2e böngészős teszt friss
+    adatbázison 6/6;
+  - a workert élőben próbáltuk: induláskor a seedelt múltra 64 alkalmat
+    nyitott és 56-ot zárt elmulasztottra, leállításkor azonnal, tisztán áll le;
+  - a FHIR-kiadást az adatbázis soraiból induló, a kiadó kódjától független
+    SQL-ellenőrzés igazolja; szándékosan elrontott csomagon (átírt érték, más
+    alakú időpont, rossz verzióhivatkozás) mindhárom hibát jelezte;
+  - az agent a saját tesztjével fogott ki egy hibát (a kérdőívverzió státusza
+    elavult gyűjteményből számolódott), és egy rosszul választott
+    FHIR-kiterjesztést is magától javított.
+
+## 2026-10-28 — Válaszlevél a ZV-döntésről; az M3 újraütemezése
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a témavezető M2-válaszára adott rövid válaszlevél tervezete
+  (a záróvizsga-döntés és a CQL-futtató konténeres javaslatának nyugtázása);
+  az M3 heti tervének újraütemezési javaslata, mert a bontás 1. hete (ZH-hét)
+  kódmunka nélkül telt el; az állapotlap frissítése.
+
+- Saját döntéseim:
+  - a 2027. januári záróvizsgára jelentkezem (a Neptun-jelentkezést a határidő
+    előtt adom be);
+  - a válaszlevél és az újraütemezett heti terv tervezet, az átnézésem és a
+    jóváhagyásom után érvényes; a CQL-futtató külön konténeres megoldása a
+    levél elküldésével válik eldöntötté.
+
+- Ellenőrzés:
+  - az újraütemezés mérlegét (85,5 óra munka, benne a témavezető által kért
+    három új ábra; kb. 78–86 órás keret november 22-ig) a bontás tételei
+    alapján tételesen átszámolva nézem át; a tartalék elfogyott, ezt a terv
+    kimondja.
+
 ## 2026-10-17–18 — Teendőlista; a beteg- és az orvosi felület átalakítása; M2-levél
 
 - Eszköz: Claude Code; a telefonos nézet ellenőrzéséhez és az M3 tételes

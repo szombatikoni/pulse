@@ -1,9 +1,11 @@
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentUser, DoctorUser, PatientUser, ensure_patient_access
+from app.core.config import settings
 from app.core.db import DbSession
 from app.models import QuestionnaireVersion, Submission
 from app.schemas.questionnaires import (
@@ -14,10 +16,10 @@ from app.schemas.questionnaires import (
     questionnaire_out,
     submission_out,
 )
+from app.services.occurrences import fill_version
 from app.services.questionnaires import (
     SubmissionError,
     assigned_templates,
-    current_version,
     list_submissions,
     submit_questionnaire,
 )
@@ -31,12 +33,16 @@ FORBIDDEN = {403: {"description": "A felhasználó nem érheti el a beteg adatai
 def patient_questionnaires(
     patient_id: uuid.UUID, db: DbSession, user: CurrentUser
 ) -> list[QuestionnaireOut]:
-    """A betegnek kirendelt kérdőívek az aktuális verziójukkal (F6). A beteg a
-    sajátjait, az orvos a hozzá rendelt betegéit látja."""
+    """A betegnek kirendelt kérdőívek (F6) az aktuális időszak alkalmához
+    rögzített verzióval: ezt tölti ki a beteg, és a beküldés is ezzel pontoz.
+    A beteg a sajátjait, az orvos a hozzá rendelt betegéit látja."""
     ensure_patient_access(db, user, patient_id)
+    today = datetime.now(settings.tz).date()
     result = []
-    for template in assigned_templates(db, patient_id):
-        version = current_version(db, template.id)
+    for template in assigned_templates(db, patient_id, today):
+        # Ha az alkalom még nincs meg, itt jön létre (ugyanaz, amit a háttérfolyamat
+        # is megnyitna), így a kitöltés közbeni sablonmódosítás nem cseréli ki a kérdéseket.
+        version = fill_version(db, patient_id, template.id, today)
         last = db.scalar(
             select(func.max(Submission.submitted_at))
             .join(QuestionnaireVersion)
@@ -46,6 +52,7 @@ def patient_questionnaires(
             )
         )
         result.append(questionnaire_out(template, version, last))
+    db.commit()
     return result
 
 

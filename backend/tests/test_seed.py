@@ -1,18 +1,24 @@
 """A seed (mesterséges demóadat, M2-leadandó) gépi ellenőrzése."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy import func, select
 
 from app.models import (
     Alert,
     Assignment,
+    AssignmentOccurrence,
     DoctorPatient,
     Measurement,
+    MeasurementType,
+    OccurrenceStatus,
     QuestionnaireTemplate,
     Rule,
     Submission,
     User,
 )
 from app.services.access import can_access_patient
+from app.services.occurrences import OccurrenceCheck, run_occurrence_check
 from app.services.status import PatientStatus, doctor_patient_list
 from app.services.users import get_user_by_email
 from seed.demo import ASSIGNMENTS, DEMO_PASSWORD, USERS, seed_demo_data
@@ -39,6 +45,7 @@ def test_seed_is_idempotent(db):
         Alert,
         QuestionnaireTemplate,
         Assignment,
+        AssignmentOccurrence,
         Submission,
     )
     before = [count(db, m) for m in models]
@@ -55,6 +62,28 @@ def test_seed_is_idempotent(db):
         "kitöltések",
     )
     assert not any(line.startswith(created) for line in second_run)
+
+
+def test_seed_opens_and_closes_occurrences_at_once(db):
+    # A seed végén lefut az alkalom-ellenőrzés: a háttérfolyamat első futására
+    # nem marad munka. Tóth Mária esti pulzusmérése két hete indult, és még
+    # egyszer sem rögzítette: a pótlási ablakon (2 nap) túli 12 nap elmulasztott,
+    # a tegnapelőtti, a tegnapi és a mai alkalom még esedékes.
+    now = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
+    log = seed_demo_data(db, now=now)
+    assert any(line.startswith("alkalom-ellenőrzés") for line in log)
+    assert run_occurrence_check(db, now) == OccurrenceCheck(0, 0)
+
+    toth = get_user_by_email(db, "toth.maria@pulse.example").patient_profile
+    statuses = db.scalars(
+        select(AssignmentOccurrence.status)
+        .join(Assignment)
+        .join(MeasurementType)
+        .where(Assignment.patient_id == toth.id, MeasurementType.code == "heart_rate")
+    ).all()
+    assert statuses.count(OccurrenceStatus.MISSED) == 12
+    assert statuses.count(OccurrenceStatus.DUE) == 3
+    assert len(statuses) == 15
 
 
 def test_seeded_doctor_list_shows_every_m2_status(db):

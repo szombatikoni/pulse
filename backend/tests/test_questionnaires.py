@@ -205,7 +205,9 @@ def test_new_version_does_not_change_old_submissions(db, patient, template):
     v2 = add_version(db, template, VersionSpec.model_validate(spec.model_dump()))
     assert v2.version_no == 2
 
-    new, _ = submit(db, patient, template, 4, 4, "rarely", now=NOW + timedelta(days=1))
+    # A következő heti időszakban: annak alkalma már az új verziót rögzíti (az
+    # aktuális időszak alkalma a régi verziónál marad, lásd test_occurrences.py).
+    new, _ = submit(db, patient, template, 4, 4, "rarely", now=NOW + timedelta(days=7))
     assert (old.version.version_no, old.total_score) == (1, 6)
     assert (new.version.version_no, new.total_score) == (2, 8)
     assert band_for(old.version, old.total_score) == "warning"  # a régi jelentése marad

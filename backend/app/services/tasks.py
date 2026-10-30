@@ -13,7 +13,8 @@ adatmodelljéből jönnek (docs/M1/03_adatmodell.md, „Előírás és alkalom")
   kérdőívnél nincs pótlás (a hallgató döntése, 2026-10-15).
 
 Az M3-ban az alkalmak (AssignmentOccurrence) ugyanezzel a szabállyal
-tárolódnak, és azokra épül a késés rögzítése és az elmaradt adat jelzése.
+tárolódnak (occurrences.py; az időszak-számítás közös), és azokra épül a késés
+rögzítése és az elmaradt adat jelzése.
 """
 
 import uuid
@@ -21,7 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from enum import StrEnum
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -36,6 +37,7 @@ from app.models import (
     Submission,
 )
 from app.services.measurements import MAX_BACKDATE
+from app.services.occurrences import period_containing, valid_on
 
 # A „Pótlás" javasolt időpontja ennyivel a legkorábbi rögzíthető idő után van,
 # hogy a mentésig eltelt idő miatt se essen ki a két napos ablakból.
@@ -93,18 +95,6 @@ def assign_measurement(
     return assignment
 
 
-def _period_days(assignment: Assignment) -> int:
-    if assignment.frequency is Frequency.DAILY:
-        return 1
-    if assignment.frequency is Frequency.WEEKLY:
-        return 7
-    return assignment.interval_days or 1
-
-
-def _local_midnight(day: date) -> datetime:
-    return datetime.combine(day, time(0), tzinfo=settings.tz)
-
-
 def _last_data_at(
     db: Session, assignment: Assignment, start: datetime, end: datetime
 ) -> datetime | None:
@@ -135,27 +125,15 @@ def _active_assignments(db: Session, patient_id: uuid.UUID, today: date) -> list
     return list(
         db.scalars(
             select(Assignment)
-            .where(
-                Assignment.patient_id == patient_id,
-                Assignment.revoked_at.is_(None),
-                Assignment.start_date <= today,
-                or_(Assignment.end_date.is_(None), Assignment.end_date >= today),
-            )
+            .where(Assignment.patient_id == patient_id, *valid_on(today))
             .order_by(Assignment.start_date, Assignment.id)
         )
     )
 
 
 def _task(db: Session, assignment: Assignment, now: datetime) -> PatientTask | None:
-    today = now.astimezone(settings.tz).date()
-    days = _period_days(assignment)
-    k = (today - assignment.start_date).days // days
-    first_day = assignment.start_date + timedelta(days=k * days)
-    start = _local_midnight(first_day)
-    end = _local_midnight(first_day + timedelta(days=days))
-    due_at = datetime.combine(
-        first_day + timedelta(days=days - 1), assignment.due_time, tzinfo=settings.tz
-    )
+    period = period_containing(assignment, now.astimezone(settings.tz).date())
+    start, end, due_at = period.start, period.end, period.due_at
 
     if assignment.target_kind is AssignmentTarget.MEASUREMENT:
         mtype = db.get(MeasurementType, assignment.measurement_type_id)
@@ -177,19 +155,15 @@ def _task(db: Session, assignment: Assignment, now: datetime) -> PatientTask | N
     # Az előző időszak: csak ha az előírás már akkor is érvényes volt.
     previous_missed = False
     catch_up_until = catch_up_suggested_at = None
-    if k > 0:
-        prev_first_day = first_day - timedelta(days=days)
-        prev_start = _local_midnight(prev_first_day)
-        if _last_data_at(db, assignment, prev_start, start) is None:
+    if period.first_day > assignment.start_date:
+        previous = period_containing(assignment, period.first_day - timedelta(days=1))
+        if _last_data_at(db, assignment, previous.start, start) is None:
             previous_missed = True
             if (
                 assignment.target_kind is AssignmentTarget.MEASUREMENT
                 and now < start + MAX_BACKDATE
             ):
-                prev_due = datetime.combine(
-                    first_day - timedelta(days=1), assignment.due_time, tzinfo=settings.tz
-                )
-                suggested = max(prev_due, now - MAX_BACKDATE + CATCH_UP_MARGIN)
+                suggested = max(previous.due_at, now - MAX_BACKDATE + CATCH_UP_MARGIN)
                 if suggested < start:
                     catch_up_until = start + MAX_BACKDATE
                     catch_up_suggested_at = suggested
