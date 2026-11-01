@@ -4,7 +4,13 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import DoctorUser, ensure_patient_access
 from app.core.db import DbSession
-from app.schemas.plans import AssignmentCreate, AssignmentOut, AssignmentReplace, assignment_out
+from app.schemas.plans import (
+    AssignmentCreate,
+    AssignmentOut,
+    AssignmentReplace,
+    AssignmentRevoke,
+    assignment_out,
+)
 from app.services import plans
 from app.services.plans import PlanError
 
@@ -52,8 +58,9 @@ def patient_plan(patient_id: uuid.UUID, db: DbSession, user: DoctorUser) -> list
 def create_assignment(
     patient_id: uuid.UUID, body: AssignmentCreate, db: DbSession, user: DoctorUser
 ) -> AssignmentOut:
-    """Új előírás (mérés vagy kérdőív). Az alkalmait a háttérfolyamat, illetve a
-    beteg első mentése nyitja meg."""
+    """Új előírás (mérés vagy kérdőív). Az aktuális időszak alkalma azonnal
+    megnyílik, és az időszakban már meglévő adat (pl. a mai mérés) teljesíti; a
+    későbbi alkalmakat a háttérfolyamat, illetve a beteg mentése nyitja meg."""
     ensure_patient_access(db, user, patient_id)
     try:
         assignment = plans.create(
@@ -84,11 +91,11 @@ def replace_assignment(
 ) -> AssignmentOut:
     """Módosítás (a2_terv 6/1. pont): a régi előírás lezárása és az új
     paraméterekkel új előírás ugyanarra a célra, egy tranzakcióban. Az új
-    előírást adja vissza."""
+    előírást adja vissza. Az opcionális indoklást a beteg is látja."""
     ensure_patient_access(db, user, patient_id)
     old = _load(db, patient_id, assignment_id)
     try:
-        new = plans.replace(db, old, assigned_by=user.id, params=body.params())
+        new = plans.replace(db, old, assigned_by=user.id, params=body.params(), note=body.note)
     except PlanError as error:
         raise _error(error) from error
     db.commit()
@@ -97,14 +104,19 @@ def replace_assignment(
 
 @router.post("/patients/{patient_id}/assignments/{assignment_id}/revoke", responses=ERRORS)
 def revoke_assignment(
-    patient_id: uuid.UUID, assignment_id: uuid.UUID, db: DbSession, user: DoctorUser
+    patient_id: uuid.UUID,
+    assignment_id: uuid.UUID,
+    db: DbSession,
+    user: DoctorUser,
+    body: AssignmentRevoke | None = None,
 ) -> AssignmentOut:
     """Visszavonás: az előírás a mai naptól nem érvényes; a még nyitott alkalma
-    törlődik, a teljesített és elmulasztott alkalmak megmaradnak."""
+    törlődik, a teljesített és elmulasztott alkalmak megmaradnak. Az opcionális
+    indoklást a beteg is látja."""
     ensure_patient_access(db, user, patient_id)
     assignment = _load(db, patient_id, assignment_id)
     try:
-        plans.revoke(db, assignment)
+        plans.revoke(db, assignment, note=body.note if body else None)
     except PlanError as error:
         raise _error(error) from error
     db.commit()

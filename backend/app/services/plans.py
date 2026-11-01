@@ -6,8 +6,15 @@
   nyitna olyan időszakokra, amelyekről a beteg nem is tudhatott.
 - Módosítás = lezárás + új előírás (a hallgató döntése, 2026-10-30; a2_terv
   6/1. pont): nincs helyben szerkesztés, így minden alkalom arra az előírásra
-  hivatkozik, ami a keletkezésekor érvényes volt.
+  hivatkozik, ami a keletkezésekor érvényes volt. Az új kezdete nem
+  választható: ma, vagy a még el nem kezdett régi kezdete (lásd replace()).
 - Visszavonás: revoked_at, a nyitott alkalmak kezelését lásd: revoke().
+  Visszavonásnál és módosításnál az orvos rövid indoklást adhat (revoke_note,
+  nem kötelező; a hallgató döntése, 2026-11-01), amit a beteg is lát.
+- Új előírásnál az aktuális időszak alkalmát a már meglévő adat azonnal
+  teljesíti (occurrences.fulfil_from_existing).
+- A beteg a teendői közt rövid jelzést kap a közelmúltbeli visszavonásról és
+  módosításról (plan_notices); ez is az előírás-adatokból számolódik.
 
 A véglegesítést (commit) a hívó végzi.
 """
@@ -15,6 +22,7 @@ A véglegesítést (commit) a hívó végzi.
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from typing import Literal
 
 from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -31,6 +39,10 @@ from app.models import (
     User,
 )
 from app.services.measurements import get_type_by_code
+from app.services.occurrences import fulfil_from_existing
+
+# A beteg ennyi napig látja a visszavonás / módosítás jelzését.
+NOTICE_DAYS = 7
 
 
 class PlanError(ValueError):
@@ -264,6 +276,7 @@ def create(
     _check_overlap(db, patient_id, assignment, start, params.end_date)
     db.add(assignment)
     db.flush()
+    fulfil_from_existing(db, assignment, now or datetime.now(UTC))
     return assignment
 
 
@@ -284,17 +297,25 @@ def _ensure_changeable(assignment: Assignment, today: date) -> None:
         raise PlanError("already_ended", conflict=True)
 
 
-def _close(db: Session, assignment: Assignment, now: datetime) -> int:
+def _clean_note(note: str | None) -> str | None:
+    """Az indoklás szóközök nélkül; üresen nincs indoklás."""
+    note = (note or "").strip()
+    return note or None
+
+
+def _close(db: Session, assignment: Assignment, now: datetime, note: str | None = None) -> int:
     """Lezárás: revoked_at, és a még nyitott (esedékes) alkalmak törlése.
 
-    Javasolt döntés, 2026-10-30 (a hallgató még megerősíti): a visszavonással
-    a kötelezettség megszűnik, ezért a nyitott, nem teljesített alkalom törlődik;
-    így nem válhat belőle elmulasztott alkalom, és nem fut be az elmaradt adat
-    szabályhoz. A teljesített, késve teljesített és elmulasztott alkalmak
-    változatlanul megmaradnak (ezek a történet). Esedékes alkalomra kitöltés nem
+    A hallgató döntése, 2026-11-01: a visszavonással a kötelezettség megszűnik,
+    ezért a nyitott, nem teljesített alkalom törlődik; így nem válhat belőle
+    elmulasztott alkalom, és nem fut be az elmaradt adat szabályhoz. A
+    teljesített, késve teljesített és elmulasztott alkalmak változatlanul
+    megmaradnak (ezek a történet). Esedékes alkalomra kitöltés nem
     hivatkozik (a kitöltés mindig teljesíti az alkalmát), így a törlés nem
-    hagy lógó hivatkozást. Visszaadja a törölt alkalmak számát."""
+    hagy lógó hivatkozást. Az indoklás (ha van) a lezárt előíráshoz kerül.
+    Visszaadja a törölt alkalmak számát."""
     assignment.revoked_at = now
+    assignment.revoke_note = _clean_note(note)
     result = db.execute(
         delete(AssignmentOccurrence).where(
             AssignmentOccurrence.assignment_id == assignment.id,
@@ -305,11 +326,13 @@ def _close(db: Session, assignment: Assignment, now: datetime) -> int:
     return result.rowcount
 
 
-def revoke(db: Session, assignment: Assignment, now: datetime | None = None) -> Assignment:
-    """Visszavonás (lásd _close)."""
+def revoke(
+    db: Session, assignment: Assignment, now: datetime | None = None, note: str | None = None
+) -> Assignment:
+    """Visszavonás opcionális indoklással (lásd _close)."""
     now = now or datetime.now(UTC)
     _ensure_changeable(assignment, local_today(now))
-    _close(db, assignment, now)
+    _close(db, assignment, now, note)
     return assignment
 
 
@@ -320,14 +343,22 @@ def replace(
     assigned_by: uuid.UUID,
     params: PlanParams,
     now: datetime | None = None,
+    note: str | None = None,
 ) -> Assignment:
-    """Módosítás egy lépésben: az új előírás ugyanarra a célra, a régi lezárva.
+    """Módosítás egy lépésben: az új előírás ugyanarra a célra, a régi lezárva
+    (visszavonás a nyitott alkalmak törlésével, _close).
 
-    Az új kezdete alapból a mai nap; a még el nem kezdett előírásnál a régi
-    kezdete (így a helyére pontosan ott lép az új, ahol a régi kezdődött volna).
+    A kezdet nem választható, és nem jöhet a jövőből (review K3, a hallgató
+    döntése, 2026-11-01): az érvényes (már elkezdett) előírásnál az új kezdete
+    a mai nap, a még el nem kezdettnél a régi kezdete. Így a régi lezárása és
+    az új kezdete mindig összeér: nincs lefedetlen köztes nap, és a váltás a
+    láncból felismerhető (_end_meets). Üres start_date-nél ez az érték
+    öröklődik; ettől eltérő start_date: start_fixed hiba.
+
     A sorrend szándékos: előbb minden ellenőrzés és az új beszúrása, csak utána
     a régi lezárása; ha az új bármin elbukik, a régihez nem nyúltunk. A hívó
-    hibánál visszagörget (rollback), így a teljes művelet atomi."""
+    hibánál visszagörget (rollback), így a teljes művelet atomi. Az indoklás
+    a régi előíráshoz kerül."""
     now = now or datetime.now(UTC)
     today = local_today(now)
     _ensure_changeable(old, today)
@@ -340,11 +371,77 @@ def replace(
         if target is None or not target.is_active:
             raise PlanError("unknown_target")
     assert target is not None
-    start = params.start_date or max(today, old.start_date)
+    start = max(today, old.start_date)
+    if params.start_date is not None and params.start_date != start:
+        raise PlanError("start_fixed")
     _check_dates(start, params.end_date, today)
     new = _build(old.patient_id, assigned_by, old.target_kind, target, params, start)
     _check_overlap(db, old.patient_id, new, start, params.end_date, ignore=old.id)
     db.add(new)
     db.flush()
-    _close(db, old, now)
+    _close(db, old, now, note)
+    fulfil_from_existing(db, new, now)
     return new
+
+
+@dataclass
+class PlanNotice:
+    """Jelzés a betegnek egy előírása közelmúltbeli változásáról. Egy
+    módosítási láncból (A → B → C, a replaced_by szerint) egy jelzés lesz, a
+    lánc végének állapotával: ha a vége visszavont, „visszavonta", különben
+    „módosult", az érvényes (utolsó) előírás paramétereivel. Az idő és az
+    indoklás a lánc utolsó változásáé."""
+
+    kind: Literal["revoked", "modified"]
+    changed_at: datetime
+    note: str | None
+    entry: PlanEntry  # a lánc első, a jelzési időszakban lezárt előírása
+    current: PlanEntry | None  # módosításnál az érvényes (új) előírás
+
+
+def plan_notices(
+    db: Session, patient_id: uuid.UUID, now: datetime | None = None
+) -> list[PlanNotice]:
+    """A beteg előírásainak az utóbbi NOTICE_DAYS napban történt visszavonásai
+    és módosításai, a legújabb elöl."""
+    now = now or datetime.now(UTC)
+    since = now - timedelta(days=NOTICE_DAYS)
+    entries = list_plan(db, patient_id, now)
+    by_id = {e.assignment.id: e for e in entries}
+    recent = [
+        e
+        for e in entries
+        if e.assignment.revoked_at is not None and e.assignment.revoked_at >= since
+    ]
+    # A lánc közbülső tagja (egy friss módosítás utódja) nem kap külön jelzést.
+    successors = {e.replaced_by for e in recent if e.replaced_by}
+    notices = []
+    for head in recent:
+        if head.assignment.id in successors:
+            continue
+        last_closed, link = head, head
+        # Kör nem lehet, a bejárás véget ér: a _successor szerint az utód
+        # kezdete sosem korábbi (visszavont tagnál a visszavonás napja, de nem a
+        # tag kezdete előtt; lejártnál a vége utáni nap), azonos kezdetnél pedig
+        # a lánc mentén a lezárás ideje (revoked_at) szigorúan nő. A bejárt
+        # halmaz csak olcsó biztosíték.
+        seen = {link.assignment.id}
+        while link.replaced_by is not None and link.replaced_by not in seen:
+            link = by_id[link.replaced_by]
+            seen.add(link.assignment.id)
+            if link.assignment.revoked_at is not None:
+                last_closed = link
+        revoked = link.assignment.revoked_at is not None
+        # A lánc feje visszavont (recent), így a legutóbb lezárt tag is az.
+        assert last_closed.assignment.revoked_at is not None
+        notices.append(
+            PlanNotice(
+                kind="revoked" if revoked else "modified",
+                changed_at=last_closed.assignment.revoked_at,
+                note=last_closed.assignment.revoke_note,
+                entry=head,
+                current=None if revoked else link,
+            )
+        )
+    notices.sort(key=lambda n: n.changed_at, reverse=True)
+    return notices

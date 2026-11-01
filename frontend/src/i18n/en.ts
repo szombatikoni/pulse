@@ -187,6 +187,13 @@ export const en: typeof hu = {
     today: 'today {{time}}',
     tomorrow: 'tomorrow {{time}}',
     weekday: '{{day}} {{time}}',
+    notices: {
+      label: 'Changes to your prescriptions',
+      revoked: 'Your doctor revoked this prescription ({{date}}).',
+      modified: 'The prescription changed ({{date}}): from now on {{freq}}, due {{time}}.',
+      modifiedFrom: 'The prescription changed ({{date}}): from {{start}}, {{freq}}, due {{time}}.',
+      note: 'Your doctor’s reason: “{{note}}”',
+    },
   },
   questionnaires: {
     title: 'Questionnaires to complete',
@@ -352,6 +359,11 @@ export const en: typeof hu = {
       changeEnd: 'end {{from}} → {{to}}',
       none: 'none',
       noEnd: 'no end',
+      note: {
+        label: 'Reason for the patient (optional)',
+        hint: 'The patient also sees this among their tasks.',
+        shown: 'Reason: “{{note}}”',
+      },
       state: {
         upcoming: 'Not started yet',
         revoked: 'Revoked {{date}}',
@@ -379,7 +391,7 @@ export const en: typeof hu = {
         start: 'Start',
         end: 'End',
         replaceHint:
-          'Saving closes the current prescription and starts a new one with these values. Earlier occurrences and completions stay unchanged.',
+          'Saving closes the current prescription and starts a new one with these values (start: {{date}}). Earlier occurrences and completions stay unchanged.',
         save: 'Save',
         saveReplace: 'Save as change',
       },
@@ -388,6 +400,8 @@ export const en: typeof hu = {
       revoked: 'Prescription revoked.',
       errors: {
         start_in_past: 'The start cannot be in the past.',
+        start_fixed:
+          'The start cannot be chosen when changing: the new prescription starts today (or, for one not yet started, on its start date).',
         end_before_start: 'The end cannot be before the start.',
         unknown_target: 'This measurement type or questionnaire cannot be prescribed.',
         overlap: 'There is already a valid prescription for this period; change that one instead.',

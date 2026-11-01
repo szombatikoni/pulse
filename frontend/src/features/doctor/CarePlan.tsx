@@ -1,4 +1,4 @@
-import { Button, Loader, NativeSelect, NumberInput, Text, TextInput } from '@mantine/core'
+import { Button, Loader, NativeSelect, NumberInput, Text, Textarea, TextInput } from '@mantine/core'
 import { ClipboardText, Drop, Gauge, Heart, type Icon, Plus, Scales } from '@phosphor-icons/react'
 import type { TFunction } from 'i18next'
 import { type FormEvent, type ReactNode, useState } from 'react'
@@ -9,6 +9,7 @@ import { useMeasurementTypes } from '../../api/measurements'
 import {
   type Assignment,
   type Frequency,
+  NOTE_MAX,
   type PlanErrorDetail,
   type PlanParams,
   type TargetKind,
@@ -98,6 +99,25 @@ function changeText(t: TFunction, prev: Assignment, next: Assignment): string {
     : t('doctor.plan.changedPlain', { date })
 }
 
+/** Indoklás a betegnek (visszavonásnál és módosításnál): nem kötelező, a beteg a
+ * teendői között látja (a hallgató döntése, 2026-11-01). */
+function NoteField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const { t } = useTranslation()
+  return (
+    <Textarea
+      label={t('doctor.plan.note.label')}
+      description={t('doctor.plan.note.hint')}
+      classNames={{ label: 'pd-field-label' }}
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value)}
+      maxLength={NOTE_MAX}
+      autosize
+      minRows={2}
+      maxRows={5}
+    />
+  )
+}
+
 function errorText(t: TFunction, error: unknown): string {
   const detail = error instanceof ApiError ? (error.detail as PlanErrorDetail | null) : null
   // A szerver saját kódja (pl. overlap); a szerkezeti hibákra (lista) általános szöveg.
@@ -136,9 +156,13 @@ function PlanForm({
   const [suggested, setSuggested] = useState(
     old?.suggested_time ? formatClock(old.suggested_time) : '',
   )
-  // Módosításnál az új alapból ma indul; a még el nem kezdett régi helyére a kezdetén.
+  // Módosításnál a kezdet nem választható (review K3, a hallgató döntése, 2026-11-01):
+  // az új ma indul, a még el nem kezdett régi helyére a kezdetén. A szerver dönti el
+  // (üres start_date), mert a böngésző mai napja eltérhet a szerver időzónájáétól;
+  // itt csak a vége mező alsó határához kell.
   const [start, setStart] = useState(old && old.start_date > today ? old.start_date : today)
   const [end, setEnd] = useState(old?.end_date ?? '')
+  const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const titleId = old ? `pd-h-plan-edit-${old.id}` : 'pd-h-plan-new'
@@ -152,7 +176,7 @@ function PlanForm({
       interval_days: frequency === 'every_n_days' ? Number(intervalDays) : null,
       due_time: due,
       suggested_time: suggested || null,
-      start_date: start || null,
+      start_date: old ? null : start || null,
       end_date: end || null,
     }
     // A mutateAsync ígérete akkor is teljesül, ha az űrlap közben eltűnik: módosításnál
@@ -160,7 +184,9 @@ function PlanForm({
     // a mutate saját visszahívása ilyenkor már nem futna le.
     const [kind, code] = target.split(':') as [TargetKind, string]
     const saving = old
-      ? replace.mutateAsync({ id: old.id, params }).then(() => t('doctor.plan.replaced'))
+      ? replace
+          .mutateAsync({ id: old.id, params, note: note.trim() })
+          .then(() => t('doctor.plan.replaced'))
       : create.mutateAsync({ kind, code, ...params }).then(() => t('doctor.plan.saved'))
     saving
       .then((text) => onDone({ ok: true, text }))
@@ -252,15 +278,17 @@ function PlanForm({
         />
       </div>
       <div className="pd-two">
-        <TextInput
-          type="date"
-          label={t('doctor.plan.form.start')}
-          classNames={{ label: 'pd-field-label' }}
-          value={start}
-          min={today}
-          onChange={(e) => setStart(e.currentTarget.value)}
-          required
-        />
+        {!old && (
+          <TextInput
+            type="date"
+            label={t('doctor.plan.form.start')}
+            classNames={{ label: 'pd-field-label' }}
+            value={start}
+            min={today}
+            onChange={(e) => setStart(e.currentTarget.value)}
+            required
+          />
+        )}
         <TextInput
           type="date"
           label={t('doctor.plan.form.end')}
@@ -271,7 +299,14 @@ function PlanForm({
           onChange={(e) => setEnd(e.currentTarget.value)}
         />
       </div>
-      {old && <p className="pd-meta">{t('doctor.plan.form.replaceHint')}</p>}
+      {old && <NoteField value={note} onChange={setNote} />}
+      {old && (
+        <p className="pd-meta">
+          {t('doctor.plan.form.replaceHint', {
+            date: formatDate(old.start_date > today ? old.start_date : today),
+          })}
+        </p>
+      )}
       {error && (
         <div className="pd-receipt" role="alert">
           <StatusIcon status="severe" size={20} />
@@ -341,6 +376,9 @@ function PlanItem({
           {periodText(t, a)} · {t('doctor.plan.by', { name: a.assigned_by })}
         </div>
         {previous && <div className="pd-plan-change">{changeText(t, previous, a)}</div>}
+        {a.revoke_note && (
+          <div className="pd-plan-note">{t('doctor.plan.note.shown', { note: a.revoke_note })}</div>
+        )}
       </div>
       {children}
     </article>
@@ -356,6 +394,7 @@ export function CarePlan({ patientId }: { patientId: string }) {
   const { revoke } = usePlanMutations(patientId)
   const [editor, setEditor] = useState<Editor | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
+  const [revokeNote, setRevokeNote] = useState('')
   const [message, setMessage] = useState<Message | null>(null)
 
   const all = plan.data ?? []
@@ -366,6 +405,7 @@ export function CarePlan({ patientId }: { patientId: string }) {
   const open = (next: Editor | null) => {
     setEditor(next)
     setConfirming(null)
+    setRevokeNote('')
     setMessage(null)
   }
   const done = (m: Message) => {
@@ -373,13 +413,16 @@ export function CarePlan({ patientId }: { patientId: string }) {
     setMessage(m)
   }
   const doRevoke = (id: string) =>
-    revoke.mutate(id, {
-      onSuccess: () => {
-        setConfirming(null)
-        setMessage({ ok: true, text: t('doctor.plan.revoked') })
+    revoke.mutate(
+      { id, note: revokeNote.trim() },
+      {
+        onSuccess: () => {
+          setConfirming(null)
+          setMessage({ ok: true, text: t('doctor.plan.revoked') })
+        },
+        onError: (e) => setMessage({ ok: false, text: errorText(t, e) }),
       },
-      onError: (e) => setMessage({ ok: false, text: errorText(t, e) }),
-    })
+    )
 
   return (
     <section className="pd-card" aria-labelledby="pd-h-plan">
@@ -434,6 +477,7 @@ export function CarePlan({ patientId }: { patientId: string }) {
               ) : confirming === a.id ? (
                 <div className="pd-plan-wide pd-confirm">
                   <p>{t('doctor.plan.confirmRevoke')}</p>
+                  <NoteField value={revokeNote} onChange={setRevokeNote} />
                   <div className="pd-plan-foot">
                     <Button variant="subtle" color="gray" onClick={() => setConfirming(null)}>
                       {t('doctor.plan.cancel')}

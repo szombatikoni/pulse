@@ -33,6 +33,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, str_enum
 
+# Az előírás visszavonásának / módosításának indoklása legfeljebb ennyi karakter.
+REVOKE_NOTE_MAX = 500
+
 
 class QuestionType(StrEnum):
     SCALE = "scale"  # skála, pl. 1–5
@@ -158,6 +161,8 @@ class Assignment(Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Visszavonásnál vagy módosításnál az orvos indoklása; a beteg is látja.
+    revoke_note: Mapped[str | None] = mapped_column(String(REVOKE_NOTE_MAX))
 
     template: Mapped[QuestionnaireTemplate | None] = relationship()
 

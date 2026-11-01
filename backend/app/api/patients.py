@@ -30,7 +30,9 @@ def my_patients(db: DbSession, user: DoctorUser) -> list[PatientSummaryOut]:
     """Az orvos priorizált beteglistája (F9): csak az éppen hozzá rendelt
     betegek, státusszal és az okával."""
     rows = doctor_patient_list(db, user.doctor_profile.id)
-    return [_summary(db, patient, result) for patient, result in rows]
+    summaries = [_summary(db, patient, result) for patient, result in rows]
+    db.commit()  # a teendők a hiányzó alkalmakat megnyitják
+    return summaries
 
 
 @router.get("/patients/{patient_id}", responses=FORBIDDEN)
@@ -39,7 +41,9 @@ def patient_detail(patient_id: uuid.UUID, db: DbSession, user: DoctorUser) -> Pa
     és okai."""
     ensure_patient_access(db, user, patient_id)
     patient = db.get(PatientProfile, patient_id)
-    return _summary(db, patient, compute_status(db, patient_id))
+    summary = _summary(db, patient, compute_status(db, patient_id))
+    db.commit()  # a teendők a hiányzó alkalmakat megnyitják
+    return summary
 
 
 @router.get("/patients/{patient_id}/alerts", responses=FORBIDDEN)

@@ -185,6 +185,14 @@ export const hu = {
     today: 'ma {{time}}',
     tomorrow: 'holnap {{time}}',
     weekday: '{{day}} {{time}}',
+    notices: {
+      label: 'Változások az előírásaidban',
+      revoked: 'Az orvos visszavonta ezt az előírást ({{date}}).',
+      modified: 'Az előírás módosult ({{date}}): mostantól {{freq}}, határidő {{time}}.',
+      modifiedFrom:
+        'Az előírás módosult ({{date}}): {{start}} kezdettel {{freq}}, határidő {{time}}.',
+      note: 'Az orvos indoklása: „{{note}}”',
+    },
   },
   questionnaires: {
     title: 'Kitöltendő kérdőívek',
@@ -350,6 +358,11 @@ export const hu = {
       changeEnd: 'vége {{from}} → {{to}}',
       none: 'nincs',
       noEnd: 'nincs vége',
+      note: {
+        label: 'Indoklás a betegnek (nem kötelező)',
+        hint: 'A beteg is látja a teendői között.',
+        shown: 'Indoklás: „{{note}}”',
+      },
       state: {
         upcoming: 'Még nem kezdődött',
         revoked: 'Visszavonva {{date}}',
@@ -377,7 +390,7 @@ export const hu = {
         start: 'Kezdete',
         end: 'Vége',
         replaceHint:
-          'Mentéskor a mostani előírás lezárul, és ezekkel az értékekkel új indul. A korábbi alkalmak és teljesítések változatlanok maradnak.',
+          'Mentéskor a mostani előírás lezárul, és ezekkel az értékekkel új indul (kezdete: {{date}}). A korábbi alkalmak és teljesítések változatlanok maradnak.',
         save: 'Mentés',
         saveReplace: 'Mentés módosításként',
       },
@@ -386,6 +399,8 @@ export const hu = {
       revoked: 'Az előírás visszavonva.',
       errors: {
         start_in_past: 'A kezdet nem lehet a múltban.',
+        start_fixed:
+          'Módosításnál a kezdet nem választható: az új előírás ma indul (a még el nem kezdett előírás helyére a kezdetén).',
         end_before_start: 'A vége nem lehet a kezdete előtt.',
         unknown_target: 'Ez a méréstípus vagy kérdőív nem írható elő.',
         overlap: 'Erre már van érvényes előírás ebben az időszakban; azt módosítsd.',

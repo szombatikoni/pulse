@@ -4,12 +4,19 @@
 from datetime import UTC, date, datetime, time, timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from app.core.config import settings
-from app.models import AssignmentOccurrence, Frequency, OccurrenceStatus
+from app.models import (
+    AssignmentOccurrence,
+    Frequency,
+    Measurement,
+    OccurrenceStatus,
+    QuestionnaireVersion,
+    Submission,
+)
 from app.services import occurrences
 from app.services.measurements import MeasurementError, get_type_by_code, record_measurement
 from app.services.occurrences import (
@@ -30,7 +37,7 @@ from app.services.questionnaires import (
     create_template,
     submit_questionnaire,
 )
-from app.services.tasks import TaskState, _last_data_at, assign_measurement, patient_tasks
+from app.services.tasks import TaskState, assign_measurement, patient_tasks
 from seed.demo import seed_demo_data
 from seed.questionnaires import WELLBEING_CODE, WELLBEING_NAME, WELLBEING_V1
 from tests.factories import assign, make_doctor, make_measurement_types, make_patient
@@ -212,7 +219,8 @@ def test_missing_past_periods_are_opened_and_closed(db, setup):
 
 def test_ended_assignment_gets_occurrences_only_until_its_end(db, setup):
     """A lejárt előírás kimaradt időszakai is megnyílnak, de csak a vége
-    (end_date) előtt kezdődők; a vége napját tartalmazó időszak még igen."""
+    (end_date) előtt kezdődők; a vége napját tartalmazó időszak még igen,
+    csonkolva: a határideje a vég napján van (review K2)."""
     weight = plan(
         db,
         setup,
@@ -225,10 +233,83 @@ def test_ended_assignment_gets_occurrences_only_until_its_end(db, setup):
     db.flush()
 
     assert open_due_occurrences(db, local(2026, 10, 30, 8, 0)) == 2
-    assert [o.period_start for o in occurrences_of(db, weight)] == [
-        local(2026, 10, 6),
-        local(2026, 10, 13),
-    ]
+    stored = occurrences_of(db, weight)
+    assert [o.period_start for o in stored] == [local(2026, 10, 6), local(2026, 10, 13)]
+    assert [o.due_at for o in stored] == [local(2026, 10, 12, 20, 0), local(2026, 10, 15, 20, 0)]
+    assert period_end(stored[-1]) == local(2026, 10, 16)
+
+
+def _ending_weekly_weight(db, setup):
+    """Heti testsúly okt. 6-tól, határidő 20:00, vége okt. 15. (a második hét
+    közepe): a második, csonka időszak okt. 13–15., határideje okt. 15. 20:00."""
+    weight = plan(
+        db,
+        setup,
+        code="body_weight",
+        start=date(2026, 10, 6),
+        due=time(20, 0),
+        frequency=Frequency.WEEKLY,
+    )
+    weight.end_date = date(2026, 10, 15)
+    db.flush()
+    return weight
+
+
+def test_measurement_on_the_end_date_fulfils_the_truncated_last_period(db, setup):
+    """Review K2: a csonka utolsó időszak határideje a vég napja (okt. 15.
+    20:00); az aznapi mérés időben teljesíti."""
+    weight = _ending_weekly_weight(db, setup)
+    open_due_occurrences(db, local(2026, 10, 14, 8, 0))
+    measurement = record(db, setup, local(2026, 10, 15, 9, 0), code="body_weight")
+
+    run_occurrence_check(db, local(2026, 10, 22, 8, 0))
+    first, last = occurrences_of(db, weight)
+    assert first.status is OccurrenceStatus.MISSED  # az okt. 6–12-i hét mérés nélkül
+    assert last.due_at == local(2026, 10, 15, 20, 0)
+    assert last.status is OccurrenceStatus.FULFILLED
+    assert last.measurement_id == measurement.id
+
+
+def test_measurement_after_the_end_date_does_not_fulfil_the_last_period(db, setup):
+    """A vég utáni mérés (okt. 17.) már nem tartozik az előíráshoz; a csonka
+    időszak a vége (okt. 16. 0:00) után 48 órával elmulasztottra zárul."""
+    weight = _ending_weekly_weight(db, setup)
+    open_due_occurrences(db, local(2026, 10, 14, 8, 0))
+    record(db, setup, local(2026, 10, 17, 9, 0), code="body_weight")
+
+    run_occurrence_check(db, local(2026, 10, 17, 23, 59))
+    last = occurrences_of(db, weight)[-1]
+    assert (last.status, last.measurement_id) == (OccurrenceStatus.DUE, None)
+    run_occurrence_check(db, local(2026, 10, 18, 0, 0))
+    db.refresh(last)
+    assert last.status is OccurrenceStatus.MISSED
+
+
+def test_task_list_shows_the_truncated_deadline(db, setup):
+    """A teendőlista a csonka időszak határidejét mutatja (a vég napját), nem
+    a teljes hét utolsó napját."""
+    weight = _ending_weekly_weight(db, setup)
+    [task] = patient_tasks(db, setup["pid"], now=local(2026, 10, 14, 9, 0))
+    assert task.assignment.id == weight.id
+    assert task.period_start == local(2026, 10, 13)
+    assert task.due_at == local(2026, 10, 15, 20, 0)
+    assert task.period_end == local(2026, 10, 16)
+    assert task.state is TaskState.DUE
+
+
+def test_period_starting_after_the_end_date_is_not_opened_by_a_measurement(db, setup):
+    weight = _ending_weekly_weight(db, setup)
+    record(db, setup, local(2026, 10, 21, 9, 0), code="body_weight")
+    assert occurrences_of(db, weight) == []
+
+
+def test_revoked_plan_takes_no_measurement_in_its_last_period(db, setup):
+    weight = _ending_weekly_weight(db, setup)
+    open_due_occurrences(db, local(2026, 10, 14, 8, 0))
+    weight.revoked_at = local(2026, 10, 14, 12, 0)
+    db.flush()
+    record(db, setup, local(2026, 10, 14, 13, 0), code="body_weight")
+    assert all(o.status is OccurrenceStatus.DUE for o in occurrences_of(db, weight))
 
 
 def test_unique_key_rejects_a_duplicate_occurrence(db, setup):
@@ -306,6 +387,38 @@ def test_period_on_the_daylight_saving_change_day(db, setup):
     assert close_missed_occurrences(db, local(2026, 10, 28, 0, 0)) == 1
 
 
+def test_catch_up_window_is_48_hours_across_the_spring_change(db, setup):
+    """Review K1: a pótlási ablak abszolút 48 óra, mint a mentés too_old határa.
+    A 03-28-i időszak vége 03-28 23:00Z (CET); a tavaszi átállás (03-29) után
+    a „két naptári nap múlva éjfél" már 03-30 22:00Z lenne, egy órával a mentés
+    határa előtt. A 22:00Z és 23:00Z közti sávban a mérés még rögzíthető, ezért
+    az alkalom sem lehet elmulasztott."""
+    bp = plan(db, setup, start=date(2026, 3, 28))
+    pulse = plan(db, setup, code="heart_rate", start=date(2026, 3, 28))
+    open_due_occurrences(db, local(2026, 3, 28, 8, 0))
+    [bp_occurrence] = occurrences_of(db, bp)
+    [pulse_occurrence] = occurrences_of(db, pulse)
+
+    # A teendőlista ugyanazt a határt ajánlja, mint amit a worker zárásra használ.
+    tasks = patient_tasks(db, setup["pid"], local(2026, 3, 29, 12, 0))
+    assert [t.catch_up_until for t in tasks] == [datetime(2026, 3, 30, 23, 0, tzinfo=UTC)] * 2
+
+    in_the_gap = datetime(2026, 3, 30, 22, 30, tzinfo=UTC)
+    assert close_missed_occurrences(db, in_the_gap) == 0
+    # 03-28 23:45 helyi = 22:45Z, a too_old határ 03-28 22:30Z: még rögzíthető.
+    record(db, setup, local(2026, 3, 28, 23, 45), now=in_the_gap)
+    assert bp_occurrence.status is OccurrenceStatus.FULFILLED_LATE
+
+    window_end = datetime(2026, 3, 30, 23, 0, tzinfo=UTC)
+    assert close_missed_occurrences(db, window_end - timedelta(seconds=1)) == 0
+    assert close_missed_occurrences(db, window_end) == 1
+    db.refresh(pulse_occurrence)
+    assert pulse_occurrence.status is OccurrenceStatus.MISSED
+    # Ugyanettől a pillanattól az időszakba eső mérés már nem is rögzíthető.
+    with pytest.raises(MeasurementError, match="too_old"):
+        record(db, setup, local(2026, 3, 28, 23, 59), now=window_end, code="heart_rate")
+
+
 def test_weekly_period_boundary(db, setup):
     weight = plan(
         db,
@@ -365,6 +478,41 @@ def test_measurement_occurrence_is_missed_after_the_window(db, setup):
     # Az időszakba eső mérés ekkor már nem rögzíthető (két napnál régebbi).
     with pytest.raises(MeasurementError, match="too_old"):
         record(db, setup, local(2026, 10, 16, 23, 59), now=local(2026, 10, 19, 0, 0))
+
+
+def test_occurrence_fulfilled_after_the_selection_is_left_out_of_the_closing(
+    db, setup, monkeypatch
+):
+    """Review k1: ha a worker kijelölése után, a zárás előtt egy egyidejű mentés
+    teljesíti az alkalmat, a zárás csak az esedékeseket írja át: a teljesített
+    kimarad, a futás nem bukik integritáshibán, a többi lejárt alkalom zárul."""
+    bp = plan(db, setup, start=date(2026, 10, 16))
+    pulse = plan(db, setup, code="heart_rate", start=date(2026, 10, 16))
+    open_due_occurrences(db, local(2026, 10, 16, 8, 0))
+    [bp_occurrence] = occurrences_of(db, bp)
+    [pulse_occurrence] = occurrences_of(db, pulse)
+    fulfilled_at = local(2026, 10, 18, 23, 59)
+
+    # A „másik tranzakció" a kijelölés után, a vérnyomás alkalmának vizsgálatakor fut.
+    real_missed_from = occurrences.missed_from
+
+    def missed_from(occurrence):
+        if occurrence.id == bp_occurrence.id:
+            db.execute(
+                update(AssignmentOccurrence)
+                .where(AssignmentOccurrence.id == bp_occurrence.id)
+                .values(status=OccurrenceStatus.FULFILLED_LATE, fulfilled_at=fulfilled_at)
+                .execution_options(synchronize_session=False)
+            )
+        return real_missed_from(occurrence)
+
+    monkeypatch.setattr(occurrences, "missed_from", missed_from)
+    assert close_missed_occurrences(db, local(2026, 10, 19, 0, 0)) == 1
+    db.flush()
+
+    assert bp_occurrence.status is OccurrenceStatus.FULFILLED_LATE
+    assert bp_occurrence.fulfilled_at == fulfilled_at
+    assert pulse_occurrence.status is OccurrenceStatus.MISSED
 
 
 def test_missed_occurrence_is_not_overwritten_by_a_late_measurement(db, setup):
@@ -599,10 +747,21 @@ def test_measurement_occurrence_has_no_questionnaire_version(db, setup):
     assert occurrence.questionnaire_version_id is None
 
 
-# --- Egyezés a számított teendőlistával (az A3-ig védi az átállást) ---------------------------
+# --- A teendőlista a tárolt alkalmakból dolgozik (A3) -------------------------------------
+#
+# Az A2-ben itt a számított teendőlista és a tárolt alkalmak egyezését néztük (az
+# átállás védelme). Az A3 óta a teendőlista maga is a tárolt alkalmakból olvas, így
+# a teszt azt rögzíti, hogy egyetlen igazságforrás van, és a háttérfolyamat
+# ütemétől nem függ az eredmény.
 
 
-def test_stored_occurrences_match_the_computed_tasks(db, setup, template):
+def _task_view(tasks):
+    return [
+        (t.code, t.state, t.due_at, t.done_at, t.previous_missed, t.catch_up_until) for t in tasks
+    ]
+
+
+def test_task_list_reads_the_stored_occurrences(db, setup, template):
     plan(db, setup, code="blood_pressure", due=time(10, 0))  # időben mérve
     plan(db, setup, code="blood_glucose", due=time(8, 0))  # késve mérve
     plan(db, setup, code="heart_rate", due=time(10, 0))  # lejárt, nincs adat
@@ -611,41 +770,71 @@ def test_stored_occurrences_match_the_computed_tasks(db, setup, template):
     record(db, setup, local(2026, 10, 17, 7, 30))
     record(db, setup, local(2026, 10, 17, 9, 0), code="blood_glucose")
     fill(db, setup, template, local(2026, 10, 17, 9, 30))
-
     now = local(2026, 10, 17, 12, 0)
+
+    # A háttérfolyamat még nem futott: a lekérés maga nyitja meg a hiányzó alkalmakat,
+    # és a worker utólagos futása semmin nem változtat.
+    before = patient_tasks(db, setup["pid"], now=now)
     run_occurrence_check(db, now)
-    # A teendőlista csak az aktuális időszakot mutatja; a visszamenőleg megnyitott
-    # korábbi alkalmak ebből az összevetésből kimaradnak.
-    stored = {
-        (o.assignment_id, o.due_at): o
-        for o in db.scalars(select(AssignmentOccurrence))
-        if o.period_start <= now < period_end(o)
-    }
-    tasks = patient_tasks(db, setup["pid"], now=now)
-    assert len(tasks) == len(stored) == 5
+    after = patient_tasks(db, setup["pid"], now=now)
+    assert _task_view(before) == _task_view(after)
 
-    expected = {
-        TaskState.DONE: {OccurrenceStatus.FULFILLED, OccurrenceStatus.FULFILLED_LATE},
-        TaskState.DUE: {OccurrenceStatus.DUE},
-        TaskState.LATE: {OccurrenceStatus.DUE},
-    }
-    for task in tasks:
-        occurrence = stored[(task.assignment.id, task.due_at)]
-        assert occurrence.period_start == task.period_start
-        assert occurrence.status in expected[task.state], task.code
-        # A teendőlista „lejárt" állapota a tárolt alkalomnál: esedékes, a határidő után.
-        assert (task.state is TaskState.LATE) == (
-            occurrence.status is OccurrenceStatus.DUE and now > occurrence.due_at
-        )
-
-    by_code = {t.code: stored[(t.assignment.id, t.due_at)].status for t in tasks}
-    assert by_code == {
+    stored = {(o.assignment_id, o.due_at): o for o in db.scalars(select(AssignmentOccurrence))}
+    by_code = {t.code: stored[(t.assignment.id, t.due_at)] for t in after}
+    assert {code: o.status for code, o in by_code.items()} == {
         "blood_pressure": OccurrenceStatus.FULFILLED,
         "blood_glucose": OccurrenceStatus.FULFILLED_LATE,
         "heart_rate": OccurrenceStatus.DUE,
         "body_weight": OccurrenceStatus.DUE,
         WELLBEING_CODE: OccurrenceStatus.FULFILLED,
     }
+    assert [(t.code, t.state) for t in after] == [
+        ("heart_rate", TaskState.LATE),
+        ("body_weight", TaskState.DUE),
+        ("blood_glucose", TaskState.DONE),
+        ("blood_pressure", TaskState.DONE),
+        (WELLBEING_CODE, TaskState.DONE),
+    ]
+    for task in after:
+        occurrence = by_code[task.code]
+        assert task.period_start == occurrence.period_start
+        assert task.period_end == period_end(occurrence)
+
+    # Egyetlen igazságforrás: a tárolt alkalom állapota dönt, nem a nyers adat. Ha
+    # az alkalom teljesített (itt kézzel), a teendő kész, pedig mérés nincs.
+    heart = by_code["heart_rate"]
+    heart.status, heart.fulfilled_at = OccurrenceStatus.FULFILLED, now
+    db.flush()
+    [task] = [t for t in patient_tasks(db, setup["pid"], now=now) if t.code == "heart_rate"]
+    assert task.state is TaskState.DONE
+    assert task.done_at == now
+
+
+def test_task_list_opens_the_current_and_previous_occurrence(db, setup):
+    bp = plan(db, setup, start=date(2026, 10, 15))
+    assert occurrences_of(db, bp) == []
+    patient_tasks(db, setup["pid"], now=local(2026, 10, 17, 8, 0))
+    # Csak a teendőhöz kellő két időszak nyílik meg; a többit a háttérfolyamat pótolja.
+    assert [o.due_at for o in occurrences_of(db, bp)] == [
+        local(2026, 10, 16, 10, 0),
+        local(2026, 10, 17, 10, 0),
+    ]
+    assert run_occurrence_check(db, local(2026, 10, 17, 8, 0)).opened == 1
+
+
+def test_previous_period_closed_as_missed_still_counts_as_missed(db, setup, template):
+    wellbeing = weekly_questionnaire(db, setup, template)
+    now = local(2026, 10, 17, 9, 0)
+    # A kérdőív előző heti (okt. 6-12.) alkalmát a háttérfolyamat már lezárta.
+    run_occurrence_check(db, now)
+    assert [o.status for o in occurrences_of(db, wellbeing)] == [
+        OccurrenceStatus.MISSED,
+        OccurrenceStatus.DUE,
+    ]
+    [task] = patient_tasks(db, setup["pid"], now=now)
+    assert task.state is TaskState.DUE
+    assert task.previous_missed
+    assert task.catch_up_until is None  # kérdőívnél nincs pótlás
 
 
 # --- Demóadat ------------------------------------------------------------------------------
@@ -664,10 +853,34 @@ def test_seed_history_gets_consistent_occurrences(db):
     ).all()
     assert any(o.status is OccurrenceStatus.MISSED for o in stored)
     for occurrence in stored:
-        data_at = _last_data_at(
+        data_at = _data_at(
             db, occurrence.assignment, occurrence.period_start, period_end(occurrence)
         )
         if occurrence.status is OccurrenceStatus.MISSED:
             assert data_at is None
         elif occurrence.status is not OccurrenceStatus.DUE:
             assert data_at is not None
+
+
+def _data_at(db, assignment, start, end):
+    """Független ellenőrzés a nyers adatból (a korábbi számított teendőlista
+    lekérdezése): a legutóbbi adat ideje az előírás [start, end) időszakában."""
+    if assignment.measurement_type_id is not None:
+        return db.scalar(
+            select(func.max(Measurement.measured_at)).where(
+                Measurement.patient_id == assignment.patient_id,
+                Measurement.type_id == assignment.measurement_type_id,
+                Measurement.measured_at >= start,
+                Measurement.measured_at < end,
+            )
+        )
+    return db.scalar(
+        select(func.max(Submission.submitted_at))
+        .join(QuestionnaireVersion)
+        .where(
+            Submission.patient_id == assignment.patient_id,
+            QuestionnaireVersion.template_id == assignment.questionnaire_template_id,
+            Submission.submitted_at >= start,
+            Submission.submitted_at < end,
+        )
+    )

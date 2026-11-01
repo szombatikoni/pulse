@@ -1,19 +1,22 @@
-"""Az előírások alkalmai (AssignmentOccurrence; M3, A2).
+"""Az előírások alkalmai (AssignmentOccurrence; M3, A2-A3).
 
 A szabályok az M1 adatmodelljéből jönnek (docs/M1/03_adatmodell.md, „Előírás és
-alkalom"), ugyanazok, mint a számított teendőlistánál (tasks.py), és az
-időszak-számítás is közös:
+alkalom"); a beteg teendőlistája (tasks.py) is ezekből a tárolt alkalmakból
+dolgozik:
 
 - az időszak napi előírásnál a helyi naptári nap; heti vagy N napos előírásnál a
-  kezdőnaptól (start_date) számított teljes időköz;
+  kezdőnaptól (start_date) számított teljes időköz; ha az előírás vége
+  (end_date) egy időszak belsejébe esik, az utolsó időszak a vég napjával
+  zárul (csonka időszak, lásd period_containing);
 - a határidő (due_at) az időszak utolsó napján, a due_time időpontban van;
 - az alkalmat a háttérfolyamat menet közben nyitja meg (az aktuális és a még
-  hiányzó korábbi időszakokét, előre nem), vagy az adat mentése hozza létre,
-  ha még nincs;
+  hiányzó korábbi időszakokét, előre nem), vagy az adat mentése, a teendőlista
+  lekérése, illetve az előírás létrehozása hozza létre, ha még nincs;
 - a mérés a measured_at, a kitöltés a beküldés ideje szerint kerül az
   időszakába; teljesítve, ha a rögzítés a határidőig történt, különben késve;
-- elmulasztva: mérésnél az időszak vége + két nap (a visszadátumozás határa,
-  MAX_BACKDATE) után, kérdőívnél az időszak vége után azonnal.
+- elmulasztva: mérésnél az időszak vége + 48 óra (a visszadátumozás határa,
+  MAX_BACKDATE, abszolút időben, lásd catch_up_deadline) után, kérdőívnél az
+  időszak vége után azonnal.
 
 A véglegesítést (commit) a hívó végzi, mint a mérésnél és a kitöltésnél.
 """
@@ -23,7 +26,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import ColumnElement, or_, select
+from sqlalchemy import ColumnElement, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, joinedload
 
@@ -45,7 +48,8 @@ from app.services.questionnaires import current_version
 
 @dataclass(frozen=True)
 class Period:
-    """Az előírás egy időszaka: [start, end), a határidő az utolsó napján."""
+    """Az előírás egy időszaka: [start, end), a határidő az utolsó napján (a
+    lejáró előírás utolsó időszakánál a vég napján, lásd period_containing)."""
 
     first_day: date
     start: datetime
@@ -75,11 +79,21 @@ def local_midnight(day: date) -> datetime:
 
 def period_containing(assignment: Assignment, day: date) -> Period:
     """Az előírás azon időszaka, amelybe a (helyi) nap esik. A kezdőnap előtti
-    napra a kezdés előtti időszakot adja; azt a hívó szűri ki."""
+    napra a kezdés előtti időszakot adja; azt a hívó szűri ki.
+
+    Az utolsó időszak csonkolása (review K2, a hallgató döntése, 2026-11-01):
+    ha az előírás vége (end_date) egy heti vagy N napos időszak belsejébe esik,
+    az időszak utolsó napja a vég napja. A határidő így end_date + due_time, az
+    időszak vége az end_date-et követő helyi éjfél, és a pótlási ablak is ettől
+    számít (catch_up_deadline); a beteg a tényleges végdátumot látja
+    határidőként. A vég után kezdődő időszakot nem csonkolja (azt a hívó szűri)."""
     days = period_days(assignment)
     k = (day - assignment.start_date).days // days
     first_day = assignment.start_date + timedelta(days=k * days)
     last_day = first_day + timedelta(days=days - 1)
+    end_date = assignment.end_date
+    if end_date is not None and first_day <= end_date < last_day:
+        last_day = end_date
     return Period(
         first_day=first_day,
         start=local_midnight(first_day),
@@ -105,13 +119,26 @@ def period_end(occurrence: AssignmentOccurrence) -> datetime:
     return local_midnight(last_day + timedelta(days=1))
 
 
+def catch_up_deadline(end: datetime) -> datetime:
+    """Az időszak (end-ben végződő) pótlási ablakának vége: az időszak vége után
+    pontosan 48 óra (MAX_BACKDATE), abszolút időben.
+
+    Az UTC-re váltás szándékos: a helyi idejű datetime-hoz adott timedelta
+    falióra szerint számol, így óraátállításkor 47 vagy 49 valós óra lenne,
+    a mentés too_old határa (measurements.py: now - MAX_BACKDATE) viszont
+    abszolút. Így a két határ mindig összeér, hézag és átfedés nélkül: amíg
+    az időszakba eső mérés még rögzíthető, az alkalom nem elmulasztott, utána
+    pedig már nem rögzíthető (a hallgató döntése, 2026-11-01; review K1)."""
+    return end.astimezone(UTC) + MAX_BACKDATE
+
+
 def missed_from(occurrence: AssignmentOccurrence) -> datetime:
     """Ettől az időponttól elmulasztott a nem teljesített alkalom. Mérésnél a
     pótlási ablak végéig vár: addig a visszadátumozott mérés még az időszakba
     eshet (ugyanaz a határ, mint a teendőlista „Pótlás" ajánlatánál)."""
     end = period_end(occurrence)
     if occurrence.assignment.target_kind is AssignmentTarget.MEASUREMENT:
-        return end + MAX_BACKDATE
+        return catch_up_deadline(end)
     return end
 
 
@@ -153,6 +180,11 @@ def _ensure(
     occurrence = _find(db, assignment, period)
     assert occurrence is not None
     return occurrence, created
+
+
+def occurrence_for(db: Session, assignment: Assignment, period: Period) -> AssignmentOccurrence:
+    """Az időszak alkalma; ha még nincs, itt nyílik meg (idempotens, lásd _ensure)."""
+    return _ensure(db, assignment, period)[0]
 
 
 def _pinned_version_id(db: Session, assignment: Assignment) -> uuid.UUID | None:
@@ -211,7 +243,7 @@ def open_due_occurrences(db: Session, now: datetime) -> int:
             .outerjoin(Assignment.template)
             .where(
                 # A visszavont előírást egészen kihagyjuk: a visszavonás a nyitott
-                # alkalmát is törli (plans.py, javasolt döntés, 2026-10-30), így a
+                # alkalmát is törli (plans.py; A hallgató döntése (2026-11-01)), így a
                 # visszavonás előtti, még meg nem nyitott időszakai sem kapnak
                 # utólag alkalmat.
                 Assignment.revoked_at.is_(None),
@@ -264,13 +296,28 @@ def close_missed_occurrences(db: Session, now: datetime) -> int:
         )
         .options(joinedload(AssignmentOccurrence.assignment))
     )
-    missed = 0
-    for occurrence in candidates:
-        if now >= missed_from(occurrence):
-            occurrence.status = OccurrenceStatus.MISSED
-            missed += 1
-    db.flush()
-    return missed
+    expired = [o for o in candidates if now >= missed_from(o)]
+    if not expired:
+        return 0
+    # Feltételes zárás (review k1): a kijelölés és a zárás között egy egyidejű
+    # mentés teljesítheti az alkalmat. Feltétel nélküli UPDATE-nél ez a
+    # fulfilled_at CHECK-en integritáshibát adna, és a teljes futás (a most
+    # nyitott alkalmakkal együtt) visszagörgetődne; így a közben teljesített
+    # sor egyszerűen kimarad. PostgreSQL-ben a zárolásra váró UPDATE a feltételt
+    # a másik tranzakció commitja után újraértékeli.
+    result = db.execute(
+        update(AssignmentOccurrence)
+        .where(
+            AssignmentOccurrence.id.in_([o.id for o in expired]),
+            AssignmentOccurrence.status == OccurrenceStatus.DUE,
+        )
+        .values(status=OccurrenceStatus.MISSED)
+        .execution_options(synchronize_session=False)
+    )
+    # A betöltött példányok státusza elavult; a következő hozzáférés újraolvassa.
+    for occurrence in expired:
+        db.expire(occurrence)
+    return result.rowcount
 
 
 def run_occurrence_check(db: Session, now: datetime | None = None) -> OccurrenceCheck:
@@ -284,7 +331,12 @@ def run_occurrence_check(db: Session, now: datetime | None = None) -> Occurrence
 def fulfil_with_measurement(db: Session, measurement: Measurement) -> list[AssignmentOccurrence]:
     """A mérés hozzárendelése az előírásai alkalmához: a mérés idejének (helyi)
     napja szerinti időszakhoz. Ha az alkalom még nincs meg (a háttérfolyamat
-    még nem járt ott), létrehozza. Visszaadja a most teljesített alkalmakat."""
+    még nem járt ott), létrehozza. Visszaadja a most teljesített alkalmakat.
+
+    Csak a mérés napján érvényes előírások számítanak (valid_on): a lejáró
+    előírás utolsó időszaka a vég napjával zárul (period_containing), így a vég
+    utáni mérés már nem tartozhat hozzá, és a vég után kezdődő időszak sem
+    nyílik meg."""
     day = measurement.measured_at.astimezone(settings.tz).date()
     assignments = db.scalars(
         select(Assignment)
@@ -303,6 +355,56 @@ def fulfil_with_measurement(db: Session, measurement: Measurement) -> list[Assig
             fulfilled.append(occurrence)
     db.flush()
     return fulfilled
+
+
+def fulfil_from_existing(
+    db: Session, assignment: Assignment, now: datetime
+) -> AssignmentOccurrence | None:
+    """Új előírásnál (létrehozás, módosítás) az aktuális időszak alkalma, a
+    már meglévő adattal teljesítve. Az M1 szerint a mérés a measured_at, a
+    kitöltés a beküldés ideje szerint tartozik az időszakába, akkor is, ha az
+    előírás később született (pl. a beteg reggel mért, az orvos délben írta
+    elő): így nincs hamis „esedékes". A szabályok a mentéskoriak: az első adat
+    számít (a rögzítés sorrendjében), a késést a rögzítés ideje és a határidő
+    dönti el. A még el nem kezdett előírásra nem nyit alkalmat."""
+    today = now.astimezone(settings.tz).date()
+    if assignment.start_date > today:
+        return None
+    period = period_containing(assignment, today)
+    occurrence, _ = _ensure(db, assignment, period)
+    if assignment.target_kind is AssignmentTarget.MEASUREMENT:
+        measurement = db.scalar(
+            select(Measurement)
+            .where(
+                Measurement.patient_id == assignment.patient_id,
+                Measurement.type_id == assignment.measurement_type_id,
+                Measurement.measured_at >= period.start,
+                Measurement.measured_at < period.end,
+            )
+            .order_by(Measurement.recorded_at, Measurement.id)
+            .limit(1)
+        )
+        if measurement is not None and _fulfil(occurrence, measurement.recorded_at):
+            occurrence.measurement_id = measurement.id
+    else:
+        submission = db.scalar(
+            select(Submission)
+            .join(QuestionnaireVersion)
+            .where(
+                Submission.patient_id == assignment.patient_id,
+                QuestionnaireVersion.template_id == assignment.questionnaire_template_id,
+                Submission.submitted_at >= period.start,
+                Submission.submitted_at < period.end,
+            )
+            .order_by(Submission.submitted_at, Submission.id)
+            .limit(1)
+        )
+        # A kitöltés hivatkozását nem írjuk át: módosításnál a régi előírás
+        # (megmaradó) alkalmára mutat, az a története.
+        if submission is not None and _fulfil(occurrence, submission.submitted_at):
+            submission.occurrence_id = submission.occurrence_id or occurrence.id
+    db.flush()
+    return occurrence
 
 
 def _questionnaire_assignments(

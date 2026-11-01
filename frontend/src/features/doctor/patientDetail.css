@@ -979,6 +979,12 @@
   font-size: 12.5px;
   font-weight: 500;
 }
+/* Az orvos indoklása a lezárt előírásnál (a beteg is látja). */
+.pd-plan-note {
+  color: var(--pulse-ink-3);
+  font-size: 12.5px;
+  font-style: italic;
+}
 .pd-plan-actions,
 .pd-plan-foot {
   display: flex;

@@ -9,6 +9,7 @@ import { StatusIcon } from '../../components/StatusLabel'
 import { toLocalInput } from '../../format'
 import i18n from '../../i18n'
 import { MeasurementForm, type MeasurementPreset, type Message } from './MeasurementForm'
+import { PlanNotices } from './PlanNotices'
 import { TaskList } from './TaskList'
 import './home.css'
 
@@ -66,7 +67,7 @@ function Greeting({ patientId, name }: { patientId: string; name: string | null 
 }
 
 /** A beteg kezdőoldala, a Teendőim (felületterv, 2026-10-30, 2. változat): csak a mai
- * teendők. A mérés rögzítése a teendő kártyáján nyílik ki, a kérdőív kitöltése saját
+ * teendők, fölöttük az előírások friss változásainak jelzése. A mérés rögzítése a teendő kártyáján nyílik ki, a kérdőív kitöltése saját
  * oldalon; mentés után a nyugta a lista alatt jelenik meg. A grafikonok és a mérési
  * napló az Előzményeim oldalon vannak. */
 export function PatientHomePage() {
@@ -105,6 +106,7 @@ export function PatientHomePage() {
   return (
     <div className="pulse-patient">
       <Greeting patientId={patientId} name={me.data?.name ?? null} />
+      <PlanNotices patientId={patientId} />
       <TaskList
         patientId={patientId}
         renderForm={(task) =>

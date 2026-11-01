@@ -1,6 +1,6 @@
 """Követési terv (M3, A2 3. lépés): az orvosi végpontok jogosultsága, az új
 előírás ellenőrzései, a módosítás (lezárás + új előírás) atomisága és a
-visszavonás alkalom-kezelése (javasolt döntés, 2026-10-30)."""
+visszavonás alkalom-kezelése (A hallgató döntése (2026-11-01))."""
 
 import uuid
 from datetime import UTC, date, datetime, time, timedelta
@@ -367,6 +367,77 @@ def test_replace_of_an_upcoming_plan_keeps_its_start(client, db, setup):
     assert listed[str(old.id)]["replaced_by"] == new["id"]
 
 
+def test_replace_with_a_future_start_is_rejected(client, db, setup):
+    """Review K3 (a hallgató döntése, 2026-11-01): az érvényes előírás
+    módosításánál a kezdet nem jöhet a jövőből (az új mindig ma indul); az
+    eltérő kezdet 422, és semmi nem változik."""
+    old = history_plan(db, setup)
+    response = client.post(
+        url(setup, f"/{old.id}/replace"),
+        json={
+            "frequency": "weekly",
+            "due_time": "20:00",
+            "start_date": (today() + timedelta(days=3)).isoformat(),
+        },
+        headers=auth(setup["doctor"]),
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == {"code": "start_fixed"}
+    db.refresh(old)
+    assert (old.revoked_at, old.end_date, old.revoke_note) == (None, None, None)
+    assert occurrences(db, old)[today()] is OccurrenceStatus.DUE
+    assert db.scalar(select(func.count()).select_from(Assignment)) == 1
+
+
+def test_replace_with_an_explicit_start_of_today_is_accepted(client, db, setup):
+    old = history_plan(db, setup)
+    response = client.post(
+        url(setup, f"/{old.id}/replace"),
+        json={"frequency": "weekly", "due_time": "20:00", "start_date": today().isoformat()},
+        headers=auth(setup["doctor"]),
+    )
+    assert response.status_code == 201
+    listed = {a["id"]: a for a in client.get(url(setup), headers=auth(setup["doctor"])).json()}
+    assert listed[str(old.id)]["replaced_by"] == response.json()["id"]
+
+
+@pytest.mark.parametrize("offset", [0, 6])
+def test_replace_of_an_upcoming_plan_with_another_start_is_rejected(client, db, setup, offset):
+    """A még el nem kezdett előírás helyére az új a régi kezdetén lép: sem mától
+    (a lánc elszakadna), sem később nem indulhat."""
+    old = measurement_plan(db, setup, today() + timedelta(days=4))
+    response = client.post(
+        url(setup, f"/{old.id}/replace"),
+        json={
+            "frequency": "weekly",
+            "due_time": "09:00",
+            "start_date": (today() + timedelta(days=offset)).isoformat(),
+        },
+        headers=auth(setup["doctor"]),
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == {"code": "start_fixed"}
+    db.refresh(old)
+    assert old.revoked_at is None
+    assert db.scalar(select(func.count()).select_from(Assignment)) == 1
+
+
+def test_replace_of_an_upcoming_plan_with_its_own_start_chains(client, db, setup):
+    start = today() + timedelta(days=4)
+    old = measurement_plan(db, setup, start)
+    response = client.post(
+        url(setup, f"/{old.id}/replace"),
+        json={"frequency": "weekly", "due_time": "09:00", "start_date": start.isoformat()},
+        headers=auth(setup["doctor"]),
+    )
+    assert response.status_code == 201
+    new = response.json()
+    assert (new["start_date"], new["status"]) == (start.isoformat(), "upcoming")
+    listed = {a["id"]: a for a in client.get(url(setup), headers=auth(setup["doctor"])).json()}
+    assert listed[str(old.id)]["replaced_by"] == new["id"]
+    assert listed[str(old.id)]["status"] == "revoked"
+
+
 def test_replacing_twice_on_the_same_day_chains_the_versions(client, db, setup):
     first = measurement_plan(db, setup, today() - timedelta(days=3))
     headers = auth(setup["doctor"])
@@ -435,8 +506,8 @@ def test_replace_is_atomic_when_closing_the_old_fails(db, setup, monkeypatch):
     old = history_plan(db, setup)
     real_close = plans._close
 
-    def failing_close(db_, assignment, now):
-        real_close(db_, assignment, now)
+    def failing_close(db_, assignment, now, note=None):
+        real_close(db_, assignment, now, note)
         raise RuntimeError("szimulált hiba a lezárás után")
 
     monkeypatch.setattr(plans, "_close", failing_close)

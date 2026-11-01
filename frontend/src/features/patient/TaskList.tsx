@@ -158,8 +158,8 @@ function TaskCard({
 }
 
 /** A beteg teendői a lap tetején (F6): mi esedékes, mi kész, mi maradt el, és meddig
- * pótolható. A szerver számolja az előírásokból (számított előnézet; az M3-ban
- * tárolt alkalmak). Ha nincs előírás, nem jelenik meg. */
+ * pótolható. A szerver az előírások tárolt alkalmaiból adja (M3, A3). Ha nincs
+ * előírás, nem jelenik meg. */
 export function TaskList({
   patientId,
   renderForm,

@@ -5,7 +5,16 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from app.models import AssignmentTarget, Frequency
-from app.services.plans import PlanEntry, PlanParams
+from app.models.questionnaire import REVOKE_NOTE_MAX
+from app.services.plans import PlanEntry, PlanNotice, PlanParams
+
+# Az orvos indoklása a betegnek (visszavonásnál és módosításnál, nem kötelező).
+Note = Field(
+    default=None,
+    max_length=REVOKE_NOTE_MAX,
+    description="Indoklás a betegnek (nem kötelező); a beteg is látja.",
+    examples=["A vérnyomása stabil, elég hetente mérni."],
+)
 
 
 class PlanParamsIn(BaseModel):
@@ -16,8 +25,9 @@ class PlanParamsIn(BaseModel):
     interval_days: int | None = Field(default=None, ge=1, le=365)
     due_time: time = Field(examples=["10:00"])
     suggested_time: time | None = Field(default=None, examples=["07:30"])
-    # Üresen új előírásnál a mai nap, módosításnál a mai nap (vagy a még el nem
-    # kezdett régi kezdete). Múltbeli kezdet nem adható meg.
+    # Üresen új előírásnál a mai nap. Múltbeli kezdet nem adható meg.
+    # Módosításnál nem választható: mindig a mai nap (a még el nem kezdett
+    # régi előírásnál a régi kezdete); ettől eltérő érték: start_fixed hiba.
     start_date: date | None = None
     end_date: date | None = None
 
@@ -47,7 +57,14 @@ class AssignmentCreate(PlanParamsIn):
 
 
 class AssignmentReplace(PlanParamsIn):
-    """Módosítás: a cél a régi előírásé, csak a paraméterek újak."""
+    """Módosítás: a cél a régi előírásé, csak a paraméterek újak. Az indoklás a
+    régi előíráshoz kerül."""
+
+    note: str | None = Note
+
+
+class AssignmentRevoke(BaseModel):
+    note: str | None = Note
 
 
 class AssignmentOut(BaseModel):
@@ -64,6 +81,7 @@ class AssignmentOut(BaseModel):
     revoked_at: datetime | None
     assigned_by: str = Field(description="Az előíró orvos neve.")
     status: Literal["active", "upcoming", "ended", "revoked"]
+    revoke_note: str | None = Field(description="Az orvos indoklása (visszavonás, módosítás).")
     # Módosításnál az az előírás, amely ennek a helyébe lépett (az adatból
     # kiolvasva: ugyanaz a cél, és a kezdete ott van, ahol ez véget ért).
     replaced_by: uuid.UUID | None
@@ -85,5 +103,44 @@ def assignment_out(entry: PlanEntry) -> AssignmentOut:
         revoked_at=a.revoked_at,
         assigned_by=entry.assigned_by,
         status=entry.status,
+        revoke_note=a.revoke_note,
         replaced_by=entry.replaced_by,
+    )
+
+
+class PlanNoticeOut(BaseModel):
+    """Jelzés a betegnek: egy előírását a közelmúltban visszavonták vagy
+    módosították. Módosításnál az érvényes előírás paramétereivel."""
+
+    kind: Literal["revoked", "modified"]
+    changed_at: datetime
+    note: str | None
+    target_kind: AssignmentTarget
+    code: str
+    name: str
+    # A lezárt (régi) előírás gyakorisága, a jelzés szövegéhez.
+    frequency: Frequency
+    interval_days: int | None
+    # Csak módosításnál: az új előírás.
+    new_frequency: Frequency | None
+    new_interval_days: int | None
+    new_due_time: time | None
+    new_start_date: date | None
+
+
+def plan_notice_out(notice: PlanNotice) -> PlanNoticeOut:
+    old, new = notice.entry.assignment, notice.current.assignment if notice.current else None
+    return PlanNoticeOut(
+        kind=notice.kind,
+        changed_at=notice.changed_at,
+        note=notice.note,
+        target_kind=old.target_kind,
+        code=notice.entry.code,
+        name=notice.entry.name,
+        frequency=old.frequency,
+        interval_days=old.interval_days,
+        new_frequency=new.frequency if new else None,
+        new_interval_days=new.interval_days if new else None,
+        new_due_time=new.due_time if new else None,
+        new_start_date=new.start_date if new else None,
     )

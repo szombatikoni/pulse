@@ -7,7 +7,7 @@ from app.services.tasks import PatientTask, TaskState
 
 
 class TaskOut(BaseModel):
-    """Egy előírás aktuális időszaka a beteg szemszögéből (számított, nem tárolt)."""
+    """Egy előírás aktuális időszaka a beteg szemszögéből (a tárolt alkalomból)."""
 
     kind: AssignmentTarget
     code: str

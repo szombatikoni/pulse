@@ -8,6 +8,42 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-11-01 — A3: tárolt teendőlista; orvosi indoklás; független review és javítások
+
+- Eszköz: Claude Code; a kódot Opus agentek írták, az átnézést egy független
+  Fable-reviewer végezte, a fő munkamenetben a döntés-előkészítés és az
+  ellenőrzés folyt
+
+- Az AI szerepe: a betegoldali teendőlista átállítása a tárolt alkalmakra (egy
+  igazságforrás); az előírás-visszavonás és -módosítás indoklás-mezője és a
+  betegoldali jelzések; a teljes M3-munka független kódátnézése
+  (docs/files/review/m3_review_2026-11-01.md), majd a leletek javítása.
+
+- Saját döntéseim:
+  - a „Kész" időpontja az első, teljesítő rögzítés ideje (az „első adat
+    számít" elv szerint);
+  - visszavonásnál a nyitott, nem teljesített alkalmak törlődnek, a
+    teljesítettek és elmulasztottak megmaradnak; az orvos nem kötelező
+    indoklást adhat, amit a beteg is lát a teendői között;
+  - a review két közepes leleténél az első javítási irányt elvetettem, mert a
+    kipróbálás megmutatta az árát: a lejáró előírás utolsó időszakánál a
+    határidő csonkolását választottam (a beteg valós határidőt lásson), a
+    módosításnál pedig a jövőbeli kezdet tiltását (a módosítás azonnal
+    hatályos), az end_date-tel zárás helyett, mert az új oszlopot és több új
+    határesetet hozott volna be.
+
+- Ellenőrzés:
+  - a tesztkészletet minden kör után a fő munkamenetben is lefuttattuk
+    (575 → 587 → 589 teszt, 99% lefedettség), a böngészős teszt 10/10 nulláról
+    újraépített példányon;
+  - a független review a jogosultsági mátrixot végpontonként, az
+    immutabilitási elveket és a FHIR-csomag tartalmát rendben találta, súlyos
+    hibát nem talált; a három közepes lelete közül a pótlási határ
+    óraátállási hibáját számszerűen is igazolta (a javítás előtt a tavaszi
+    óraátállás tesztje elbukott, utána átment);
+  - a felületi változásokat képernyőképeken is ellenőriztem
+    (docs/files/review/kepek_a3_2026-11-01).
+
 ## 2026-10-30 — M3 indul: tárolt alkalmak, worker, FHIR-kiadás
 
 - Eszköz: Claude Code; a kódot külön Opus agentek írták, a fő munkamenetben a

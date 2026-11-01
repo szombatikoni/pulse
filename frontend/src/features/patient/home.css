@@ -178,6 +178,52 @@
   color: var(--pulse-ink-2);
 }
 
+/* Az előírások friss változásai (visszavonás, módosítás) a teendők fölött: halk,
+   semleges sáv, nem státusz-színnel (nem riasztás, csak tájékoztatás). */
+.pulse-notices {
+  display: grid;
+  gap: 8px;
+}
+.pulse-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-2);
+}
+.pulse-notice > svg {
+  margin-top: 1px;
+  color: var(--pulse-ink-3);
+}
+.pulse-notice p {
+  margin: 0;
+}
+.pulse-notice .nt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  color: var(--pulse-ink-1);
+}
+.pulse-notice .nt b {
+  font-weight: 600;
+}
+.pulse-notice .nt .tm,
+.pulse-notice .nn {
+  font-size: 13.5px;
+  color: var(--pulse-ink-3);
+  font-weight: 500;
+}
+.pulse-notice .nx {
+  font-size: 15px;
+}
+.pulse-notice .nn {
+  margin-top: 4px;
+}
+
 /* Két hasáb */
 .pulse-grid-2 {
   display: grid;

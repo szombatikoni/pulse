@@ -22,6 +22,8 @@ export type Assignment = {
   revoked_at: string | null
   assigned_by: string
   status: 'active' | 'upcoming' | 'ended' | 'revoked'
+  /** Az orvos indoklása a visszavonásnál vagy módosításnál (a beteg is látja). */
+  revoke_note: string | null
   /** Módosításnál az előírás, amely ennek a helyébe lépett. */
   replaced_by: string | null
 }
@@ -37,6 +39,9 @@ export type PlanParams = {
 }
 
 export type AssignmentCreate = PlanParams & { kind: TargetKind; code: string }
+
+/** Az indoklás felső határa (a szerverrel egyezik: REVOKE_NOTE_MAX). */
+export const NOTE_MAX = 500
 
 export type PlanErrorDetail = { code: string }
 
@@ -69,12 +74,13 @@ export function usePlanMutations(patientId: string) {
       onSuccess,
     }),
     replace: useMutation({
-      mutationFn: ({ id, params }: { id: string; params: PlanParams }) =>
-        apiPost<Assignment>(`${base}/${id}/replace`, params),
+      mutationFn: ({ id, params, note }: { id: string; params: PlanParams; note: string }) =>
+        apiPost<Assignment>(`${base}/${id}/replace`, { ...params, note: note || null }),
       onSuccess,
     }),
     revoke: useMutation({
-      mutationFn: (id: string) => apiPost<Assignment>(`${base}/${id}/revoke`, undefined),
+      mutationFn: ({ id, note }: { id: string; note: string }) =>
+        apiPost<Assignment>(`${base}/${id}/revoke`, { note: note || null }),
       onSuccess,
     }),
   }

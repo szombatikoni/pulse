@@ -1,8 +1,9 @@
 // A két M2-folyamat a felületen végigvíve: a beteg mér és kérdőívet tölt ki,
 // az orvos a priorizált listán és az adatlapon látja a jelzést, idegen beteg
 // adatához pedig nem fér hozzá. A végén az orvos a követési tervet szerkeszti
-// (M3, A2). Frissen seedelt adatbázist vár (backend/seed), és módosítja az
-// adatokat (Tóth Mária új mérései, kitöltése és testsúly-előírása).
+// (M3, A2), indoklással, és a beteg a teendői közt látja a változást (M3, A3).
+// Frissen seedelt adatbázist vár (backend/seed), és módosítja az adatokat
+// (Tóth Mária új mérései, kitöltése és testsúly-előírása).
 import { expect, test, type Page } from '@playwright/test'
 
 const PASSWORD = 'pulse-demo-2026'
@@ -190,15 +191,31 @@ test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a
   await expect(main).toContainText('kritikus')
 })
 
-test('követési terv, orvos: új előírás, módosítás és visszavonás, a lista mutatja a váltást', async ({
-  page,
-}) => {
+// A követési terv a beteg adatlapján, a testsúly-előírás aktuális és korábbi kártyái.
+async function openPlan(page: Page) {
   await login(page, 'dr.nagy@pulse.example')
   await expect(page).toHaveURL(/\/doctor$/)
   await page.getByRole('link', { name: 'Tóth Mária' }).click()
   const plan = page.getByRole('region', { name: 'Követési terv' })
-  const current = plan.locator('.pd-plan-item:not(.past)').filter({ hasText: 'Testsúly' })
-  const past = plan.locator('.pd-plan-item.past').filter({ hasText: 'Testsúly' })
+  return {
+    plan,
+    current: plan.locator('.pd-plan-item:not(.past)').filter({ hasText: 'Testsúly' }),
+    past: plan.locator('.pd-plan-item.past').filter({ hasText: 'Testsúly' }),
+  }
+}
+
+// A beteg teendői fölötti jelzés a testsúly-előírás változásáról.
+async function weightNotice(page: Page) {
+  await login(page, 'toth.maria@pulse.example')
+  await expect(page).toHaveURL(/\/patient$/)
+  const notices = page.getByRole('region', { name: 'Változások az előírásaidban' })
+  return notices.locator('.pulse-notice').filter({ hasText: 'Testsúly' })
+}
+
+test('követési terv, orvos: új előírás és módosítás indoklással, a lista mutatja a váltást', async ({
+  page,
+}) => {
+  const { plan, current, past } = await openPlan(page)
 
   // Új előírás: testsúly hetente, 9:00-ig (a seedben Tóth Máriának nincs ilyen).
   await plan.getByRole('button', { name: 'Új előírás' }).click()
@@ -218,8 +235,16 @@ test('követési terv, orvos: új előírás, módosítás és visszavonás, a l
     'aria-pressed',
     'true',
   )
+  // A kezdet módosításnál nem választható: az új ma indul (review K3).
+  await expect(current.getByLabel('Kezdete')).toHaveCount(0)
+  await expect(current).toContainText('új indul (kezdete:')
   await current.getByRole('button', { name: 'N naponta' }).click()
   await current.getByLabel('Hány naponta').fill('3')
+  // Az indoklás nem kötelező; a felület jelzi, hogy a beteg is látja.
+  await expect(current).toContainText('A beteg is látja a teendői között.')
+  await current
+    .getByLabel('Indoklás a betegnek (nem kötelező)')
+    .fill('Elég háromnaponta mérni, stabil a testsúlya.')
   await current.getByRole('button', { name: 'Mentés módosításként' }).click()
   await expect(plan).toContainText('Az előírás módosítva.')
 
@@ -229,13 +254,44 @@ test('követési terv, orvos: új előírás, módosítás és visszavonás, a l
   await expect(current).toContainText(/Módosítva .+: hetente → 3 naponta/)
   await expect(past).toHaveCount(1)
   await expect(past).toContainText('Módosítva')
+  // Az indoklás a lezárt (régi) előírásnál halványan látszik.
+  await expect(past).toContainText('Indoklás: „Elég háromnaponta mérni, stabil a testsúlya.”')
+})
 
-  // Visszavonás megerősítéssel: az előírás a korábbiak közé kerül.
+test('a beteg a teendői közt látja a módosítást és az indoklást', async ({ page }) => {
+  const notice = await weightNotice(page)
+  await expect(notice).toHaveCount(1)
+  await expect(notice).toContainText(
+    /Az előírás módosult \(.+\): mostantól 3 naponta, határidő 09:00\./,
+  )
+  await expect(notice).toContainText(
+    'Az orvos indoklása: „Elég háromnaponta mérni, stabil a testsúlya.”',
+  )
+  // Az új előírás teendője is ott van (ma még nincs testsúlymérés).
+  await expect(page.locator('.pulse-task').filter({ hasText: 'Testsúly' })).toContainText(
+    'Esedékes.',
+  )
+})
+
+test('követési terv, orvos: visszavonás megerősítéssel és indoklással', async ({ page }) => {
+  const { plan, current, past } = await openPlan(page)
   await current.getByRole('button', { name: 'Visszavonás' }).click()
   await expect(current).toContainText('Biztosan visszavonod?')
+  await current.getByLabel('Indoklás a betegnek (nem kötelező)').fill('Egyelőre nem kell mérni.')
   await current.getByRole('button', { name: 'Visszavonás' }).click()
   await expect(plan).toContainText('Az előírás visszavonva.')
   await expect(current).toHaveCount(0)
   await expect(past).toHaveCount(2)
   await expect(past.last()).toContainText('Visszavonva')
+  await expect(past.last()).toContainText('Indoklás: „Egyelőre nem kell mérni.”')
+})
+
+test('a beteg a visszavonást látja, a teendő eltűnik', async ({ page }) => {
+  const notice = await weightNotice(page)
+  // A módosítás és a visszavonás egy láncban: egyetlen jelzés, a végállapottal.
+  await expect(notice).toHaveCount(1)
+  await expect(notice).toContainText(/Az orvos visszavonta ezt az előírást \(.+\)\./)
+  await expect(notice).toContainText('Az orvos indoklása: „Egyelőre nem kell mérni.”')
+  await page.locator('.pulse-task').first().waitFor()
+  await expect(page.locator('.pulse-task').filter({ hasText: 'Testsúly' })).toHaveCount(0)
 })
