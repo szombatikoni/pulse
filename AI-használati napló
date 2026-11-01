@@ -10,8 +10,9 @@ A hibák szűrése kétirányú — több esetben én azonosítottam az AI téve
 
 ## 2026-11-01 — A3: tárolt teendőlista; orvosi indoklás; független review és javítások
 
-- Eszköz: Claude Code (a kódtervezeteket Opus agentek készítették, a
-  kódátnézést egy független Fable-reviewer)
+- Eszköz: Claude Code (a kódtervezeteket Opus agentek készítették; a saját
+  átnézésem mellé, második szemként egy független Fable-reviewer is
+  átvizsgálta a teljes M3-kódot)
 
 - Az AI szerepe: a betegoldali teendőlista átállítása a tárolt alkalmakra (egy
   igazságforrás); az előírás-visszavonás és -módosítás indoklás-mezője és a
@@ -21,8 +22,11 @@ A hibák szűrése kétirányú — több esetben én azonosítottam az AI téve
 - A saját munkám: az indoklás-mező és a betegoldali jelzés az én ötletem (a
   visszavonás betegoldali következményeit végiggondolva kértem őket); a
   visszavonás szabályát példákon kérdeztem végig, mielőtt jóváhagytam; a
-  review két leleténél a javítási irányt én fordítottam meg; a felületet
-  képernyőképeken és a demón ellenőriztem, az alábbi döntéseket meghoztam.
+  review két leleténél a javítási irányt én fordítottam meg; minden lépést én
+  vettem át: a kódváltozásokat a védési jegyzet magyarázataival együtt
+  néztem át, a felületet képernyőképeken és a demón ellenőriztem, és az
+  alábbi döntéseket meghoztam. A Fable-review ezt nem váltja ki, hanem
+  kiegészíti (gépi második szem a határesetekre).
 
 - Saját döntéseim:
   - a „Kész" időpontja az első, teljesítő rögzítés ideje (az „első adat
