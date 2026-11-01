@@ -1,7 +1,8 @@
 // A két M2-folyamat a felületen végigvíve: a beteg mér és kérdőívet tölt ki,
 // az orvos a priorizált listán és az adatlapon látja a jelzést, idegen beteg
-// adatához pedig nem fér hozzá. Frissen seedelt adatbázist vár (backend/seed),
-// és módosítja az adatokat (Tóth Mária új mérései és kitöltése).
+// adatához pedig nem fér hozzá. A végén az orvos a követési tervet szerkeszti
+// (M3, A2). Frissen seedelt adatbázist vár (backend/seed), és módosítja az
+// adatokat (Tóth Mária új mérései, kitöltése és testsúly-előírása).
 import { expect, test, type Page } from '@playwright/test'
 
 const PASSWORD = 'pulse-demo-2026'
@@ -187,4 +188,54 @@ test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a
   await expect(main).toContainText('pontszáma a(z) figyelmeztető vagy kritikus sávban')
   await expect(main).toContainText('13/13')
   await expect(main).toContainText('kritikus')
+})
+
+test('követési terv, orvos: új előírás, módosítás és visszavonás, a lista mutatja a váltást', async ({
+  page,
+}) => {
+  await login(page, 'dr.nagy@pulse.example')
+  await expect(page).toHaveURL(/\/doctor$/)
+  await page.getByRole('link', { name: 'Tóth Mária' }).click()
+  const plan = page.getByRole('region', { name: 'Követési terv' })
+  const current = plan.locator('.pd-plan-item:not(.past)').filter({ hasText: 'Testsúly' })
+  const past = plan.locator('.pd-plan-item.past').filter({ hasText: 'Testsúly' })
+
+  // Új előírás: testsúly hetente, 9:00-ig (a seedben Tóth Máriának nincs ilyen).
+  await plan.getByRole('button', { name: 'Új előírás' }).click()
+  await plan.getByLabel('Mit ír elő?').selectOption({ label: 'Testsúly' })
+  await plan.getByRole('button', { name: 'Hetente' }).click()
+  await plan.getByLabel('Határidő').fill('09:00')
+  await plan.getByRole('button', { name: 'Mentés', exact: true }).click()
+  await expect(plan).toContainText('Az előírás elmentve.')
+  await expect(current).toContainText('Hetente · határidő 09:00')
+  await expect(current).toContainText('előírta: Dr. Nagy Péter')
+
+  // Módosítás: az űrlap a régi értékekkel nyílik; mentéskor a régi lezárul, és
+  // ugyanarra a célra új előírás indul.
+  await current.getByRole('button', { name: 'Módosítás' }).click()
+  await expect(current.getByLabel('Határidő')).toHaveValue('09:00')
+  await expect(current.getByRole('button', { name: 'Hetente' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await current.getByRole('button', { name: 'N naponta' }).click()
+  await current.getByLabel('Hány naponta').fill('3')
+  await current.getByRole('button', { name: 'Mentés módosításként' }).click()
+  await expect(plan).toContainText('Az előírás módosítva.')
+
+  // A váltás az új előírásnál látszik, a régi halványan a korábbiak között.
+  await expect(current).toHaveCount(1)
+  await expect(current).toContainText('3 naponta · határidő 09:00')
+  await expect(current).toContainText(/Módosítva .+: hetente → 3 naponta/)
+  await expect(past).toHaveCount(1)
+  await expect(past).toContainText('Módosítva')
+
+  // Visszavonás megerősítéssel: az előírás a korábbiak közé kerül.
+  await current.getByRole('button', { name: 'Visszavonás' }).click()
+  await expect(current).toContainText('Biztosan visszavonod?')
+  await current.getByRole('button', { name: 'Visszavonás' }).click()
+  await expect(plan).toContainText('Az előírás visszavonva.')
+  await expect(current).toHaveCount(0)
+  await expect(past).toHaveCount(2)
+  await expect(past.last()).toContainText('Visszavonva')
 })

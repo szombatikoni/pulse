@@ -22,6 +22,13 @@ class QuestionOut(BaseModel):
     options: list[OptionOut]
 
 
+class QuestionnaireTemplateOut(BaseModel):
+    """Egy kirendelhető kérdőív a követési terv űrlapjához (verzió nélkül)."""
+
+    code: str
+    name: str
+
+
 class QuestionnaireOut(BaseModel):
     """Egy kirendelt kérdőív a kitöltendő verziójával: az aktuális időszak
     alkalmához rögzített verzióval (ezt tölti ki a beteg)."""

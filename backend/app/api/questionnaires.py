@@ -7,9 +7,10 @@ from sqlalchemy import func, select
 from app.api.deps import CurrentUser, DoctorUser, PatientUser, ensure_patient_access
 from app.core.config import settings
 from app.core.db import DbSession
-from app.models import QuestionnaireVersion, Submission
+from app.models import QuestionnaireTemplate, QuestionnaireVersion, Submission
 from app.schemas.questionnaires import (
     QuestionnaireOut,
+    QuestionnaireTemplateOut,
     SubmissionCreate,
     SubmissionOut,
     SubmissionReceipt,
@@ -27,6 +28,17 @@ from app.services.questionnaires import (
 router = APIRouter(tags=["questionnaires"])
 
 FORBIDDEN = {403: {"description": "A felhasználó nem érheti el a beteg adatait"}}
+
+
+@router.get("/questionnaires", responses={403: {"description": "Csak orvos"}})
+def questionnaire_templates(db: DbSession, _user: DoctorUser) -> list[QuestionnaireTemplateOut]:
+    """A kirendelhető (aktív) kérdőívek, név szerint: a követési terv űrlapjához."""
+    templates = db.scalars(
+        select(QuestionnaireTemplate)
+        .where(QuestionnaireTemplate.is_active.is_(True))
+        .order_by(QuestionnaireTemplate.name)
+    )
+    return [QuestionnaireTemplateOut(code=t.code, name=t.name) for t in templates]
 
 
 @router.get("/patients/{patient_id}/questionnaires", responses=FORBIDDEN)

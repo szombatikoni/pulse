@@ -210,9 +210,10 @@ def open_due_occurrences(db: Session, now: datetime) -> int:
             select(Assignment)
             .outerjoin(Assignment.template)
             .where(
-                # A visszavont előírást egészen kihagyjuk. Hogy a visszavonás
-                # előtti időszakai kapjanak-e alkalmat, az A2 3. lépésének
-                # (visszavonás a felületen) döntése lesz.
+                # A visszavont előírást egészen kihagyjuk: a visszavonás a nyitott
+                # alkalmát is törli (plans.py, javasolt döntés, 2026-10-30), így a
+                # visszavonás előtti, még meg nem nyitott időszakai sem kapnak
+                # utólag alkalmat.
                 Assignment.revoked_at.is_(None),
                 Assignment.start_date <= today,
                 # A lejárt előírás is kell: a vége előtti, kimaradt időszakai miatt.

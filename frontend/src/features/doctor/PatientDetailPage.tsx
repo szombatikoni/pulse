@@ -30,6 +30,7 @@ import {
 } from '../../format'
 import i18n from '../../i18n'
 import { TaskIcon } from '../patient/TaskList'
+import { CarePlan } from './CarePlan'
 import { MeasurementCharts } from './charts/MeasurementCharts'
 import './patientDetail.css'
 import { reasonText, triggerText } from './reasons'
@@ -339,7 +340,7 @@ const formatBirth = (iso: string) =>
 
 /** A beteg adatlapja az orvosnak (F10), a felületterv szerint: fejléc a státusszal,
  * bal hasábban a nyitott riasztások és a mérések grafikonja, jobb hasábban a teendők
- * teljesítése és a kérdőív-kitöltések. */
+ * teljesítése, a követési terv (M3) és a kérdőív-kitöltések. */
 export function PatientDetailPage() {
   const { t } = useTranslation()
   const { patientId = '' } = useParams()
@@ -441,6 +442,7 @@ export function PatientDetailPage() {
         </div>
         <div className="pd-stack-lg">
           <TaskProgress tasks={p.tasks ?? []} />
+          <CarePlan patientId={patientId} />
           <SubmissionHistory patientId={patientId} />
         </div>
       </div>

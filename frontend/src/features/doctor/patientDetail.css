@@ -909,3 +909,156 @@
     display: none;
   }
 }
+
+/* követési terv (terv: pulse.css „szabályok, követési terv"; M3, A2) */
+.pd-plan {
+  display: grid;
+  gap: 10px;
+}
+.pd-plan-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: start;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--pulse-raised);
+  border: 1px solid var(--pulse-line);
+}
+.pd-plan-item.past {
+  background: transparent;
+  opacity: 0.72;
+}
+.pd-tico {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--pulse-fill);
+  color: #fff;
+}
+.pd-plan-item.past .pd-tico {
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-3);
+}
+.pd-plan-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.pd-plan-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.pd-plan-name .nm {
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+}
+.pd-plan-item.past .pd-plan-name .nm {
+  color: var(--pulse-ink-2);
+}
+.pd-plan-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--pulse-line-2);
+  color: var(--pulse-ink-3);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.pd-plan-change {
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-left: 2px solid var(--pulse-ink-4);
+  color: var(--pulse-ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.pd-plan-actions,
+.pd-plan-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.pd-plan-actions,
+.pd-plan-wide {
+  grid-column: 1 / -1;
+}
+.pd-confirm {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--pulse-card);
+  color: var(--pulse-ink-2);
+  font-size: 13.5px;
+}
+.pd-plan-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--pulse-card);
+  border: 1px solid var(--pulse-line-2);
+}
+.pd-plan-wide .pd-plan-form {
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--pulse-line-2);
+  border-radius: 0;
+  background: transparent;
+}
+.pd-field {
+  display: grid;
+  gap: 6px;
+}
+.pd-field-label {
+  color: var(--pulse-ink-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.pd-plan-freq {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+.pd-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.pd-receipt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--pulse-ink-1);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.pd-plan-past {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+.pd-plan-sub {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--pulse-ink-3);
+}
+.pd-plan > [role='status']:empty {
+  display: none;
+}
+@media (max-width: 420px) {
+  .pd-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
