@@ -2,27 +2,22 @@ import { Loader, Text } from '@mantine/core'
 import { ArrowLeft, CaretRight } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 
 import { ApiError, apiGet } from '../../api/client'
-import { type MeasurementType, useMeasurementTypes } from '../../api/measurements'
-import {
-  type Alert,
-  type PatientStatus,
-  type RuleVersion,
-  type Trigger,
-  usePatient,
-} from '../../api/patients'
+import { useMeasurementTypes } from '../../api/measurements'
+import { type Alert, type PatientStatus, type Trigger, usePatient } from '../../api/patients'
+import { useQuestionnaireTemplates } from '../../api/plans'
 import { usePatientSubmissions } from '../../api/questionnaires'
 import type { Task } from '../../api/tasks'
 import { StatusIcon, StatusLabel } from '../../components/StatusLabel'
 import {
   ageInYears,
-  componentLabel,
   formatDateTime,
   formatMeasurementNumber,
-  formatNumber,
+  formatMeasurementValue,
   formatRelative,
   formatSoon,
   formatUntil,
@@ -33,7 +28,9 @@ import { TaskIcon } from '../patient/TaskList'
 import { CarePlan } from './CarePlan'
 import { MeasurementCharts } from './charts/MeasurementCharts'
 import './patientDetail.css'
-import { reasonText, triggerText } from './reasons'
+import { reasonText, triggerId, triggerText, violationLimits } from './reasons'
+import { ruleCondition, ruleTarget, type RuleTextContext } from './ruleText'
+import { RulesTab } from './RulesTab'
 import { SubmissionHistory } from './SubmissionHistory'
 
 /** A beteg összes riasztása, a lezártakkal együtt: a lezárt kártyához és a
@@ -45,51 +42,92 @@ function useAllAlerts(patientId: string) {
   })
 }
 
-/** A szabályverzió feltétele olvashatóan: mérésnél „Szisztolés > 140 Hgmm vagy
- * Diasztolés > 90 Hgmm", kérdőívnél „„Közérzet” pontszáma a(z) figyelmeztető vagy
- * kritikus sávban". */
-function conditionText(
-  t: TFunction,
-  version: RuleVersion,
-  types: MeasurementType[],
-  questionnaireName: string | undefined,
-): string {
-  if (version.rule_type === 'questionnaire') {
-    const bands = (version.params.bands ?? [])
-      .map((b) => t(`questionnaires.bands.${b}`, { defaultValue: b }))
-      .join(t('doctor.alert.or'))
-    return t('doctor.alert.questionnaireCondition', {
-      name: questionnaireName ?? version.params.questionnaire,
-      bands,
-    })
+/** A legújabb kiváltó esemény összes kiváltó adata. Időablakos szabálynál ez az
+ * ablak összes határsértő mérése, romló trendnél a kitöltések, elmaradt adatnál az
+ * elmulasztott alkalmak (mind időrendben). */
+function latestTriggers(alert: Alert): Trigger[] {
+  for (let i = alert.events.length - 1; i >= 0; i -= 1) {
+    const triggers = alert.events[i].triggers
+    if (triggers.length) return triggers
   }
-  const typeCode = version.params.measurement_type ?? ''
-  const type = types.find((x) => x.code === typeCode)
-  return Object.entries(version.params.limits ?? {})
-    .flatMap(([component, limit]) => {
-      const label = componentLabel(t, typeCode, component)
-      const unitCode = type?.components.find((c) => c.code === component)?.unit ?? ''
-      const unit = unitLabel(t, unitCode)
-      const parts: string[] = []
-      if (limit.max !== undefined) parts.push(`${label} > ${formatNumber(limit.max)} ${unit}`)
-      if (limit.min !== undefined) parts.push(`${label} < ${formatNumber(limit.min)} ${unit}`)
-      return parts
-    })
-    .join(t('doctor.alert.or'))
+  return []
 }
 
 /** A riasztás legutóbbi kiváltó adata (a legújabb eseményből). */
 function latestTrigger(alert: Alert): Trigger | undefined {
-  for (let i = alert.events.length - 1; i >= 0; i -= 1) {
-    const triggers = alert.events[i].triggers
-    if (triggers.length) return triggers[triggers.length - 1]
+  return latestTriggers(alert).at(-1)
+}
+
+/** Több kiváltó adat egy elemének rövid alakja: mérésnél az érték és az ideje,
+ * kitöltésnél a pontszám és az ideje, alkalomnál a célpont és a határidő. */
+function triggerItemText(t: TFunction, trigger: Trigger): string {
+  if (trigger.measurement) {
+    const m = trigger.measurement
+    return `${formatMeasurementValue(t, m)} (${formatDateTime(m.measured_at)})`
   }
-  return undefined
+  if (trigger.submission) {
+    const s = trigger.submission
+    return t('doctor.detail.submissionItem', {
+      score: s.total_score,
+      max: s.max_score,
+      when: formatDateTime(s.submitted_at),
+    })
+  }
+  return triggerText(t, trigger)
+}
+
+/** Egykiváltós esemény egysoros alakja (pl. küszöbriasztás): mérésnél az érték és
+ * zárójelben a határsértés, egyébként a kiváltó adat mondata. */
+function eventTriggerText(t: TFunction, trigger: Trigger): string {
+  if (!trigger.measurement) return triggerText(t, trigger)
+  const m = trigger.measurement
+  const unit = unitLabel(t, m.values[0]?.unit ?? '')
+  return `${formatMeasurementNumber(m)} ${unit} (${triggerText(t, trigger)})`
+}
+
+/** Több kiváltó adat egymás alatt, soronként egy: mérésnél az érték, csak az átlépett
+ * határok (pl. „> 140 / > 90", mert az érték már előttük áll) és az időpont, kitöltésnél a pontszám és az ideje, alkalomnál a célpont és a
+ * határidő. A mondatok a reasons.ts / ruleText.ts forrásaiból jönnek. */
+function TriggerList({ triggers, labelledBy }: { triggers: Trigger[]; labelledBy?: string }) {
+  const { t } = useTranslation()
+  return (
+    <ul className="pd-trig-list" aria-labelledby={labelledBy}>
+      {triggers.map((tr) => (
+        <li key={triggerId(tr)}>
+          {tr.measurement ? (
+            <>
+              <span className="v">
+                {formatMeasurementNumber(tr.measurement)}{' '}
+                {unitLabel(t, tr.measurement.values[0]?.unit ?? '')}
+              </span>
+              {' · '}
+              {violationLimits(tr)}
+              {' · '}
+              <span className="w">{formatDateTime(tr.measurement.measured_at)}</span>
+            </>
+          ) : (
+            triggerItemText(t, tr)
+          )}
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 /** A riasztás címe: mi történt, hétköznapi szavakkal. */
-function alertTitle(t: TFunction, alert: Alert, trigger: Trigger | undefined): string {
+function alertTitle(
+  t: TFunction,
+  alert: Alert,
+  trigger: Trigger | undefined,
+  ctx: RuleTextContext,
+): string {
   const version = alert.rule_version
+  if (version.rule_type === 'missing_data') {
+    return t('doctor.alert.titleMissing', { name: ruleTarget(t, version.params, ctx) })
+  }
+  if (version.rule_type === 'questionnaire' && version.params.trend_count !== undefined) {
+    return t('doctor.alert.titleTrend', { name: ruleTarget(t, version.params, ctx) })
+  }
   if (version.rule_type === 'questionnaire' && trigger?.submission) {
     const s = trigger.submission
     return t('doctor.alert.titleQuestionnaire', {
@@ -149,15 +187,15 @@ const CHECK = (
 
 /** Egy nyitott riasztás magyarázattal (F17): mi történt, melyik szabályverzió, mely
  * adat, melyik feltétel; az életút lépései és az eseménytörténet. */
-function AlertCard({ alert, types }: { alert: Alert; types: MeasurementType[] }) {
+function AlertCard({ alert, ctx }: { alert: Alert; ctx: RuleTextContext }) {
   const { t } = useTranslation()
   const version = alert.rule_version
-  const trigger = latestTrigger(alert)
-  const questionnaireName = alert.events.flatMap((e) => e.triggers).find((x) => x.submission)
-    ?.submission?.questionnaire_name
+  const triggers = latestTriggers(alert)
+  const trigger = triggers.at(-1)
   const big = bigValue(t, trigger)
-  const title = alertTitle(t, alert, trigger)
+  const title = alertTitle(t, alert, trigger, ctx)
   const firstTodo = STEPS.findIndex((s) => !has(alert, s))
+  const triggersLabelId = useId()
 
   return (
     <article className="pd-alert" aria-label={title}>
@@ -187,11 +225,19 @@ function AlertCard({ alert, types }: { alert: Alert; types: MeasurementType[] })
         <span className="k">{t('doctor.detail.why')}</span>
         <span>
           {t('doctor.alert.condition', {
-            condition: conditionText(t, version, types, questionnaireName),
+            condition: ruleCondition(t, version.rule_type, version.params, ctx),
           })}
         </span>
-        {trigger && (
-          <span>{t('doctor.detail.triggerData', { data: triggerText(t, trigger) })}</span>
+        {triggers.length === 1 && (
+          <span>{t('doctor.detail.triggerData', { data: triggerText(t, triggers[0]) })}</span>
+        )}
+        {triggers.length > 1 && (
+          <>
+            <span id={triggersLabelId}>
+              {t('doctor.detail.triggerDataMany', { count: triggers.length })}
+            </span>
+            <TriggerList triggers={triggers} labelledBy={triggersLabelId} />
+          </>
         )}
       </div>
       <ol className="pd-steps" aria-label={t('doctor.detail.lifecycle')}>
@@ -217,23 +263,28 @@ function AlertCard({ alert, types }: { alert: Alert; types: MeasurementType[] })
             <li key={i}>
               <span className="d" aria-hidden="true" />
               <span className="w">{formatDateTime(event.created_at)}</span>
-              <span>
+              <div>
                 <span className="e">{t(`doctor.alert.events.${event.event_type}`)}</span>
-                {event.triggers.map((tr) => (
-                  <span key={tr.measurement?.id ?? tr.submission?.id}>
+                {event.triggers.length > 1 && (
+                  <span className="pd-muted">
                     {' · '}
-                    {tr.measurement
-                      ? `${formatMeasurementNumber(tr.measurement)} ${unitLabel(t, tr.measurement.values[0]?.unit ?? '')} (${triggerText(t, tr)})`
-                      : triggerText(t, tr)}
+                    {t('doctor.detail.triggerCount', { count: event.triggers.length })}
                   </span>
-                ))}
+                )}
+                {event.triggers.length === 1 && (
+                  <span>
+                    {' · '}
+                    {eventTriggerText(t, event.triggers[0])}
+                  </span>
+                )}
                 {event.rule_version && event.rule_version.version_no !== version.version_no && (
                   <span className="pd-muted">
                     {' · '}
                     {t('doctor.alert.eventVersion', { version: event.rule_version.version_no })}
                   </span>
                 )}
-              </span>
+              </div>
+              {event.triggers.length > 1 && <TriggerList triggers={event.triggers} />}
             </li>
           ))}
         </ol>
@@ -243,11 +294,11 @@ function AlertCard({ alert, types }: { alert: Alert; types: MeasurementType[] })
 }
 
 /** Lezárt riasztás röviden (indoklás és visszajelzés az M3-ban kerül a végpontra). */
-function ClosedAlert({ alert }: { alert: Alert }) {
+function ClosedAlert({ alert, ctx }: { alert: Alert; ctx: RuleTextContext }) {
   const { t } = useTranslation()
   const trigger = latestTrigger(alert)
   const big = bigValue(t, trigger)
-  const title = alertTitle(t, alert, trigger)
+  const title = alertTitle(t, alert, trigger, ctx)
   const closed = alert.events.find((e) => e.event_type === 'closed')
   return (
     <article className="pd-alert closed" aria-label={t('doctor.detail.closedLabel', { title })}>
@@ -338,16 +389,30 @@ const formatBirth = (iso: string) =>
     day: 'numeric',
   }).format(new Date(iso))
 
+// Az adatlap fülei (felületterv: Áttekintés, Szabályok, Követési terv). A követési
+// terv az A2 óta az Áttekintés jobb hasábjában van, ezért külön fület (még) nem kap.
+const TABS = ['overview', 'rules'] as const
+type Tab = (typeof TABS)[number]
+
 /** A beteg adatlapja az orvosnak (F10), a felületterv szerint: fejléc a státusszal,
- * bal hasábban a nyitott riasztások és a mérések grafikonja, jobb hasábban a teendők
- * teljesítése, a követési terv (M3) és a kérdőív-kitöltések. */
+ * alatta fülek. Az Áttekintés bal hasábjában a nyitott riasztások és a mérések
+ * grafikonja, a jobb hasábban a teendők teljesítése, a követési terv (M3) és a
+ * kérdőív-kitöltések; a Szabályok fülön a beteg szabályai és a szerkesztő (M3, A4). */
 export function PatientDetailPage() {
   const { t } = useTranslation()
   const { patientId = '' } = useParams()
+  const [search, setSearch] = useSearchParams()
   const patient = usePatient(patientId)
   const alerts = useAllAlerts(patientId)
   const submissions = usePatientSubmissions(patientId)
   const types = useMeasurementTypes()
+  const templates = useQuestionnaireTemplates()
+  // A fül az URL-ben (?tab=rules): frissítés és visszalépés után is megmarad.
+  const tab: Tab = search.get('tab') === 'rules' ? 'rules' : 'overview'
+  const ctx: RuleTextContext = {
+    types: types.data ?? [],
+    questionnaires: Object.fromEntries((templates.data ?? []).map((x) => [x.code, x.name])),
+  }
 
   if (patient.isPending) return <Loader />
   if (patient.isError) {
@@ -399,52 +464,76 @@ export function PatientDetailPage() {
         </div>
       </header>
 
-      <div className="pd-grid-2">
-        <div className="pd-stack-lg">
-          <section className="pd-sec" aria-labelledby="pd-h-alerts">
-            <div className="pd-sec-head">
-              <div className="left">
-                <h2 className="pd-h-sec" id="pd-h-alerts">
-                  {t('doctor.alertsTitle')}
-                </h2>
-                {open.length > 0 && (
-                  <span
-                    className={
-                      open.some((a) => a.severity === 'severe') ? 'pd-badge-n hot' : 'pd-badge-n'
-                    }
-                  >
-                    {open.length}
-                  </span>
+      <div className="pd-tabs" role="tablist" aria-label={t('doctor.detail.tabsLabel')}>
+        {TABS.map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`pd-tab-${id}`}
+            aria-selected={tab === id}
+            aria-controls="pd-tabpanel"
+            onClick={() => setSearch(id === 'overview' ? {} : { tab: id })}
+          >
+            {t(`doctor.detail.tabs.${id}`)}
+          </button>
+        ))}
+      </div>
+
+      <div id="pd-tabpanel" role="tabpanel" aria-labelledby={`pd-tab-${tab}`}>
+        {tab === 'rules' ? (
+          <RulesTab patientId={patientId} patientName={p.name} ctx={ctx} />
+        ) : (
+          <div className="pd-grid-2">
+            <div className="pd-stack-lg">
+              <section className="pd-sec" aria-labelledby="pd-h-alerts">
+                <div className="pd-sec-head">
+                  <div className="left">
+                    <h2 className="pd-h-sec" id="pd-h-alerts">
+                      {t('doctor.alertsTitle')}
+                    </h2>
+                    {open.length > 0 && (
+                      <span
+                        className={
+                          open.some((a) => a.severity === 'severe')
+                            ? 'pd-badge-n hot'
+                            : 'pd-badge-n'
+                        }
+                      >
+                        {open.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {alerts.isPending && <Loader size="sm" />}
+                {alerts.isError && <Text c="red">{t('errors.unavailable')}</Text>}
+                {alerts.isSuccess && open.length === 0 && (
+                  <div className="pd-card pd-empty">
+                    <StatusIcon status="ok" size={22} />
+                    <span>{t('doctor.noAlerts')}</span>
+                  </div>
                 )}
-              </div>
+                {open.map((alert) => (
+                  <AlertCard key={alert.id} alert={alert} ctx={ctx} />
+                ))}
+                {closed.map((alert) => (
+                  <ClosedAlert key={alert.id} alert={alert} ctx={ctx} />
+                ))}
+              </section>
+              <MeasurementCharts
+                patientId={patientId}
+                doctor
+                alerts={all}
+                submissions={submissions.data ?? []}
+              />
             </div>
-            {alerts.isPending && <Loader size="sm" />}
-            {alerts.isError && <Text c="red">{t('errors.unavailable')}</Text>}
-            {alerts.isSuccess && open.length === 0 && (
-              <div className="pd-card pd-empty">
-                <StatusIcon status="ok" size={22} />
-                <span>{t('doctor.noAlerts')}</span>
-              </div>
-            )}
-            {open.map((alert) => (
-              <AlertCard key={alert.id} alert={alert} types={types.data ?? []} />
-            ))}
-            {closed.map((alert) => (
-              <ClosedAlert key={alert.id} alert={alert} />
-            ))}
-          </section>
-          <MeasurementCharts
-            patientId={patientId}
-            doctor
-            alerts={all}
-            submissions={submissions.data ?? []}
-          />
-        </div>
-        <div className="pd-stack-lg">
-          <TaskProgress tasks={p.tasks ?? []} />
-          <CarePlan patientId={patientId} />
-          <SubmissionHistory patientId={patientId} />
-        </div>
+            <div className="pd-stack-lg">
+              <TaskProgress tasks={p.tasks ?? []} />
+              <CarePlan patientId={patientId} />
+              <SubmissionHistory patientId={patientId} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

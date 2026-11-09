@@ -1,9 +1,10 @@
 // A két M2-folyamat a felületen végigvíve: a beteg mér és kérdőívet tölt ki,
 // az orvos a priorizált listán és az adatlapon látja a jelzést, idegen beteg
 // adatához pedig nem fér hozzá. A végén az orvos a követési tervet szerkeszti
-// (M3, A2), indoklással, és a beteg a teendői közt látja a változást (M3, A3).
+// (M3, A2), indoklással, és a beteg a teendői közt látja a változást (M3, A3);
+// végül a Szabályok fülön a küszöbszabályt módosítja új verzióként (M3, A4).
 // Frissen seedelt adatbázist vár (backend/seed), és módosítja az adatokat
-// (Tóth Mária új mérései, kitöltése és testsúly-előírása).
+// (Tóth Mária új mérései, kitöltése, testsúly-előírása és küszöbszabálya).
 import { expect, test, type Page } from '@playwright/test'
 
 const PASSWORD = 'pulse-demo-2026'
@@ -35,7 +36,12 @@ test('az orvosi lista minden M2-státuszt mutat, prioritás szerint, idegen bete
 
   expect(rows.map((r) => r.split(' ')[0])).toEqual(['Súlyos', 'Figyelem', 'Adathiány', 'Rendben'])
   expect(rows[0]).toContain('Varga Béla')
+  // Szabó János: az időablakos riasztás legutóbbi kiváltó mérése.
   expect(rows[1]).toContain('Szisztolés 152 Hgmm (> 140)')
+  // Kiss Ilona: Adathiány a kérdőív elmulasztott alkalma miatt (M3, A4), célponttal
+  // és határidővel.
+  expect(rows[2]).toContain('Kiss Ilona')
+  expect(rows[2]).toMatch(/Elmulasztott alkalom: „Közérzet” kérdőív, határidő .+ 20:00/)
   expect(rows.some((r) => r.includes('Tóth Mária'))).toBe(false)
 })
 
@@ -45,8 +51,21 @@ test('az adatlapon a riasztás magyarázattal és eseménytörténettel látszik
   // Az adatlap részei (riasztások, kitöltések, mérések) külön kéréssel töltődnek
   // be, ezért az ellenőrzés addig vár, amíg a szöveg megjelenik (expect … toContainText).
   const main = page.locator('main')
-  await expect(main).toContainText('Küszöbszabály, 1. verzió · közepes')
-  await expect(main).toContainText('Feltétel: Szisztolés > 140 Hgmm vagy Diasztolés > 90 Hgmm')
+  // A seedben (M3, A4) a tartós eltérést az időablakos szabály jelzi: legalább 3
+  // határsértő mérés 7 napon belül. A magyarázat az ablak összes kiváltó mérését
+  // felsorolja (a negyedik ismételt aktiválódásként kapcsolódott hozzá).
+  await expect(main).toContainText('Időablakos szabály, 1. verzió · közepes')
+  await expect(main).toContainText(
+    'Feltétel: Szisztolés > 140 Hgmm vagy Diasztolés > 90 Hgmm, legalább 3 mérésnél 7 napon belül',
+  )
+  // A több kiváltó adat egymás alatti lista, soronként egy mérés: az érték, utána csak
+  // az átlépett határok a komponensek sorrendjében (az érték nem ismétlődik), és az időpont.
+  const triggerList = main.getByRole('list', { name: 'Kiváltó adatok (4):' })
+  const triggers = triggerList.getByRole('listitem')
+  await expect(triggers).toHaveCount(4)
+  await expect(triggers.first()).toHaveText(/^146\/92 Hgmm · > 140 \/ > 90 · \S/)
+  await expect(triggers.last()).toHaveText(/^152\/95 Hgmm · > 140 \/ > 90 · \S/)
+  await expect(triggerList).not.toContainText('Szisztolés')
   await expect(main).toContainText('Keletkezett')
   await expect(main).toContainText('Ismételt aktiválódás')
   await expect(main).toContainText(/86,4 kg|85,8 kg/)
@@ -172,7 +191,7 @@ test('kérdőív-folyamat, beteg: kitöltés és beküldés, a pontszám nem lá
   await expect(page.getByRole('button', { name: 'Mégis kitöltöm újra' })).toBeVisible()
 })
 
-test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a mérés', async ({ page }) => {
+test('az orvos látja: Tóth Mária Súlyos, az ok a kritikus kérdőív', async ({ page }) => {
   await login(page, 'dr.nagy@pulse.example')
   await expect(page).toHaveURL(/\/doctor$/)
   await page.locator('.pulse-prow').first().waitFor()
@@ -181,12 +200,14 @@ test('az orvos látja: Tóth Mária Súlyos, az okok között a kérdőív és a
   expect(first.startsWith('Súlyos')).toBe(true)
   // A kérdőív két szabálya (figyelmeztető és kritikus) ugyanazt az okot egyszer írja ki.
   expect(first.split('13/13 pont (kritikus sáv)')).toHaveLength(2)
-  expect(first).toContain('Szisztolés 165 Hgmm (> 140)')
+  // A 165/98-as mérés már nem nyit riasztást (M3, A4 seed): a küszöbszabály csak
+  // 180 fölött jelez, az időablakos pedig legalább 3 határsértő mérést kér 7 napon belül.
+  expect(first).not.toContain('Szisztolés 165')
 
   await page.getByRole('link', { name: 'Tóth Mária' }).click()
   const main = page.locator('main')
   await expect(main).toContainText('Kérdőívszabály, 1. verzió')
-  await expect(main).toContainText('pontszáma a(z) figyelmeztető vagy kritikus sávban')
+  await expect(main).toContainText('Feltétel: a pontszám a(z) figyelmeztető vagy kritikus sávban')
   await expect(main).toContainText('13/13')
   await expect(main).toContainText('kritikus')
 })
@@ -208,7 +229,9 @@ async function openPlan(page: Page) {
 async function weightNotice(page: Page) {
   await login(page, 'toth.maria@pulse.example')
   await expect(page).toHaveURL(/\/patient$/)
-  const notices = page.getByRole('region', { name: 'Változások az előírásaidban' })
+  const notices = page.getByRole('region', {
+    name: 'Változások az előírásaidban',
+  })
   return notices.locator('.pulse-notice').filter({ hasText: 'Testsúly' })
 }
 
@@ -294,4 +317,110 @@ test('a beteg a visszavonást látja, a teendő eltűnik', async ({ page }) => {
   await expect(notice).toContainText('Az orvos indoklása: „Egyelőre nem kell mérni.”')
   await page.locator('.pulse-task').first().waitFor()
   await expect(page.locator('.pulse-task').filter({ hasText: 'Testsúly' })).toHaveCount(0)
+})
+
+// A beteg szabályai az adatlap Szabályok fülén (M3, A4).
+async function openRules(page: Page) {
+  await login(page, 'dr.nagy@pulse.example')
+  await expect(page).toHaveURL(/\/doctor$/)
+  await page.getByRole('link', { name: 'Tóth Mária' }).click()
+  await page.getByRole('tab', { name: 'Szabályok' }).click()
+  await expect(page).toHaveURL(/\?tab=rules$/)
+  return page.getByRole('region', { name: 'Tóth Mária szabályai' })
+}
+
+test('szabályok, orvos: a küszöbszabály módosítása új verziót hoz létre', async ({ page }) => {
+  const rules = await openRules(page)
+  // A négy típus csoportban, mindegyik a leírásával; a seed szabályai a helyükön.
+  for (const type of ['Küszöbszabály', 'Időablakos szabály', 'Kérdőívszabály', 'Elmaradt adat']) {
+    await expect(rules.getByRole('group', { name: type })).toBeVisible()
+  }
+  const threshold = rules.getByRole('article', {
+    name: 'Vérnyomás: Szisztolés > 180 Hgmm',
+  })
+  await expect(threshold).toContainText('súlyos')
+  await expect(threshold).toContainText(/1\. verzió, .+ óta/)
+  await expect(
+    rules.getByRole('article', {
+      name: 'Vérnyomás: Szisztolés > 140 Hgmm vagy Diasztolés > 90 Hgmm, legalább 3 mérésnél 7 napon belül',
+    }),
+  ).toBeVisible()
+  await expect(
+    rules.getByRole('article', {
+      name: 'Vérnyomás: 2 egymást követő alkalom elmulasztva',
+    }),
+  ).toBeVisible()
+
+  // Szerkesztés: a szerkesztő az aktuális verzióval nyílik; változás nélkül nem menthető.
+  await threshold.getByRole('button', { name: 'Szerkesztés' }).click()
+  const editor = page.getByRole('complementary', {
+    name: 'Szabály szerkesztése',
+  })
+  await expect(editor).toContainText('Küszöbszabály · Vérnyomás')
+  await expect(editor).toContainText('1. verzió érvényes')
+  const save = editor.getByRole('button', { name: 'Mentés 2. verzióként' })
+  await expect(save).toBeDisabled()
+
+  // Érvénytelen érték: az előnézet a hibát mutatja, a mentés tiltva marad.
+  const upper = editor.getByLabel('Szisztolés felső határ')
+  await upper.fill('20')
+  await expect(editor).toContainText('Szisztolés: a határ 50 és 300 Hgmm közötti szám lehet.')
+  await expect(save).toBeDisabled()
+
+  // 180 → 175: az élő előnézet kiemeli a változott értéket.
+  await upper.fill('175')
+  await expect(editor.locator('.pd-preview')).toContainText(
+    'Vérnyomás: Szisztolés > 175 Hgmm esetén súlyos riasztás.',
+  )
+  await expect(editor.locator('.pd-preview .chg')).toHaveText('175')
+  await expect(save).toBeEnabled()
+  await save.click()
+
+  // A lista az új verziót mutatja, a szerkesztő a 2. verzióval nyílik újra, és a
+  // verziólistában a régi is megmarad.
+  await expect(rules).toContainText('A szabály módosítva, mostantól a(z) 2. verzió érvényes.')
+  const changed = rules.getByRole('article', {
+    name: 'Vérnyomás: Szisztolés > 175 Hgmm',
+  })
+  await expect(changed).toContainText(/2\. verzió, .+ óta/)
+  await expect(
+    rules.getByRole('article', { name: 'Vérnyomás: Szisztolés > 180 Hgmm' }),
+  ).toHaveCount(0)
+  await expect(editor).toContainText('2. verzió érvényes')
+  await expect(editor.getByRole('button', { name: 'Mentés 3. verzióként' })).toBeDisabled()
+  const versions = editor.locator('.pd-versions li')
+  await expect(versions).toHaveCount(2)
+  await expect(versions.first()).toContainText('2. verzió')
+  await expect(versions.first()).toContainText('Szisztolés > 175 Hgmm, súlyos')
+  await expect(versions.first()).toContainText('érvényes')
+  await expect(versions.last()).toContainText('Szisztolés > 180 Hgmm, súlyos')
+})
+
+test('szabályok, orvos: új szabálynál előbb a típus választható, utána az űrlapja', async ({
+  page,
+}) => {
+  const rules = await openRules(page)
+  await rules.getByRole('button', { name: 'Új szabály' }).click()
+  const picker = page.getByRole('complementary', {
+    name: 'Milyen típusú szabály legyen?',
+  })
+  for (const type of ['Küszöbszabály', 'Időablakos szabály', 'Kérdőívszabály', 'Elmaradt adat']) {
+    await expect(picker.getByRole('button', { name: new RegExp(`^${type}`) })).toBeVisible()
+  }
+  await picker.getByRole('button', { name: /^Elmaradt adat/ }).click()
+
+  // Az elmaradt adat űrlapja: célpont (mérés vagy kérdőív) és az elmulasztások száma.
+  const editor = page.getByRole('complementary', { name: 'Új szabály' })
+  await expect(editor).toContainText('Elmaradt adat · Vérnyomás')
+  await editor.getByLabel('Mit figyeljen?').selectOption({ label: 'Közérzet' })
+  await expect(editor.locator('.pd-preview')).toContainText(
+    'Közérzet: 2 egymást követő alkalom elmulasztva esetén közepes riasztás.',
+  )
+  await expect(editor.getByRole('button', { name: 'Mentés 1. verzióként' })).toBeEnabled()
+  // Mentés nélkül vissza: a lista nem változik.
+  await editor.getByRole('button', { name: 'Mégse' }).click()
+  await expect(page.getByRole('complementary', { name: 'Új szabály' })).toHaveCount(0)
+  await expect(
+    rules.getByRole('group', { name: 'Elmaradt adat' }).getByRole('article'),
+  ).toHaveCount(1)
 })

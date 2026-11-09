@@ -15,25 +15,52 @@ export type Violation = {
   limit: number
 }
 
-/** Egy kiváltó adat: mérés a határátlépéseivel, vagy kérdőív-kitöltés a sávjával. */
+/** Egy alkalom (elmaradt adatnál a kiváltó, Adathiánynál az ok): mit kellett
+ * volna rögzíteni (méréstípus vagy kérdőív) és mikorra. */
+export type OccurrenceTrigger = {
+  id: string
+  due_at: string
+  status: 'due' | 'fulfilled' | 'fulfilled_late' | 'missed'
+  target_kind: 'measurement' | 'questionnaire'
+  code: string
+  name: string
+}
+
+/** Egy kiváltó adat: mérés a határátlépéseivel, kérdőív-kitöltés a sávjával, vagy
+ * elmulasztott alkalom. */
 export type Trigger = {
   measurement: Measurement | null
   violations: Violation[]
   submission: Submission | null
   band: string | null
+  occurrence?: OccurrenceTrigger | null
+}
+
+export type RuleType = 'threshold' | 'window' | 'questionnaire' | 'missing_data'
+
+/** A szabályverzió paraméterei; a típustól függ, mely kulcsok vannak (a szerver a
+ * hiányzókat elhagyja, lásd backend/app/services/rules.py). */
+export type RuleParams = {
+  measurement_type?: string
+  limits?: Record<string, { min?: number; max?: number }>
+  /** időablakos: legalább ennyi határsértő mérés … */
+  count?: number
+  /** … ennyi napon belül */
+  window_days?: number
+  questionnaire?: string
+  bands?: string[]
+  /** kérdőív, romló trend: ennyi kitöltésen át */
+  trend_count?: number
+  /** elmaradt adat: ennyi egymást követő elmulasztott alkalom */
+  consecutive_missed?: number
 }
 
 export type RuleVersion = {
   rule_id: string
   version_no: number
-  rule_type: 'threshold' | 'window' | 'questionnaire' | 'missing_data'
+  rule_type: RuleType
   severity: Severity
-  params: {
-    measurement_type?: string
-    limits?: Record<string, { min?: number; max?: number }>
-    questionnaire?: string
-    bands?: string[]
-  }
+  params: RuleParams
 }
 
 export type AlertEvent = {
@@ -55,7 +82,7 @@ export type Alert = {
 
 export type StatusReason = {
   status: PatientStatus
-  code: 'open_alert' | 'no_data_yet' | 'stale_data' | 'fresh_data'
+  code: 'open_alert' | 'missed_occurrence' | 'no_data_yet' | 'stale_data' | 'fresh_data'
   at: string | null
   alert_id: string | null
   severity: Severity | null
