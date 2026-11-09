@@ -110,6 +110,16 @@ export const hu = {
     cancel: 'Mégse',
     savedDetail: '{{value}}, {{when}}.',
     caughtUp: 'Az elmaradt mérés pótolva.',
+    correct: 'Javítás',
+    correctAria: '{{value}} ({{when}}) javítása',
+    correctionTitle: 'Javítás: a(z) {{date}} {{type}}mérés értékeit módosítod',
+    correctionHint:
+      'A mérés ideje ({{time}}) nem változik. Az eredeti érték „javítva” jelöléssel megmarad a naplóban.',
+    saveCorrection: 'Javítás mentése',
+    correctionSaved: 'A javítás elmentve.',
+    correctionSavedDetail:
+      '{{from}} → {{to}} {{unit}}. A régi érték javítottként megmarad a naplóban.',
+    corrected: 'javítva',
     empty: 'Még nincs rögzített mérés.',
     charts: {
       mine: 'Méréseim',
@@ -153,6 +163,7 @@ export const hu = {
       unknown_type: 'Ismeretlen méréstípus.',
       unknown_component: 'Ismeretlen érték: {{component}}.',
       timezone_required: 'A mérés idejéhez időzóna is kell.',
+      already_corrected: 'Ezt a mérést már javítottad. A javított értéket módosíthatod.',
       generic: 'A mérést nem sikerült elmenteni.',
     },
   },
@@ -354,6 +365,9 @@ export const hu = {
       eventAssignee: 'felelős: {{name}}',
       eventBy: 'hozzárendelte: {{name}}',
       eventReason: 'Indoklás: „{{reason}}”',
+      needsReview: 'Kiváltó adat javítva',
+      conditionStillMet: 'a feltétel továbbra is teljesül',
+      conditionNoLongerMet: 'a feltétel már nem teljesül',
       errors: {
         already_closed: 'A riasztást közben lezárták.',
         doctor_not_assigned: 'A választott orvos már nincs a beteghez rendelve.',

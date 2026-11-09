@@ -4,7 +4,7 @@ import { type ReactNode, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { apiGet } from '../../../api/client'
-import type { Measurement } from '../../../api/measurements'
+import { isCurrent, type Measurement } from '../../../api/measurements'
 import type { Alert } from '../../../api/patients'
 import type { Submission } from '../../../api/questionnaires'
 import { StatusIcon } from '../../../components/StatusLabel'
@@ -165,16 +165,20 @@ export function MeasurementCharts({
       </section>
     )
 
-  // A végpont a legújabbat adja elöl; a grafikon időrendben rajzol.
+  // A végpont a legújabbat adja elöl; a grafikon időrendben rajzol. A felülírt
+  // (javított) mérés csak a táblázatban marad, jelölve; a görbe és a legutóbbi érték
+  // csak az érvényeseket mutatja (M3, A7).
   const all = [...series.data].reverse()
   const ofType = (code: string) => all.filter((m) => m.type_code === code)
   const inRange = <P extends { t: Date }>(arr: P[]) => arr.filter((p) => daysAgo(p.t, now) < days)
+  const current = <P extends { superseded?: boolean }>(arr: P[]) => arr.filter((p) => !p.superseded)
 
+  // A „kiváltó adat javítva” esemény nem kiértékelés: a mérései nem riasztást kiváltók.
   const flagged = new Set(
     alerts.flatMap((a) =>
-      a.events.flatMap((e) =>
-        e.triggers.flatMap((tr) => (tr.measurement ? [tr.measurement.id] : [])),
-      ),
+      a.events
+        .filter((e) => e.event_type !== 'trigger_corrected')
+        .flatMap((e) => e.triggers.flatMap((tr) => (tr.measurement ? [tr.measurement.id] : []))),
     ),
   )
   const bpThr = doctor ? thresholdsFor(alerts, 'blood_pressure') : []
@@ -186,9 +190,15 @@ export function MeasurementCharts({
     sys: valueOf(m, 'systolic'),
     dia: valueOf(m, 'diastolic'),
     trig: flagged.has(m.id),
+    superseded: !isCurrent(m),
   }))
   const lineOf = (code: string): LinePoint[] =>
-    ofType(code).map((m) => ({ id: m.id, t: new Date(m.measured_at), v: valueOf(m) }))
+    ofType(code).map((m) => ({
+      id: m.id,
+      t: new Date(m.measured_at),
+      v: valueOf(m),
+      superseded: !isCurrent(m),
+    }))
 
   if (all.length === 0) {
     return (
@@ -202,7 +212,8 @@ export function MeasurementCharts({
   }
 
   const bp = inRange(bpAll)
-  const lastBP = bpAll[bpAll.length - 1]
+  const bpCurrent = current(bpAll)
+  const lastBP = bpCurrent[bpCurrent.length - 1]
   const mmHg = t('units.mmHg')
   const rangeLabel = (title: string) => t('measurements.charts.rangeLabel', { title, count: days })
   const bpBody = !bp.length ? (
@@ -211,7 +222,7 @@ export function MeasurementCharts({
     <BpTable points={bp} thresholds={bpThr} doctor={doctor} />
   ) : (
     <BpChart
-      points={bpAll}
+      points={bpCurrent}
       thresholds={bpThr}
       days={days}
       height={270}
@@ -222,10 +233,11 @@ export function MeasurementCharts({
 
   const multiples: ReactNode[] = []
   const lineCard = (code: string, unitCode: string, dec: number, gap: number, always: boolean) => {
-    const full = lineOf(code)
+    const withSuperseded = lineOf(code)
+    const full = current(withSuperseded)
     // Az orvos a fő típusokat üresen is látja; a beteg csak azt, amiből van mérése.
     if (!(always && doctor) && !full.length) return
-    const pts = inRange(full)
+    const pts = inRange(withSuperseded)
     const last = full[full.length - 1]
     const unit = t(`units.${unitCode}`)
     const title = t(`measurementTypes.${code}`)
@@ -319,7 +331,7 @@ export function MeasurementCharts({
           <div className="left">
             <h3 className="pd-h-card">{t('measurementTypes.blood_pressure')}</h3>
             <span className="pd-meta">
-              {mmHg} · {t('measurements.charts.countInRange', { count: bp.length })}
+              {mmHg} · {t('measurements.charts.countInRange', { count: current(bp).length })}
             </span>
           </div>
           {lastBP && (
@@ -355,7 +367,7 @@ export function MeasurementCharts({
                 {t('measurements.charts.sevLimit', { value: groups.sev })}
               </span>
             )}
-            {doctor && bp.some((p) => p.trig) && (
+            {doctor && bp.some((p) => p.trig && !p.superseded) && (
               <span className="k">
                 <LegendRing />
                 {t('doctor.flagged')}
@@ -370,6 +382,17 @@ export function MeasurementCharts({
       </div>
     </section>
   )
+}
+
+/** A felülírt (javított) mérés jelölése a táblázatban, a betegoldali naplóval azonos
+ * módon: „javítva” címke, áthúzott érték, szürke sor (M3, A7). */
+function SupersededTag({ point }: { point: { superseded?: boolean } }) {
+  const { t } = useTranslation()
+  return point.superseded ? <span className="pulse-tag">{t('measurements.corrected')}</span> : null
+}
+
+function Struck({ point, children }: { point: { superseded?: boolean }; children: ReactNode }) {
+  return point.superseded ? <s>{children}</s> : <>{children}</>
 }
 
 function BpTable({
@@ -395,12 +418,19 @@ function BpTable({
         </thead>
         <tbody>
           {[...points].reverse().map((p) => {
-            const sys = thresholds.length ? overKindOf(thresholds, p) : ''
+            const sys = thresholds.length && !p.superseded ? overKindOf(thresholds, p) : ''
             return (
-              <tr key={p.id}>
-                <td>{formatDateTime(p.t.toISOString())}</td>
-                <td className="n strong">{p.sys}</td>
-                <td className="n strong">{p.dia}</td>
+              <tr key={p.id} className={p.superseded ? 'superseded' : undefined}>
+                <td>
+                  {formatDateTime(p.t.toISOString())}
+                  <SupersededTag point={p} />
+                </td>
+                <td className="n strong">
+                  <Struck point={p}>{p.sys}</Struck>
+                </td>
+                <td className="n strong">
+                  <Struck point={p}>{p.dia}</Struck>
+                </td>
                 {doctor && (
                   <td>
                     {sys && (
@@ -413,7 +443,7 @@ function BpTable({
                         )}
                       </span>
                     )}
-                    {p.trig && (
+                    {p.trig && !p.superseded && (
                       <span className="pd-muted"> · {t('measurements.charts.flagAlert')}</span>
                     )}
                   </td>
@@ -446,9 +476,14 @@ function LineTable({ points, unit, dec }: { points: LinePoint[]; unit: string; d
         </thead>
         <tbody>
           {[...points].reverse().map((p) => (
-            <tr key={p.id}>
-              <td>{formatDateTime(p.t.toISOString())}</td>
-              <td className="n strong">{fmtNum(p.v, dec)}</td>
+            <tr key={p.id} className={p.superseded ? 'superseded' : undefined}>
+              <td>
+                {formatDateTime(p.t.toISOString())}
+                <SupersededTag point={p} />
+              </td>
+              <td className="n strong">
+                <Struck point={p}>{fmtNum(p.v, dec)}</Struck>
+              </td>
             </tr>
           ))}
         </tbody>

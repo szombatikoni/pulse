@@ -112,6 +112,16 @@ export const en: typeof hu = {
     cancel: 'Cancel',
     savedDetail: '{{value}}, {{when}}.',
     caughtUp: 'The missed measurement has been added.',
+    correct: 'Correct',
+    correctAria: 'Correct {{value}} ({{when}})',
+    correctionTitle: 'Correction: you are changing the values of the {{date}} {{type}} measurement',
+    correctionHint:
+      'The time of the measurement ({{time}}) stays the same. The original value stays in the log, marked “corrected”.',
+    saveCorrection: 'Save correction',
+    correctionSaved: 'Correction saved.',
+    correctionSavedDetail:
+      '{{from}} → {{to}} {{unit}}. The old value stays in the log, marked as corrected.',
+    corrected: 'corrected',
     empty: 'No measurements recorded yet.',
     charts: {
       mine: 'My measurements',
@@ -155,6 +165,8 @@ export const en: typeof hu = {
       unknown_type: 'Unknown measurement type.',
       unknown_component: 'Unknown value: {{component}}.',
       timezone_required: 'The measurement time needs a time zone.',
+      already_corrected:
+        'You have already corrected this measurement. You can correct the corrected value instead.',
       generic: 'The measurement could not be saved.',
     },
   },
@@ -355,6 +367,9 @@ export const en: typeof hu = {
       eventAssignee: 'owner: {{name}}',
       eventBy: 'assigned by {{name}}',
       eventReason: 'Reason: “{{reason}}”',
+      needsReview: 'Trigger data corrected',
+      conditionStillMet: 'the condition is still met',
+      conditionNoLongerMet: 'the condition is no longer met',
       errors: {
         already_closed: 'The alert has been closed in the meantime.',
         doctor_not_assigned: 'The selected doctor is no longer assigned to this patient.',

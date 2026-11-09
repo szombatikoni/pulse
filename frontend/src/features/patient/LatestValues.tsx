@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
-import { type Measurement, usePatientMeasurements } from '../../api/measurements'
+import { isCurrent, type Measurement, usePatientMeasurements } from '../../api/measurements'
 import { formatMeasurementNumber, formatRelative, unitLabel } from '../../format'
 
 const TYPE_ORDER = ['blood_pressure', 'heart_rate', 'body_weight', 'blood_glucose']
@@ -43,9 +43,9 @@ export function LatestValues({ patientId }: { patientId: string }) {
   const measurements = usePatientMeasurements(patientId)
   if (!measurements.data || measurements.data.length === 0) return null
 
-  // A lista a legújabb méréssel kezdődik.
+  // A lista a legújabb méréssel kezdődik; a felülírt (javított) mérés nem számít (A7).
   const tiles = TYPE_ORDER.map((code) => {
-    const list = measurements.data.filter((m) => m.type_code === code)
+    const list = measurements.data.filter((m) => m.type_code === code && isCurrent(m))
     return list.length ? { code, list } : null
   }).filter((x) => x !== null)
 

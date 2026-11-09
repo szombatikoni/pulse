@@ -17,8 +17,16 @@ import {
   timeFrame,
 } from './scale'
 
-export type BpPoint = { id: string; t: Date; sys: number; dia: number; trig: boolean }
-export type LinePoint = { id: string; t: Date; v: number }
+/** A `superseded` a felülírt (javított) mérés: csak a táblázat mutatja, jelölve (A7). */
+export type BpPoint = {
+  id: string
+  t: Date
+  sys: number
+  dia: number
+  trig: boolean
+  superseded?: boolean
+}
+export type LinePoint = { id: string; t: Date; v: number; superseded?: boolean }
 export type ScorePoint = { id: string; t: Date; score: number; max: number; band: string }
 
 /** Vérnyomás „súlyzóként": napi pálca, fent a szisztolés, lent a diasztolés pont.

@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next'
 
-import type { Alert, PatientStatus, Trigger } from '../../api/patients'
+import type { Alert, AlertEvent, PatientStatus, Trigger } from '../../api/patients'
 import { formatDateTime, formatMeasurementNumber, formatRelative, unitLabel } from '../../format'
 import { ruleTarget, type RuleTextContext } from './ruleText'
 
@@ -9,11 +9,13 @@ import { ruleTarget, type RuleTextContext } from './ruleText'
 
 /** A legújabb kiváltó esemény összes kiváltó adata. Időablakos szabálynál ez az
  * ablak összes határsértő mérése, romló trendnél a kitöltések, elmaradt adatnál az
- * elmulasztott alkalmak (mind időrendben). */
+ * elmulasztott alkalmak (mind időrendben). A „kiváltó adat javítva” esemény nem
+ * kiértékelés (a kiváltói az eredeti és a javított mérés), ezért kimarad (A7). */
 export function latestTriggers(alert: Alert): Trigger[] {
   for (let i = alert.events.length - 1; i >= 0; i -= 1) {
-    const triggers = alert.events[i].triggers
-    if (triggers.length) return triggers
+    const event = alert.events[i]
+    if (event.event_type === 'trigger_corrected') continue
+    if (event.triggers.length) return event.triggers
   }
   return []
 }
@@ -70,6 +72,20 @@ export function bigValue(t: TFunction, trigger: Trigger | null | undefined) {
     }
   }
   return null
+}
+
+/** A „kiváltó adat javítva” esemény mondata (A7), pl. „148/92 → 131/82 Hgmm · a
+ * feltétel már nem teljesül”. A kiváltók sorrendje: [eredeti, javított]. */
+export function correctionText(t: TFunction, event: AlertEvent): string {
+  const [from, to] = event.triggers.map((tr) => tr.measurement)
+  if (!from || !to) return ''
+  const unit = unitLabel(t, to.values[0]?.unit ?? '')
+  const change = `${formatMeasurementNumber(from)} → ${formatMeasurementNumber(to)} ${unit}`
+  if (event.condition_met === null || event.condition_met === undefined) return change
+  const condition = event.condition_met
+    ? t('doctor.alert.conditionStillMet')
+    : t('doctor.alert.conditionNoLongerMet')
+  return `${change} · ${condition}`
 }
 
 /** A riasztás jele a súlyossága szerint. A felelősnél lévő riasztás sem „Kezelve”:

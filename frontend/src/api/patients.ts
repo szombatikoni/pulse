@@ -77,6 +77,9 @@ export type AlertEvent = {
   reason?: string | null
   /** Felelőshöz rendelésnél: kihez rendelték. */
   assignee?: UserRef | null
+  /** „Kiváltó adat javítva” eseménynél: a feltétel a javítás után még teljesül-e
+   * (a kiváltók ilyenkor [eredeti, javított] mérés). */
+  condition_met?: boolean | null
 }
 
 export type AlertState = 'new' | 'seen' | 'assigned' | 'closed'

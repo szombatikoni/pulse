@@ -5,13 +5,16 @@ import { useTranslation } from 'react-i18next'
 
 import { ApiError } from '../../api/client'
 import {
+  type Measurement,
   type MeasurementErrorDetail,
+  useCorrectMeasurement,
   useMeasurementTypes,
   useRecordMeasurement,
 } from '../../api/measurements'
 import { StatusIcon } from '../../components/StatusLabel'
 import {
   componentLabel,
+  formatMeasurementNumber,
   formatMeasurementValue,
   formatRelative,
   formatTime,
@@ -40,18 +43,34 @@ const byTypeOrder = (a: { code: string }, b: { code: string }) => {
   return rank(a.code) - rank(b.code)
 }
 
+/** A javítás sávjának dátuma: „nov. 3-i” (magyarul a toldalékkal), angolul „3 Nov”. */
+function correctionDate(iso: string, language: string): string {
+  const date = new Date(iso)
+  if (language === 'en') {
+    return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(date)
+  }
+  const day = new Intl.DateTimeFormat('hu-HU', { month: 'short', day: 'numeric' }).format(date)
+  return `${day.replace(/\.$/, '')}-i`
+}
+
 /** Mérés rögzítése (F4): típus, értékek komponensenként, a mérés ideje (alapból most).
  * A teendő kártyáján (`inTask`) a típust a teendő adja, ezért nincs típusválasztó és cím;
- * a mentés nyugtáját a szülő mutatja (`onSaved`), mert az űrlap ilyenkor bezárul. */
+ * a mentés nyugtáját a szülő mutatja (`onSaved`), mert az űrlap ilyenkor bezárul.
+ *
+ * Javítás (`correction`, M3, A7): ugyanez az űrlap a mérés mostani értékeivel előtöltve,
+ * a pótlás sávjának mintájára jelölve. A típus és a mérés ideje nem módosítható (D1),
+ * ezért típusválasztó és időmező sincs; a mentés a javítás végpontjára megy. */
 export function MeasurementForm({
   patientId,
   preset,
+  correction,
   inTask = false,
   onSaved,
   onClose,
 }: {
   patientId: string
   preset?: MeasurementPreset | null
+  correction?: Measurement | null
   inTask?: boolean
   onSaved?: (measurementId: string, receipt: Message) => void
   onClose?: () => void
@@ -59,8 +78,13 @@ export function MeasurementForm({
   const { t, i18n } = useTranslation()
   const types = useMeasurementTypes()
   const record = useRecordMeasurement(patientId)
-  const [typeCode, setTypeCode] = useState(preset?.typeCode ?? 'blood_pressure')
-  const [values, setValues] = useState<Record<string, number | string>>({})
+  const correct = useCorrectMeasurement(patientId)
+  const [typeCode, setTypeCode] = useState(
+    correction?.type_code ?? preset?.typeCode ?? 'blood_pressure',
+  )
+  const [values, setValues] = useState<Record<string, number | string>>(() =>
+    correction ? Object.fromEntries(correction.values.map((v) => [v.component, v.value])) : {},
+  )
   // „Most" esetén a mentés pillanata lesz a mérés ideje; „Másik időpont" esetén a mező értéke.
   const [timeMode, setTimeMode] = useState<'now' | 'other'>(preset?.measuredAt ? 'other' : 'now')
   const [measuredAt, setMeasuredAt] = useState(() => preset?.measuredAt ?? toLocalInput(new Date()))
@@ -80,6 +104,10 @@ export function MeasurementForm({
   const earliest = new Date(now.getTime() - BACKDATE_DAYS * 86_400_000)
 
   const showError = (error: unknown) => {
+    if (error instanceof ApiError && error.status === 409) {
+      setMessage({ ok: false, title: t('measurements.errors.already_corrected') })
+      return
+    }
     if (error instanceof ApiError && error.status === 422 && error.detail) {
       const detail = error.detail as MeasurementErrorDetail
       const component = detail.component ? componentLabel(t, typeCode, detail.component) : ''
@@ -99,13 +127,36 @@ export function MeasurementForm({
     if (!type) return
     setMessage(null)
     setFieldError(null)
+    const numbers = Object.fromEntries(type.components.map((c) => [c.code, Number(values[c.code])]))
+    if (correction) {
+      correct.mutate(
+        { id: correction.id, values: numbers },
+        {
+          onSuccess: (measurement) => {
+            const receipt = {
+              ok: true,
+              title: t('measurements.correctionSaved'),
+              text: t('measurements.correctionSavedDetail', {
+                from: formatMeasurementNumber(correction),
+                to: formatMeasurementNumber(measurement),
+                unit: unitLabel(t, measurement.values[0]?.unit ?? ''),
+              }),
+            }
+            if (onSaved) onSaved(measurement.id, receipt)
+            else setMessage(receipt)
+          },
+          onError: showError,
+        },
+      )
+      return
+    }
     const at = timeMode === 'now' ? new Date() : new Date(measuredAt)
     record.mutate(
       {
         type_code: type.code,
         // A helyi idő ISO-formában, időzónával (UTC-re váltva) megy a szerverre.
         measured_at: at.toISOString(),
-        values: Object.fromEntries(type.components.map((c) => [c.code, Number(values[c.code])])),
+        values: numbers,
       },
       {
         onSuccess: (measurement) => {
@@ -135,9 +186,29 @@ export function MeasurementForm({
   }
   const sortedTypes = [...(types.data ?? [])].sort(byTypeOrder)
 
+  // Javításnál a típus rögzített, mint a teendő kártyáján.
+  const typeFixed = inTask || !!correction
   const form = (
     <form onSubmit={submit} className="pulse-mform">
-      {!inTask && (
+      {correction && (
+        <div className="pulse-receipt">
+          <StatusIcon status="attention" size={22} />
+          <div>
+            <b>
+              {t('measurements.correctionTitle', {
+                date: correctionDate(correction.measured_at, i18n.language),
+                type: t(`measurementTypes.${correction.type_code}`).toLocaleLowerCase('hu'),
+              })}
+            </b>
+            <p className="pulse-hint">
+              {t('measurements.correctionHint', {
+                time: formatTime(new Date(correction.measured_at)),
+              })}
+            </p>
+          </div>
+        </div>
+      )}
+      {!typeFixed && (
         <div>
           <h2 className="pulse-h-sec" id="meres-cim">
             {t('measurements.freeTitle')}
@@ -160,7 +231,7 @@ export function MeasurementForm({
         </div>
       )}
       {/* Méréstípus: rádiógombok címkével; a címke maga a nagy, ikonos gomb. */}
-      {!inTask && (
+      {!typeFixed && (
         <div className="pulse-typeseg" role="radiogroup" aria-label={t('measurements.type')}>
           {sortedTypes.map((x) => {
             const Glyph = TYPE_ICON[x.code] ?? Gauge
@@ -192,7 +263,7 @@ export function MeasurementForm({
             <NumberInput
               key={c.code}
               // A teendők kártyájáról (pl. „Pótlás”) érkezve rögtön ide kerül a fókusz.
-              autoFocus={i === 0 && !!preset}
+              autoFocus={i === 0 && (!!preset || !!correction)}
               // Az egység a mező jobb szélén látszik; a felolvasó a címkében is hallja.
               label={
                 <>
@@ -233,7 +304,7 @@ export function MeasurementForm({
             mindig a terület jobb szélén áll). */}
       <div className="pulse-form-foot">
         <div className="pulse-form-time">
-          {timeMode === 'now' ? (
+          {correction ? null : timeMode === 'now' ? (
             <Stack gap={7}>
               <span className="pulse-field-label">{t('measurements.measuredAt')}</span>
               <div className="pulse-row-wrap">
@@ -279,12 +350,17 @@ export function MeasurementForm({
               </Button>
             )
           )}
-          <Button type="submit" size="md" loading={record.isPending} disabled={!type}>
-            {t('measurements.save')}
+          <Button
+            type="submit"
+            size="md"
+            loading={record.isPending || correct.isPending}
+            disabled={!type}
+          >
+            {correction ? t('measurements.saveCorrection') : t('measurements.save')}
           </Button>
         </div>
       </div>
-      {timeMode === 'other' && (
+      {timeMode === 'other' && !correction && (
         <div className="pulse-row-wrap">
           <span className="pulse-hint">{t('measurements.measuredAtHint')}</span>
           <button type="button" className="pulse-linkbtn" onClick={() => setTimeMode('now')}>
@@ -306,6 +382,12 @@ export function MeasurementForm({
     </form>
   )
   if (inTask) return form
+  if (correction)
+    return (
+      <section className="pulse-pcard" id="javitas-urlap" aria-label={t('measurements.correct')}>
+        {form}
+      </section>
+    )
   return (
     <section className="pulse-pcard" id="meres-urlap" aria-labelledby="meres-cim">
       {form}

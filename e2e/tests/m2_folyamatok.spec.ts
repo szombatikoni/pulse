@@ -6,9 +6,12 @@
 // A riasztás-életút (M3, A6): a Riasztások oldal, a megtekintés az adatlap
 // megnyitásakor, a felelőshöz rendelés és a lezárás indoklással és betegüzenettel;
 // a beteglistán Kezelve, a beteg a teendői fölött látja a visszajelzést.
+// A mérésjavítás (M3, A7): Varga Béla az Előzményeim-ből javítja a 186/104-es
+// mérését, a felülírt sor jelölve marad; az orvos a kártyán „Kiváltó adat javítva”
+// címkét és az eseménysorban a javítást látja.
 // Frissen seedelt adatbázist vár (backend/seed), és módosítja az adatokat
 // (Tóth Mária új mérései, kitöltése, testsúly-előírása és küszöbszabálya, Szabó
-// János két lezárt riasztása, Varga Béla megtekintett riasztásai).
+// János két lezárt riasztása, Varga Béla megtekintett riasztásai és javított mérése).
 import { expect, test, type Page } from '@playwright/test'
 
 const PASSWORD = 'pulse-demo-2026'
@@ -575,4 +578,89 @@ test('a beteg a Teendőim oldalon látja az orvos visszajelzését', async ({ pa
   )
   // A belső indoklás nem a betegnek szól.
   await expect(page.locator('main')).not.toContainText('kontroll két hét múlva')
+})
+
+// --- Mérésjavítás (M3, A7) ------------------------------------------------------------
+
+test('mérésjavítás, beteg: javítás az Előzményeim-ből, a felülírt sor jelölve marad', async ({
+  page,
+}) => {
+  await login(page, 'varga.bela@pulse.example')
+  await expect(page).toHaveURL(/\/patient$/)
+  await page.getByRole('link', { name: 'Előzményeim', exact: true }).click()
+  await expect(page).toHaveURL(/\/patient\/history$/)
+
+  // A 180 fölötti mérés (a küszöbriasztás kiváltója) sorában a „Javítás”.
+  const original = history(page).filter({ hasText: '186/104 Hgmm' })
+  await expect(original).toHaveCount(1)
+  await original.getByRole('button', { name: /^186\/104 Hgmm \(.+\) javítása$/ }).click()
+
+  // A rögzítő-űrlap a mostani értékekkel nyílik, a pótlás sávjának mintájára jelölve;
+  // a mérés ideje nem módosítható (nincs időmező).
+  const form = page.getByRole('region', { name: 'Javítás' })
+  await expect(form).toContainText(/Javítás: a\(z\) .+-i vérnyomásmérés értékeit módosítod/)
+  await expect(form.getByLabel('Szisztolés (Hgmm)')).toHaveValue('186')
+  await expect(form.getByLabel('Diasztolés (Hgmm)')).toHaveValue('104')
+  await expect(form.getByLabel('A mérés ideje')).toHaveCount(0)
+  await form.getByLabel('Szisztolés (Hgmm)').fill('168')
+  await form.getByLabel('Diasztolés (Hgmm)').fill('99')
+  await form.getByRole('button', { name: 'Javítás mentése' }).click()
+
+  // Megerősítés; az űrlap bezárul.
+  await expect(page.getByText('A javítás elmentve.')).toBeVisible()
+  await expect(page.getByText(/186\/104 → 168\/99 Hgmm/)).toBeVisible()
+  await expect(form).toHaveCount(0)
+
+  // A felülírt sor szürkén, áthúzva, „javítva” címkével marad, és nem javítható újra;
+  // a javított érték új sorként, javíthatóan áll fölötte.
+  const superseded = page.locator('.pulse-history li.superseded')
+  await expect(superseded).toHaveCount(1)
+  await expect(superseded).toContainText('javítva')
+  await expect(superseded.locator('s')).toHaveText('186/104')
+  await expect(superseded.getByRole('button')).toHaveCount(0)
+  const fixed = history(page).filter({ hasText: '168/99 Hgmm' })
+  await expect(fixed).toHaveCount(1)
+  await expect(fixed.getByRole('button', { name: /javítása$/ })).toBeVisible()
+})
+
+test('mérésjavítás, orvos: „Kiváltó adat javítva” a kártyán, a javítás az eseménysorban', async ({
+  page,
+}) => {
+  await login(page, 'dr.kovacs@pulse.example')
+  await expect(page).toHaveURL(/\/doctor$/)
+  // A jelölés nem állapot: Varga Béla továbbra is Súlyos, elöl.
+  await page.locator('.pulse-prow').first().waitFor()
+  const [first] = await rowsText(page)
+  expect(first.startsWith('Súlyos')).toBe(true)
+  expect(first).toContain('Varga Béla')
+
+  await page.getByRole('link', { name: 'Varga Béla' }).click()
+  const main = page.locator('main')
+  const threshold = main.locator('article.pd-alert').filter({ hasText: 'Küszöbszabály' })
+  const window = main.locator('article.pd-alert').filter({ hasText: 'Időablakos szabály' })
+  await expect(threshold).toHaveCount(1)
+  // Mindkét riasztás kiváltói közt ott volt a javított mérés; automatikus lezárás nincs.
+  await expect(threshold.locator('.pd-chip-warn')).toHaveText('Kiváltó adat javítva')
+  await expect(window.locator('.pd-chip-warn')).toHaveText('Kiváltó adat javítva')
+  await expect(threshold.getByRole('button', { name: 'Lezárás…' })).toBeVisible()
+
+  // Az eseménysorban: melyik értékből melyik lett, és a feltétel az aktuális verzió
+  // szerint. A 168 a 180-as küszöb alatt van, a 7 napos ablakban viszont 140 fölött.
+  await threshold.getByText(/Eseménytörténet/).click()
+  const timeline = threshold.locator('.pd-timeline')
+  await expect(timeline.locator('li').first()).toContainText(
+    'Kiváltó adat javítva · 186/104 → 168/99 Hgmm · a feltétel már nem teljesül · Varga Béla',
+  )
+  await window.getByText(/Eseménytörténet/).click()
+  await expect(window.locator('.pd-timeline')).toContainText(
+    'Kiváltó adat javítva · 186/104 → 168/99 Hgmm · a feltétel továbbra is teljesül',
+  )
+  await expect(window.locator('.pd-timeline li').first()).toContainText('Ismételt aktiválódás')
+
+  // Az adatlap mérés-táblázata a betegoldalival azonos módon jelöli a felülírt sort.
+  await main.getByRole('group', { name: 'Nézet' }).getByRole('button', { name: 'Táblázat' }).click()
+  const row = main.locator('.pd-tbl tr.superseded')
+  await expect(row).toHaveCount(1)
+  await expect(row).toContainText('javítva')
+  await expect(row.locator('s')).toHaveText(['186', '104'])
 })

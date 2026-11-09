@@ -1,5 +1,5 @@
 import { Button, Modal, NativeSelect, Textarea } from '@mantine/core'
-import { CaretRight, UserPlus } from '@phosphor-icons/react'
+import { CaretRight, PencilSimple, UserPlus } from '@phosphor-icons/react'
 import type { TFunction } from 'i18next'
 import { type FormEvent, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -20,6 +20,7 @@ import {
   alertSeverityStatus,
   alertTitle,
   bigValue,
+  correctionText,
   latestTrigger,
   latestTriggers,
 } from './alertText'
@@ -153,6 +154,20 @@ function EventDetails({ event }: { event: AlertEvent }) {
   )
 }
 
+const corrected = (event: AlertEvent) => event.event_type === 'trigger_corrected'
+
+/** „Kiváltó adat javítva” (A7): sárga címke a státuszsor mellett, amíg az orvos le nem
+ * zárja a riasztást (a jelölés nem állapot, a rangsort nem változtatja). */
+function ReviewChip() {
+  const { t } = useTranslation()
+  return (
+    <span className="pd-chip-warn">
+      <PencilSimple size={12} weight="bold" aria-hidden="true" />
+      {t('doctor.alert.needsReview')}
+    </span>
+  )
+}
+
 /** A riasztás eseménytörténete (legújabb elöl), kinyitható. */
 function EventHistory({ alert }: { alert: Alert }) {
   const { t } = useTranslation()
@@ -170,13 +185,15 @@ function EventHistory({ alert }: { alert: Alert }) {
             <span className="w">{formatDateTime(event.created_at)}</span>
             <div>
               <span className="e">{t(`doctor.alert.events.${event.event_type}`)}</span>
-              {event.triggers.length > 1 && (
+              {/* Javításnál a két kiváltó az eredeti és a javított mérés (A7). */}
+              {corrected(event) && <span> · {correctionText(t, event)}</span>}
+              {!corrected(event) && event.triggers.length > 1 && (
                 <span className="pd-muted">
                   {' · '}
                   {t('doctor.detail.triggerCount', { count: event.triggers.length })}
                 </span>
               )}
-              {event.triggers.length === 1 && (
+              {!corrected(event) && event.triggers.length === 1 && (
                 <span>
                   {' · '}
                   {eventTriggerText(t, event.triggers[0])}
@@ -190,7 +207,9 @@ function EventHistory({ alert }: { alert: Alert }) {
               )}
               <EventDetails event={event} />
             </div>
-            {event.triggers.length > 1 && <TriggerList triggers={event.triggers} />}
+            {!corrected(event) && event.triggers.length > 1 && (
+              <TriggerList triggers={event.triggers} />
+            )}
           </li>
         ))}
       </ol>
@@ -475,6 +494,7 @@ export function AlertCard({
           <h3 className="pd-alert-title">
             {title}
             {alert.status === 'new' && <span className="pd-chip">{t('doctor.detail.new')}</span>}
+            {alert.needs_review && <ReviewChip />}
             {alert.assigned_to && (
               <span className="pd-chip-soft">
                 {t('doctor.alert.owner', { name: alert.assigned_to.name })}

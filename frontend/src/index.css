@@ -295,6 +295,34 @@ body {
   color: var(--mantine-color-dark-2);
 }
 
+/* Felülírt (javított) mérés (M3, A7): szürkén, áthúzott értékkel, „javítva” címkével. */
+.pulse-history li.superseded .vl,
+.pulse-history li.superseded .tm,
+.pulse-history li.superseded .ty {
+  color: var(--pulse-ink-3);
+  font-weight: 500;
+}
+.pulse-history li.superseded s {
+  text-decoration-thickness: 1.5px;
+}
+.pulse-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--pulse-fill);
+  color: var(--pulse-ink-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.pulse-history .ac {
+  min-width: 64px;
+  text-align: right;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pulse-history li {
     transition: none;
