@@ -8,6 +8,54 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-11-09 — A6: riasztás-életút, Kezelve státusz, Riasztások oldal; független átnézés
+
+- Eszköz: Claude Code (a kódtervezeteket két Opus agent készítette; az A4 és az
+  A6 teljes kódját egy független Fable-reviewer is átnézte, a leleteket egy
+  harmadik agent javította)
+
+- Az AI szerepe: tervjavaslat az A6-hoz a döntendő kérdésekkel
+  (a6_terv_2026-11-09); az állapotváltás-végpontok és a riasztáskártya
+  életút-gombjai; a lezárás kötelező indoklással és nem kötelező, a betegnek
+  szóló üzenettel; a Kezelve státusz számítása; a Riasztások oldal; a
+  betegoldali visszajelzés-kártya; a független kódátnézés és a leletek
+  javítása.
+
+- A saját munkám: a tervjavaslat döntési pontjait én döntöttem el; a terv
+  feltárta, hogy a Kezelve jelentésénél a felületterv jelmagyarázata és az
+  M1-ben rögzített működési szabályok ütköznek, és a működési szabályok
+  változatát választottam, mert a dolgozat kiértékelési példái arra épülnek;
+  a felületet a képernyőképeken néztem át, és a beteglista csoportcímének
+  javítását („Kezelve") én kértem; a független átnézést én kértem, a javítások
+  körét és az M4-re halasztott tételeket én hagytam jóvá.
+
+- Saját döntéseim:
+  - a riasztás a beteg adatlapjának megnyitásakor automatikusan megtekintett
+    lesz (a felület külön jelzést küld, nem a lekérdezés mellékhatása);
+  - Kezelve = az orvos lezárta a riasztást, de megerősítő, rendben lévő adat
+    még nem érkezett; a megerősítést az aktuális szabályverzió szerint ítéljük
+    meg (a riasztás keletkezéskori jelentése változatlan marad);
+  - a lezárt riasztás végleges, újranyitás nincs: új kiváltó adat új riasztást
+    nyit;
+  - a felelős a beteghez éppen hozzárendelt orvos lehet (alapértelmezésben a
+    lezáró orvos maga), a korábbi felelősök az eseménytörténetben megmaradnak;
+  - a betegnek szóló üzenet a betegé: az orvos lezárt kártyáján csak a belső
+    indoklás látszik;
+  - az újra-hozzárendelés gombja a felületterv szerint rejtve marad (későbbi
+    apróság).
+
+- Ellenőrzés:
+  - 725 teszt (99% lefedettség), böngészős teszt 15/15 nulláról újraépített
+    példányon (a Riasztások oldal szűrése, a teljes lezárás-folyamat, és hogy
+    a beteg a visszajelzést látja, a belső indoklást viszont nem);
+  - a független Fable-átnézés kritikus és közepes hibát nem talált; négy
+    kisebb leletét (zárolási versenyhelyzet a kiértékelés és a lezárás közt,
+    a felelős-választó alapértéke betöltés közben, elavuló lista-gyorsítótár
+    szabálymódosítás után, egyidejű verziómentés hibaválasza) javíttattam, és
+    a feltárt teszthiányokra négy új teszt készült;
+  - a felületet a képernyőképeken (docs/files/review/kepek_a6_2026-11-09)
+    néztem át.
+
 ## 2026-11-09 — A4: a négy szabálytípus, szabály-API, Szabályok fül
 
 - Eszköz: Claude Code (a kódtervezeteket három Opus agent készítette, lépésenként)
