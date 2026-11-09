@@ -354,7 +354,10 @@ def fulfil_with_measurement(db: Session, measurement: Measurement) -> list[Assig
     Csak a mérés napján érvényes előírások számítanak (valid_on): a lejáró
     előírás utolsó időszaka a vég napjával zárul (period_containing), így a vég
     utáni mérés már nem tartozhat hozzá, és a vég után kezdődő időszak sem
-    nyílik meg."""
+    nyílik meg.
+
+    A mérés javítása (measurements.correct_measurement) ezt nem hívja: az
+    eredeti mérés teljesítése áll (07_mukodesi_szabalyok.md 3. rész, A7)."""
     day = measurement.measured_at.astimezone(settings.tz).date()
     assignments = db.scalars(
         select(Assignment)
@@ -384,7 +387,12 @@ def fulfil_from_existing(
     előírás később született (pl. a beteg reggel mért, az orvos délben írta
     elő): így nincs hamis „esedékes". A szabályok a mentéskoriak: az első adat
     számít (a rögzítés sorrendjében), a késést a rögzítés ideje és a határidő
-    dönti el. A még el nem kezdett előírásra nem nyit alkalmat."""
+    dönti el. A még el nem kezdett előírásra nem nyit alkalmat.
+
+    A felülírt (javított) mérést itt szándékosan NEM szűrjük ki (A7): az
+    alkalom a mérés tényét nézi, nem az értékét. A javítás az eredeti mérési
+    idejét örökli, és később rögzül, így a rögzítés szerinti első mindig az
+    eredeti marad; kizárásával a javítás késői rögzítési ideje hamis késést adna."""
     today = now.astimezone(settings.tz).date()
     if assignment.start_date > today:
         return None

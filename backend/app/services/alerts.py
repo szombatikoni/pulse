@@ -14,6 +14,11 @@ kitöltés (a sávjával), elmaradt adatnál az elmulasztott alkalom (határidő
 célponttal). Mivel ezek változatlanok (a verziók immutabilisak, a mérés
 javításkor új sort kap, a lezárt alkalom határideje és célpontja nem változik),
 a magyarázat utólag sem változik.
+
+A „kiváltó adat javítva" esemény (A7) kiváltó adata [eredeti, javított] mérés,
+és tárolja, hogy a feltétel a javítás után még teljesül-e. Ez nem kiértékelés:
+a riasztás „legutóbbi kiváltó adata" (beteglista, Riasztások oldal) ezért nem
+ebből, hanem a legutóbbi keletkezés vagy ismételt aktiválódás eseményből jön.
 """
 
 import uuid
@@ -145,7 +150,9 @@ def explain_event(db: Session, event: AlertEvent) -> EventExplanation:
         for occurrence in occurrence_triggers(db, ids):
             explanation.triggers.append(TriggerExplanation(occurrence=occurrence))
         return explanation
-    for measurement in get_measurements(db, ids):
+    # A tárolt sorrendben (javításnál [eredeti, javított], amelyek mérési ideje azonos).
+    by_id = {m.id: m for m in get_measurements(db, ids)}
+    for measurement in (by_id[i] for i in ids if i in by_id):
         violations: list[Violation] = []
         if version is not None and rule_type in (RuleType.THRESHOLD, RuleType.WINDOW):
             # A WindowParams a ThresholdParams leszármazottja: a határok ugyanott
@@ -161,9 +168,10 @@ def explain_alert(db: Session, alert: Alert) -> list[EventExplanation]:
 
 
 def latest_trigger(db: Session, alert: Alert) -> TriggerExplanation | None:
-    """A legutóbbi kiváltó adat a magyarázatával (a beteglista „Ok" oszlopához)."""
+    """A legutóbbi kiváltó adat a magyarázatával (a beteglista „Ok" oszlopához).
+    A „kiváltó adat javítva" esemény nem kiértékelés, ezért kimarad (A7)."""
     for event in reversed(alert.events):
-        if event.trigger_data_ids:
+        if event.trigger_data_ids and event.event_type is not AlertEventType.TRIGGER_CORRECTED:
             triggers = explain_event(db, event).triggers
             if triggers:
                 return triggers[-1]

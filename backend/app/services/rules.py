@@ -42,6 +42,7 @@ from app.models import (
     RuleVersion,
     Severity,
     Submission,
+    not_superseded,
 )
 from app.services.questionnaires import band_for
 from app.services.questionnaires import current_version as questionnaire_version
@@ -453,7 +454,8 @@ def window_violations(
 ) -> list[Measurement]:
     """Az időablak határsértő mérései measured_at szerint rendezve (az új mérést
     is beleértve). Az ablak [measured_at − window_days nap, measured_at],
-    mindkét széle beleértve, a beteg ugyanilyen típusú méréseiből.
+    mindkét széle beleértve, a beteg ugyanilyen típusú méréseiből. A felülírt
+    (javított) mérés nem számít, csak a javítási lánc vége (not_superseded, A7).
 
     Ismert korlát: a visszadátumozott mérés csak a saját measured_at-jáig látja
     az ablakot, a nála később mért értékeket nem."""
@@ -465,6 +467,7 @@ def window_violations(
             Measurement.type_id == measurement.type_id,
             Measurement.measured_at >= start,
             Measurement.measured_at <= measurement.measured_at,
+            not_superseded(),
         )
         .options(
             selectinload(Measurement.values).selectinload(MeasurementValue.component),
@@ -500,6 +503,135 @@ def evaluate_measurement(
             touched.append(
                 _raise_alert(db, rule, version, measurement.patient_id, trigger_ids, now)
             )
+    db.flush()
+    return touched
+
+
+# Az események, amelyek a riasztás kiértékelését rögzítik (a kiváltó adataik a
+# riasztás aktuális alapja); a „kiváltó adat javítva" nem ilyen.
+EVALUATION_EVENTS = (AlertEventType.CREATED, AlertEventType.RE_TRIGGERED)
+
+
+def _chain_end(db: Session, measurement: Measurement) -> Measurement:
+    """A mérés javítási láncának vége (az érvényes érték): m3 → m3′ → m3″.
+    Lekérdezéssel, nem a correction kapcsolatból, mert az a sessionben a
+    javítás előtti (üres) állapotában maradhatott."""
+    while True:
+        successor = db.scalar(
+            select(Measurement)
+            .where(Measurement.corrected_from == measurement.id)
+            .options(
+                selectinload(Measurement.values).selectinload(MeasurementValue.component),
+                selectinload(Measurement.type),
+            )
+        )
+        if successor is None:
+            return measurement
+        measurement = successor
+
+
+def correction_condition_met(db: Session, alert: Alert, version: RuleVersion) -> bool | None:
+    """Teljesül-e még a riasztás feltétele a javítás után, az adott (aktuális)
+    szabályverzió szerint (07_mukodesi_szabalyok.md 3. rész; A7).
+
+    Az alap a riasztás legutóbbi kiértékelése (keletkezés vagy ismételt
+    aktiválódás) a kiváltó adataival:
+    - küszöbszabálynál a kiváltó mérés(ek) javítási láncának vége határsértő-e;
+    - időablakos szabálynál az ablak újraszámolása ugyanarra a végpontra (a
+      legutóbbi kiváltó mérés ideje; a javítás ezt nem változtatja, D1), a
+      felülírt mérések nélkül: legalább count határsértő mérés van-e benne.
+      A 07-es példában: m2, m3′, m4 a v3 (> 135) szerint 2 sértő < 3, tehát
+      „a feltétel már nem teljesül".
+    Más szabálytípusnál (kérdőív, elmaradt adat) nincs mérés-kiváltó: None."""
+    if version.rule_type not in (RuleType.THRESHOLD, RuleType.WINDOW):
+        return None
+    basis = db.scalar(
+        select(AlertEvent)
+        .where(AlertEvent.alert_id == alert.id, AlertEvent.event_type.in_(EVALUATION_EVENTS))
+        .order_by(AlertEvent.created_at.desc(), AlertEvent.id.desc())
+        .limit(1)
+    )
+    ids = [uuid.UUID(i) for i in (basis.trigger_data_ids or [])] if basis else []
+    triggers = list(
+        db.scalars(
+            select(Measurement)
+            .where(Measurement.id.in_(ids))
+            .options(
+                selectinload(Measurement.values).selectinload(MeasurementValue.component),
+                selectinload(Measurement.type),
+            )
+        )
+    )
+    if not triggers:
+        return False
+    if version.rule_type is RuleType.THRESHOLD:
+        params = ThresholdParams.model_validate(version.params)
+        return any(threshold_violations(params, _chain_end(db, m)) for m in triggers)
+    w_params = WindowParams.model_validate(version.params)
+    anchor = max(triggers, key=lambda m: (m.measured_at, m.id))
+    return len(window_violations(db, w_params, anchor)) >= w_params.count
+
+
+def flag_corrected_trigger(
+    db: Session,
+    original: Measurement,
+    correction: Measurement,
+    *,
+    actor_id: uuid.UUID | None = None,
+    now: datetime | None = None,
+) -> list[Alert]:
+    """„Kiváltó adat javítva" esemény minden riasztásba, amelynek valamelyik
+    eseménye a javított mérést kiváltóként tartalmazza (A7; a hallgató döntései
+    D2, D4). A javítás után hívandó (a javító sor már a sessionben van).
+
+    Az esemény kiváltó adata [eredeti, javított], a szabályverziója az aktuális,
+    és tárolja, hogy a feltétel e szerint még teljesül-e (pillanatkép,
+    correction_condition_met). Láncnál (m3′ javítása) a korábbi javítás-esemény
+    tartalmazza m3′-t, így ugyanaz a riasztás kapja az újabb eseményt is.
+
+    - Nyitott riasztás: az esemény mellé needs_review jelölést kap; automatikus
+      lezárás nincs, az állapot és a súlyosság nem változik (a jelölés nem
+      állapot). Az írás a meglévő sorzáras úton megy (open_alert for_update); ha
+      közben egy orvos lezárta, a lezártként kezeljük.
+    - Lezárt riasztás (D4): az esemény bekerül a történetébe, de needs_review
+      nem áll be, és az állapota sem változik (a lezárás végállapot).
+
+    A riasztások a szabályok rögzített sorrendjében zárolódnak (mint a
+    kiértékelésben), így két egyidejű művelet nem várhat körkörösen egymásra.
+    Visszaadja az érintett riasztásokat."""
+    now = now or datetime.now(UTC)
+    with_trigger = select(AlertEvent.alert_id).where(
+        AlertEvent.trigger_data_ids.contains([str(original.id)])
+    )
+    alerts = db.scalars(
+        select(Alert)
+        .join(Rule, Alert.rule_id == Rule.id)
+        .where(Alert.patient_id == original.patient_id, Alert.id.in_(with_trigger))
+        .order_by(Rule.created_at, Rule.id, Alert.created_at, Alert.id)
+    ).all()
+    touched = []
+    for alert in alerts:
+        is_open = False
+        if alert.status is not AlertStatus.CLOSED:
+            locked = open_alert(db, alert.patient_id, alert.rule_id, for_update=True)
+            is_open = locked is not None and locked.id == alert.id
+            if not is_open:
+                db.refresh(alert)
+        version = current_version(db, alert.rule_id)
+        db.add(
+            AlertEvent(
+                alert_id=alert.id,
+                actor_id=actor_id,
+                event_type=AlertEventType.TRIGGER_CORRECTED,
+                rule_version_id=version.id,
+                trigger_data_ids=[str(original.id), str(correction.id)],
+                condition_met=correction_condition_met(db, alert, version),
+                created_at=now,
+            )
+        )
+        if is_open:
+            alert.needs_review = True
+        touched.append(alert)
     db.flush()
     return touched
 

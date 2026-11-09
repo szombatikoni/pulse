@@ -43,6 +43,7 @@ from app.models import (
     QuestionnaireVersion,
     QuestionType,
     Submission,
+    not_superseded,
 )
 
 # A teljes URL-ek alapja (fullUrl, kérdőív-canonical); ugyanaz, mint az M2-es
@@ -133,8 +134,9 @@ def patient_resource(patient: PatientProfile) -> dict[str, Any]:
 
 
 def observation_resource(measurement: Measurement) -> dict[str, Any]:
-    """Egy mérés Observation-ként. A státusz mindig final: a mérésjavítás
-    (corrected_from) folyamata az M3 A7 tétele, a kiadása vele együtt dől el."""
+    """Egy mérés Observation-ként. A státusz mindig final: a felülírt (javított)
+    eredeti nem kerül a csomagba, csak a javítási lánc vége (A7, a hallgató
+    döntése D6a; a `corrected` státuszú kiadás M4-re felírható)."""
     mtype = measurement.type
     values = {v.component_id: v.value for v in measurement.values}
     resource: dict[str, Any] = {"resourceType": "Observation", "id": str(measurement.id)}
@@ -249,14 +251,15 @@ def _answer_codings(answer: Answer) -> list[dict[str, str]]:
 def patient_bundle(
     db: Session, patient_id: uuid.UUID, now: datetime | None = None
 ) -> dict[str, Any]:
-    """A beteg teljes FHIR-csomagja: Patient, a hivatkozott kérdőívverziók, a
-    mérések (időrendben) és a kitöltések (időrendben). Csak olvas."""
+    """A beteg teljes FHIR-csomagja: Patient, a hivatkozott kérdőívverziók, az
+    érvényes mérések (időrendben; a felülírt eredeti nélkül, D6a) és a
+    kitöltések (időrendben). Csak olvas."""
     patient = db.get(PatientProfile, patient_id)
     if patient is None:
         raise LookupError(f"Nincs ilyen beteg: {patient_id}")
     measurements = db.scalars(
         select(Measurement)
-        .where(Measurement.patient_id == patient_id)
+        .where(Measurement.patient_id == patient_id, not_superseded())
         .options(
             selectinload(Measurement.type).selectinload(MeasurementType.components),
             selectinload(Measurement.values).selectinload(MeasurementValue.component),

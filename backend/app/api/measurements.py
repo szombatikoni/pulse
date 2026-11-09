@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from app.api.deps import CurrentUser, PatientUser, ensure_patient_access
 from app.core.db import DbSession
 from app.schemas.measurements import (
+    MeasurementCorrection,
     MeasurementCreate,
     MeasurementOut,
     MeasurementTypeOut,
@@ -13,6 +14,7 @@ from app.schemas.measurements import (
 )
 from app.services.measurements import (
     MeasurementError,
+    correct_measurement,
     list_measurements,
     list_types,
     record_measurement,
@@ -72,6 +74,57 @@ def create_measurement(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"code": error.code, "component": error.component},
+        ) from error
+    db.commit()
+    return measurement_out(measurement)
+
+
+@router.post(
+    "/patients/{patient_id}/measurements/{measurement_id}/correction",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        403: {
+            "description": "Csak a beteg javíthat, és csak a saját mérését (nem létező "
+            "mérésre is 403)"
+        },
+        409: {"description": "A mérést már javították (already_corrected): a lánc végét kell"},
+        422: {"description": "Érvénytelen érték (a detail.code adja meg az okát)"},
+    },
+)
+def correct(
+    patient_id: uuid.UUID,
+    measurement_id: uuid.UUID,
+    body: MeasurementCorrection,
+    db: DbSession,
+    user: PatientUser,
+) -> MeasurementOut:
+    """Mérés javítása (F7; M3, A7): új mérés-sor a javított értékekkel, az
+    eredetire hivatkozva; a mérés ideje az eredetié marad, és nincs időkorlát.
+    Az érintett riasztások „kiváltó adat javítva" eseményt kapnak (a nyitottak
+    felülvizsgálat-jelölést is), a javított érték a szokásos kiértékelésen megy
+    át. Csak a lánc vége javítható; a felülírt mérésre 409. Nem létező vagy más
+    beteghez tartozó mérésre 403, mint a többi erőforrásnál: a válaszból nem
+    derül ki, létezik-e az azonosító."""
+    ensure_patient_access(db, user, patient_id)
+    try:
+        measurement, _alerts = correct_measurement(
+            db,
+            patient_id=patient_id,
+            measurement_id=measurement_id,
+            values=body.values,
+            actor_id=user.id,
+        )
+    except MeasurementError as error:
+        if error.code == "not_found":
+            forbidden = HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+            raise forbidden from error
+        code = (
+            status.HTTP_409_CONFLICT
+            if error.code == "already_corrected"
+            else status.HTTP_422_UNPROCESSABLE_CONTENT
+        )
+        raise HTTPException(
+            status_code=code, detail={"code": error.code, "component": error.component}
         ) from error
     db.commit()
     return measurement_out(measurement)

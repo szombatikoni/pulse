@@ -7,7 +7,8 @@ Ezt veti össze azzal, amit a motor a csomagból beolvasott és kiszámolt
 
   1. Observation: mérésenként a LOINC-kód, az értékek, a UCUM-egységkódok, a
      mérés és a rögzítés ideje (helyi eltolással, ezredmásodpercig) és a helyi
-     nap; nincs hiányzó és nincs fölös mérés;
+     nap; nincs hiányzó és nincs fölös mérés. A felülírt (javított) mérés nem
+     várt: a kiadás csak a javítási lánc végét adja ki (M3, A7, D6a);
   2. QuestionnaireResponse: a kitöltéskori verzióra hivatkozik-e, a kitöltés
      ideje és a válaszok; Questionnaire: a hivatkozott verziók kérdései és
      válaszlehetőségei;
@@ -100,6 +101,9 @@ def adatbazis(conn: psycopg.Connection, email: str) -> dict:
                 JOIN measurement_values v ON v.measurement_id = m.id
                 JOIN measurement_components c ON c.id = v.component_id
                 WHERE m.patient_id = %s
+                  -- A felülírt (javított) mérés nem kerül a kiadásba (A7, D6a):
+                  -- csak a javítási lánc vége.
+                  AND NOT EXISTS (SELECT 1 FROM measurements j WHERE j.corrected_from = m.id)
                 ORDER BY m.measured_at, m.id, c.order_no""",
             (beteg_id,),
         )

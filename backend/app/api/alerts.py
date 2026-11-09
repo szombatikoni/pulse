@@ -16,7 +16,7 @@ from sqlalchemy import select
 
 from app.api.deps import DoctorUser, ensure_patient_access
 from app.core.db import DbSession
-from app.models import Alert, AlertStatus, PatientProfile, User
+from app.models import Alert, AlertEventType, AlertStatus, PatientProfile, User
 from app.schemas.alerts import AlertAssign, AlertClose, AlertListItemOut, PatientRefOut
 from app.schemas.patients import AlertOut, alert_out, trigger_out
 from app.services import alerts
@@ -133,8 +133,16 @@ def my_alerts(
     for alert in rows:
         explanations = alerts.explain_alert(db, alert)
         out = alert_out(alert, explanations, names)
-        # A legutóbbi kiváltó adat (mint a latest_trigger, de a már kész magyarázatból).
-        trigger = next((e.triggers[-1] for e in reversed(explanations) if e.triggers), None)
+        # A legutóbbi kiváltó adat (mint a latest_trigger, de a már kész magyarázatból;
+        # a „kiváltó adat javítva" esemény nem kiértékelés, kimarad).
+        trigger = next(
+            (
+                e.triggers[-1]
+                for e in reversed(explanations)
+                if e.triggers and e.event.event_type is not AlertEventType.TRIGGER_CORRECTED
+            ),
+            None,
+        )
         patient = patients[alert.patient_id]
         result.append(
             AlertListItemOut(

@@ -154,6 +154,11 @@ class AlertEvent(Base):
     # újra-hozzárendelés után is kiolvasható a korábbi felelősök sora; az
     # aktuális felelős az Alert.assigned_to. Más eseménynél üres.
     assignee_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    # „Kiváltó adat javítva" eseménynél (M3, A7): a javítás után a riasztás
+    # feltétele az esemény (akkor aktuális) szabályverziója szerint még teljesül-e.
+    # Pillanatkép: a javítás idején számolódik, később nem változik. Más
+    # eseménynél üres. A kiváltó adat ilyenkor [eredeti, javított] mérés.
+    condition_met: Mapped[bool | None] = mapped_column()
     # A kiértékelés idejét a szolgáltatás adja (a tesztekben szimulált idő).
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

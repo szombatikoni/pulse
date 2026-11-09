@@ -79,6 +79,9 @@ class AlertEventOut(BaseModel):
     reason: str | None = None
     # Felelőshöz rendelésnél: kihez rendelték (a korábbi felelősök is látszanak).
     assignee: UserRefOut | None = None
+    # „Kiváltó adat javítva" eseménynél (A7): a feltétel a javítás után, az
+    # esemény szabályverziója szerint még teljesül-e; a kiváltók [eredeti, javított].
+    condition_met: bool | None = None
 
 
 class AlertOut(BaseModel):
@@ -183,6 +186,7 @@ def alert_out(
                 actor=user_ref(e.event.actor_id, names),
                 reason=e.event.reason,
                 assignee=user_ref(e.event.assignee_id, names),
+                condition_met=e.event.condition_met,
             )
             for e in events
         ],

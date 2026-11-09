@@ -32,6 +32,11 @@ A Kezelve oka (M3, A6; a 07-es dokumentum szerint, a hallgató döntése D4a+D5)
   adatra vár" ugyanarra a szabályra félrevezető volna.
 A lezárás tehát önmagában soha nem ad Rendben státuszt.
 
+A felülírt (javított) mérés sehol nem számít (A7, közös not_superseded()
+feltétel): a frissességben és a megerősítő adatnál csak a javítási lánc vége.
+A javított kiváltójú nyitott riasztás needs_review jelölése a státuszt nem
+változtatja (csak jelölés).
+
 Csak a tárolt alkalom-státuszokat olvassa, lezárást nem futtat: az a
 háttérfolyamaté (legfeljebb a futási időköznyi késéssel; a hallgató döntése).
 Adat nélkül sosem Rendben a státusz: az adathiány nem ad kedvező jelzést.
@@ -66,6 +71,7 @@ from app.models import (
     RuleVersion,
     Severity,
     Submission,
+    not_superseded,
 )
 from app.services.access import assigned_patients_query
 from app.services.alerts import list_patient_alerts
@@ -120,9 +126,13 @@ class PatientStatusResult:
 
 
 def last_data_at(db: Session, patient_id: uuid.UUID) -> datetime | None:
-    """A legutóbbi adat ideje: mérés (a mérés ideje) vagy kérdőív-kitöltés."""
+    """A legutóbbi adat ideje: mérés (a mérés ideje) vagy kérdőív-kitöltés. A
+    felülírt mérés nem számít (A7); mivel a javítás a mérés idejét megtartja
+    (D1), ez az értéket nem változtatja, csak a közös szabályt követi."""
     measured = db.scalar(
-        select(func.max(Measurement.measured_at)).where(Measurement.patient_id == patient_id)
+        select(func.max(Measurement.measured_at)).where(
+            Measurement.patient_id == patient_id, not_superseded()
+        )
     )
     submitted = db.scalar(
         select(func.max(Submission.submitted_at)).where(Submission.patient_id == patient_id)
@@ -184,6 +194,9 @@ _DONE = (OccurrenceStatus.FULFILLED, OccurrenceStatus.FULFILLED_LATE)
 def _measurements_since(
     db: Session, patient_id: uuid.UUID, type_code: str, since: datetime
 ) -> list[Measurement]:
+    """A méréstípus érvényes mérései a megadott idő után. A felülírt (javított)
+    mérés kimarad (A7): a régi érték nem lehet „megerősítő adat", csak a javítási
+    lánc vége."""
     return list(
         db.scalars(
             select(Measurement)
@@ -192,6 +205,7 @@ def _measurements_since(
                 Measurement.patient_id == patient_id,
                 MeasurementType.code == type_code,
                 Measurement.measured_at > since,
+                not_superseded(),
             )
             .options(
                 selectinload(Measurement.values).selectinload(MeasurementValue.component),

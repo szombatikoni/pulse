@@ -114,7 +114,10 @@ _DONE = {OccurrenceStatus.FULFILLED, OccurrenceStatus.FULFILLED_LATE}
 
 def _done_at(db: Session, occurrence: AssignmentOccurrence) -> datetime | None:
     """Mikor készült a teljesítő adat: mérésnél a mérés ideje (measured_at), mert
-    a beteg ezt adta meg; kitöltésnél a beküldés ideje (= fulfilled_at)."""
+    a beteg ezt adta meg; kitöltésnél a beküldés ideje (= fulfilled_at).
+
+    Az alkalom az eredeti mérésre mutat akkor is, ha azt később javították (A7):
+    szűrés itt nem kell, mert a javítás a mérési időt nem változtatja (D1)."""
     if occurrence.status not in _DONE:
         return None
     if occurrence.measurement_id is not None:

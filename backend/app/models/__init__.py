@@ -17,6 +17,7 @@ from app.models.measurement import (
     MeasurementComponent,
     MeasurementType,
     MeasurementValue,
+    not_superseded,
 )
 from app.models.notification import Notification, NotificationType
 from app.models.questionnaire import (
@@ -68,4 +69,5 @@ __all__ = [
     "Submission",
     "User",
     "UserRole",
+    "not_superseded",
 ]
