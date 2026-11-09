@@ -44,6 +44,7 @@ from app.models import (
 )
 from app.services.measurements import MAX_BACKDATE
 from app.services.questionnaires import current_version
+from app.services.rules import MissedTarget, evaluate_missed
 
 
 @dataclass(frozen=True)
@@ -284,8 +285,10 @@ def open_due_occurrences(db: Session, now: datetime) -> int:
 
 
 def close_missed_occurrences(db: Session, now: datetime) -> int:
-    """A lejárt, nem teljesített alkalmak elmulasztottra zárása. Idempotens:
-    csak esedékes alkalmat zár. Visszaadja a most lezártak számát."""
+    """A lejárt, nem teljesített alkalmak elmulasztottra zárása, majd az érintett
+    célpontok elmaradt adat szabályainak kiértékelése (rules.evaluate_missed;
+    M3, A4). Idempotens: csak esedékes alkalmat zár, és ha semmit nem zárt le,
+    nem is értékel. Visszaadja a most lezártak számát."""
     # A határidő mindig az időszak vége előtt van, így az időszak vége nem
     # tárolt oszlop nélkül is jó előszűrés; a pontos határ (missed_from) után.
     candidates = db.scalars(
@@ -305,19 +308,34 @@ def close_missed_occurrences(db: Session, now: datetime) -> int:
     # nyitott alkalmakkal együtt) visszagörgetődne; így a közben teljesített
     # sor egyszerűen kimarad. PostgreSQL-ben a zárolásra váró UPDATE a feltételt
     # a másik tranzakció commitja után újraértékeli.
-    result = db.execute(
-        update(AssignmentOccurrence)
-        .where(
-            AssignmentOccurrence.id.in_([o.id for o in expired]),
-            AssignmentOccurrence.status == OccurrenceStatus.DUE,
+    closed = set(
+        db.scalars(
+            update(AssignmentOccurrence)
+            .where(
+                AssignmentOccurrence.id.in_([o.id for o in expired]),
+                AssignmentOccurrence.status == OccurrenceStatus.DUE,
+            )
+            .values(status=OccurrenceStatus.MISSED)
+            .returning(AssignmentOccurrence.id)
+            .execution_options(synchronize_session=False)
         )
-        .values(status=OccurrenceStatus.MISSED)
-        .execution_options(synchronize_session=False)
     )
+    # Csak a ténylegesen most lezártak célpontjai (a közben teljesítettek nem).
+    targets = {
+        MissedTarget(
+            patient_id=o.assignment.patient_id,
+            measurement_type_id=o.assignment.measurement_type_id,
+            questionnaire_template_id=o.assignment.questionnaire_template_id,
+        )
+        for o in expired
+        if o.id in closed
+    }
     # A betöltött példányok státusza elavult; a következő hozzáférés újraolvassa.
     for occurrence in expired:
         db.expire(occurrence)
-    return result.rowcount
+    if targets:
+        evaluate_missed(db, targets, now=now)
+    return len(closed)
 
 
 def run_occurrence_check(db: Session, now: datetime | None = None) -> OccurrenceCheck:

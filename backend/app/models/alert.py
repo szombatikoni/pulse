@@ -20,7 +20,7 @@ from app.models.base import Base, str_enum
 
 
 class RuleType(StrEnum):
-    """A négy paraméterezhető szabálytípus (F11). Az M2-ben az első működik."""
+    """A négy paraméterezhető szabálytípus (F11); mind a négy működik (M3)."""
 
     THRESHOLD = "threshold"  # egyszeri küszöbátlépés
     WINDOW = "window"  # időablakos ismétlődés
