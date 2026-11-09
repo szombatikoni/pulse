@@ -2,12 +2,14 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models import (
     Alert,
     AlertEventType,
     AlertStatus,
+    AssignmentTarget,
+    OccurrenceStatus,
     PatientProfile,
     RuleType,
     RuleVersion,
@@ -16,7 +18,7 @@ from app.models import (
 from app.schemas.measurements import MeasurementOut, measurement_out
 from app.schemas.questionnaires import SubmissionOut, submission_out
 from app.schemas.tasks import TaskOut
-from app.services.alerts import EventExplanation, TriggerExplanation
+from app.services.alerts import EventExplanation, OccurrenceTrigger, TriggerExplanation
 from app.services.status import PatientStatus, PatientStatusResult
 
 
@@ -27,14 +29,28 @@ class ViolationOut(BaseModel):
     limit: float
 
 
+class OccurrenceTriggerOut(BaseModel):
+    """Egy alkalom (elmaradt adatnál a kiváltó, Adathiánynál az ok): mit
+    kellett volna rögzíteni és mikorra."""
+
+    id: uuid.UUID
+    due_at: datetime
+    status: OccurrenceStatus
+    target_kind: AssignmentTarget
+    code: str
+    name: str
+
+
 class TriggerOut(BaseModel):
     """Egy kiváltó adat: mérésnél melyik értéke lépte át a határt, kérdőív-
-    kitöltésnél a pontszám és a kiértékelési sáv."""
+    kitöltésnél a pontszám és a kiértékelési sáv, elmaradt adatnál az
+    elmulasztott alkalom."""
 
     measurement: MeasurementOut | None = None
     violations: list[ViolationOut] = []
     submission: SubmissionOut | None = None
     band: str | None = None
+    occurrence: OccurrenceTriggerOut | None = None
 
 
 class RuleVersionOut(BaseModel):
@@ -65,7 +81,9 @@ class AlertOut(BaseModel):
 
 class StatusReasonOut(BaseModel):
     status: PatientStatus
-    code: str
+    code: str = Field(
+        description="open_alert | missed_occurrence | no_data_yet | stale_data | fresh_data"
+    )
     at: datetime | None
     alert_id: uuid.UUID | None
     severity: Severity | None
@@ -96,6 +114,17 @@ def rule_version_out(version: RuleVersion) -> RuleVersionOut:
     )
 
 
+def occurrence_trigger_out(trigger: OccurrenceTrigger) -> OccurrenceTriggerOut:
+    return OccurrenceTriggerOut(
+        id=trigger.occurrence.id,
+        due_at=trigger.occurrence.due_at,
+        status=trigger.occurrence.status,
+        target_kind=trigger.target_kind,
+        code=trigger.code,
+        name=trigger.name,
+    )
+
+
 def trigger_out(trigger: TriggerExplanation) -> TriggerOut:
     return TriggerOut(
         measurement=measurement_out(trigger.measurement) if trigger.measurement else None,
@@ -105,6 +134,7 @@ def trigger_out(trigger: TriggerExplanation) -> TriggerOut:
         ],
         submission=submission_out(trigger.submission) if trigger.submission else None,
         band=trigger.band,
+        occurrence=occurrence_trigger_out(trigger.occurrence) if trigger.occurrence else None,
     )
 
 
@@ -133,9 +163,12 @@ def patient_summary_out(
     result: PatientStatusResult,
     triggers: dict[uuid.UUID, TriggerExplanation | None],
 ) -> PatientSummaryOut:
+    """A triggers a riasztás okainál a riasztás azonosítója, az elmulasztott
+    alkalom okainál az alkalom azonosítója szerint adja az „Ok" oszlop adatát."""
     reasons = []
     for reason in result.reasons:
-        trigger = triggers.get(reason.alert.id) if reason.alert else None
+        key = reason.alert.id if reason.alert else reason.occurrence_id
+        trigger = triggers.get(key) if key else None
         reasons.append(
             StatusReasonOut(
                 status=reason.status,

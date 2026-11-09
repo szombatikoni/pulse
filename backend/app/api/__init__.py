@@ -9,6 +9,7 @@ from app.api import (
     patients,
     plans,
     questionnaires,
+    rules,
     tasks,
 )
 
@@ -21,4 +22,5 @@ api_router.include_router(patients.router)
 api_router.include_router(questionnaires.router)
 api_router.include_router(tasks.router)
 api_router.include_router(plans.router)
+api_router.include_router(rules.router)
 api_router.include_router(fhir.router)

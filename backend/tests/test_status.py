@@ -1,12 +1,16 @@
 """Beteg-státusz és az orvos priorizált listája (F9)."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
 from app.core.config import settings
-from app.models import AlertStatus, Severity
+from app.models import AlertStatus, Frequency, OccurrenceStatus, Severity
+from app.services.measurements import get_type_by_code, record_measurement
+from app.services.occurrences import run_occurrence_check
+from app.services.plans import revoke
 from app.services.status import PatientStatus, compute_status, doctor_patient_list
+from app.services.tasks import assign_measurement
 from tests.factories import assign, make_doctor, make_patient, make_threshold_rule, record_bp
 
 NOW = datetime(2026, 10, 12, 8, 0, tzinfo=UTC)
@@ -163,3 +167,151 @@ def test_questionnaire_submission_also_counts_as_fresh_data(db, doctor, patient)
     result = status_of(db, patient)
     assert result.status is PatientStatus.OK
     assert result.last_data_at == NOW - timedelta(hours=1)
+
+
+# --- Adathiány és frissesség az alkalmakból (M3, A4 2. lépés) ---------------------------
+
+
+def local(y, m, d, hh=0, mm=0):
+    return datetime(y, m, d, hh, mm, tzinfo=settings.tz)
+
+
+def bp_plan(db, patient, doctor, start, frequency=None, interval_days=None):
+    """Vérnyomás-előírás 10:00-s határidővel (alapból naponta). A mérés alkalma
+    az időszak vége + 48 óra után elmulasztott."""
+    return assign_measurement(
+        db,
+        patient_id=patient.patient_profile.id,
+        measurement_type=get_type_by_code(db, "blood_pressure"),
+        assigned_by=doctor.id,
+        start_date=start,
+        frequency=frequency or Frequency.DAILY,
+        interval_days=interval_days,
+    )
+
+
+def check(db, now=NOW):
+    return run_occurrence_check(db, now)
+
+
+def test_missed_latest_occurrence_gives_no_data_even_with_fresh_data(db, doctor, patient):
+    # NOW = okt. 12. 10:00 (helyi): az okt. 9-i alkalom okt. 12. 0:00-kor zárult.
+    # Az okt. 8-i mérés 4 napos, a 7 napos szabály szerint friss lenne.
+    bp_plan(db, patient, doctor, start=date(2026, 10, 8))
+    record_bp(db, patient, 125, 80, at=local(2026, 10, 8, 7, 30))
+    check(db)
+    result = status_of(db, patient)
+    assert result.status is PatientStatus.NO_DATA
+    [reason] = result.reasons
+    assert reason.code == "missed_occurrence"
+    assert reason.at == local(2026, 10, 9, 10, 0)
+    assert reason.occurrence.status is OccurrenceStatus.MISSED
+
+
+def test_later_fulfilled_occurrence_supersedes_an_earlier_miss(db, doctor, patient):
+    # A „legutóbbi lezárt alkalom" a nem esedékesek közül a legkésőbbi
+    # határidejű (mint az elmaradt adat szabálynál): az okt. 11-i teljesítés
+    # után az okt. 9-i elmulasztás már nem az utolsó.
+    bp_plan(db, patient, doctor, start=date(2026, 10, 8))
+    record_bp(db, patient, 125, 80, at=local(2026, 10, 8, 7, 30))
+    record_bp(db, patient, 124, 79, at=local(2026, 10, 11, 7, 30))
+    check(db)
+    assert [r.code for r in status_of(db, patient).reasons] == ["fresh_data"]
+
+
+def test_late_fulfilment_is_not_missed(db, doctor, patient):
+    bp_plan(db, patient, doctor, start=date(2026, 10, 8))
+    record_bp(db, patient, 125, 80, at=local(2026, 10, 8, 7, 30))
+    # Pótlás: az okt. 9-i mérést másnap rögzíti (a határidő után, a pótlási ablakban).
+    record_measurement(
+        db,
+        patient_id=patient.patient_profile.id,
+        type_code="blood_pressure",
+        values={"systolic": 126, "diastolic": 81},
+        measured_at=local(2026, 10, 9, 19, 0),
+        now=local(2026, 10, 10, 8, 0),
+    )
+    check(db)
+    result = status_of(db, patient)
+    assert result.status is PatientStatus.OK
+    assert [r.code for r in result.reasons] == ["fresh_data"]
+
+
+def test_fulfilled_monthly_plan_keeps_20_day_old_data_fresh(db, doctor, patient):
+    # 30 napos előírás szept. 2-től: az első időszak (szept. 2. – okt. 1.) a
+    # szept. 22-i méréssel teljesítve, a második még esedékes. A 7 napos szabály
+    # nem él, mert van lezárt alkalom: a frissességet az alkalmak adják.
+    bp_plan(
+        db,
+        patient,
+        doctor,
+        start=date(2026, 9, 2),
+        frequency=Frequency.EVERY_N_DAYS,
+        interval_days=30,
+    )
+    record_bp(db, patient, 125, 80, at=NOW - timedelta(days=20))
+    check(db)
+    result = status_of(db, patient)
+    assert result.status is PatientStatus.OK
+    assert [r.code for r in result.reasons] == ["fresh_data"]
+    assert result.last_data_at == NOW - timedelta(days=20)
+
+
+def test_revoked_plan_misses_do_not_stick(db, doctor, patient):
+    plan = bp_plan(db, patient, doctor, start=date(2026, 10, 1))
+    check(db)  # okt. 1–9. elmulasztva
+    # Friss adat, de nem az előírt méréstípusból (nem teljesít alkalmat).
+    at = NOW - timedelta(days=1)
+    record_measurement(
+        db,
+        patient_id=patient.patient_profile.id,
+        type_code="heart_rate",
+        values={"value": 72},
+        measured_at=at,
+        now=at,
+    )
+    assert [r.code for r in status_of(db, patient).reasons] == ["missed_occurrence"]
+
+    revoke(db, plan, now=NOW)
+    result = status_of(db, patient)
+    # Nincs lezárt alkalom érvényes előíráson: a 7 napos szabály él, az adat friss.
+    assert result.status is PatientStatus.OK
+    assert [r.code for r in result.reasons] == ["fresh_data"]
+
+
+def test_before_the_first_deadline_the_7_day_rule_applies(db, doctor, patient):
+    # Módosítás = visszavonás + új előírás mától: a régi elmulasztása nem
+    # számít, az új első határideje még nem járt le, így a 7 napos szabály dönt.
+    old = bp_plan(db, patient, doctor, start=date(2026, 10, 1))
+    record_bp(db, patient, 125, 80, at=NOW - timedelta(days=10))
+    check(db)
+    revoke(db, old, now=NOW)
+    bp_plan(db, patient, doctor, start=date(2026, 10, 12))
+    result = status_of(db, patient)
+    assert result.status is PatientStatus.NO_DATA
+    assert [r.code for r in result.reasons] == ["stale_data"]
+
+
+def test_without_plan_the_7_day_rule_applies(db, patient):
+    record_bp(db, patient, 125, 80, at=NOW - timedelta(days=8))
+    assert [r.code for r in status_of(db, patient).reasons] == ["stale_data"]
+
+
+def test_no_data_yet_with_missed_occurrence_lists_both(db, doctor, patient):
+    bp_plan(db, patient, doctor, start=date(2026, 10, 8))
+    check(db)
+    result = status_of(db, patient)
+    assert result.status is PatientStatus.NO_DATA
+    assert [r.code for r in result.reasons] == [
+        "missed_occurrence",
+        "no_data_yet",
+    ]
+
+
+def test_status_does_not_close_occurrences(db, doctor, patient):
+    # A lekérdezés csak a tárolt állapotot olvassa: a zárás a háttérfolyamaté.
+    bp_plan(db, patient, doctor, start=date(2026, 10, 8))
+    record_bp(db, patient, 125, 80, at=local(2026, 10, 8, 7, 30))
+    result = status_of(db, patient)
+    assert result.status is PatientStatus.OK
+    assert check(db).missed > 0  # a status_of nem zárta le őket

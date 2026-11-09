@@ -7,7 +7,13 @@ from app.core.db import DbSession
 from app.models import PatientProfile
 from app.schemas.patients import AlertOut, PatientSummaryOut, alert_out, patient_summary_out
 from app.schemas.tasks import task_out
-from app.services.alerts import explain_alert, latest_trigger, list_patient_alerts
+from app.services.alerts import (
+    TriggerExplanation,
+    explain_alert,
+    latest_trigger,
+    list_patient_alerts,
+    occurrence_triggers,
+)
 from app.services.status import PatientStatusResult, compute_status, doctor_patient_list
 from app.services.tasks import patient_tasks
 
@@ -20,6 +26,10 @@ def _summary(
     db: DbSession, patient: PatientProfile, result: PatientStatusResult
 ) -> PatientSummaryOut:
     triggers = {r.alert.id: latest_trigger(db, r.alert) for r in result.reasons if r.alert}
+    # Az elmulasztott alkalom okainál az alkalom a célpontjával (mit, mikorra).
+    missed = [r.occurrence.id for r in result.reasons if r.occurrence]
+    for occurrence in occurrence_triggers(db, missed):
+        triggers[occurrence.occurrence.id] = TriggerExplanation(occurrence=occurrence)
     summary = patient_summary_out(patient, result, triggers)
     summary.tasks = [task_out(t) for t in patient_tasks(db, patient.id)]
     return summary
