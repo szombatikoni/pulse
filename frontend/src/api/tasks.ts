@@ -48,9 +48,26 @@ export type PlanNotice = {
   new_start_date: string | null
 }
 
+/** Jelzés a betegnek: az orvos visszajelzése egy riasztás lezárásakor (M3, A6).
+ * Egyirányú, válaszolni nem lehet. A changed_at a létrehozás ideje. */
+export type AlertFeedbackNotice = {
+  kind: 'alert_feedback'
+  changed_at: string
+  text: string
+  doctor_name: string
+  alert_id: string
+  /** Miről szólt a riasztás: a szabály típusa és célpontja (méréstípus vagy kérdőív). */
+  rule_type: 'threshold' | 'window' | 'questionnaire' | 'missing_data'
+  target_code: string
+  target_name: string
+}
+
+/** A beteg jelzései egy listában, a kind szerint megkülönböztetve (a legújabb elöl). */
+export type Notice = PlanNotice | AlertFeedbackNotice
+
 export function usePlanNotices(patientId: string) {
   return useQuery({
     queryKey: ['patients', patientId, 'plan-notices'],
-    queryFn: () => apiGet<PlanNotice[]>(`/patients/${patientId}/plan-notices`),
+    queryFn: () => apiGet<Notice[]>(`/patients/${patientId}/plan-notices`),
   })
 }

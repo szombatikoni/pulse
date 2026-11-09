@@ -224,6 +224,46 @@
   margin-top: 4px;
 }
 
+/* Az orvos visszajelzése a riasztás lezárásakor (M3, A6; felületterv .msg) */
+.pulse-msgs {
+  display: grid;
+  gap: 8px;
+}
+.pulse-msg {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: var(--pulse-card);
+  border: 1px solid var(--pulse-line);
+}
+.pulse-msg p,
+.pulse-msg blockquote {
+  margin: 0;
+}
+.pulse-msg .from {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 13.5px;
+  color: var(--pulse-ink-3);
+}
+.pulse-msg .from .name {
+  font-family: var(--pulse-serif);
+  font-size: 15.5px;
+  font-weight: 500;
+  color: var(--pulse-ink-1);
+}
+.pulse-msg blockquote {
+  margin-top: 8px;
+  color: var(--pulse-ink-1);
+  font-size: 16px;
+  line-height: 1.55;
+  max-width: 68ch;
+}
+
 /* Két hasáb */
 .pulse-grid-2 {
   display: grid;

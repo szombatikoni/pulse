@@ -55,11 +55,15 @@ export const triggerId = (trigger: Trigger | null | undefined) =>
 
 /** Az okok listája ismétlés nélkül: ha két riasztást ugyanaz az adat váltott ki
  * (pl. egy kritikus kitöltés a közepes és a súlyos szabályt is), az ok csak egyszer,
- * a súlyosabbnál jelenik meg. */
+ * a súlyosabbnál jelenik meg. A Kezelve ok mondata a lezáró orvost nevezi meg, ezért
+ * ugyanannak az orvosnak több lezárása is egy sor (különben ugyanaz a mondat ismétlődne). */
 export function uniqueReasons(reasons: StatusReason[]): StatusReason[] {
   const seen = new Set<string>()
   return reasons.filter((reason) => {
-    const id = triggerId(reason.trigger)
+    const id =
+      reason.code === 'closed_awaiting_data' && reason.actor
+        ? `closed-${reason.actor.id}`
+        : triggerId(reason.trigger)
     if (!id) return true
     if (seen.has(id)) return false
     seen.add(id)
@@ -69,11 +73,16 @@ export function uniqueReasons(reasons: StatusReason[]): StatusReason[] {
 
 /** Az „Ok" oszlop egy mondata egy státuszokhoz. Riasztásnál a legutóbbi kiváltó
  * mérés határátlépései, pl. „Szisztolés 152 Hgmm (> 140), Diasztolés 95 Hgmm (> 90)";
- * elmulasztott alkalomnál „Elmulasztott alkalom: Vérnyomás, határidő nov. 8. 10:00". */
+ * elmulasztott alkalomnál „Elmulasztott alkalom: Vérnyomás, határidő nov. 8. 10:00";
+ * Kezelvénél „Dr. Kovács Éva lezárta, megerősítő adat még nem érkezett". */
 export function reasonText(t: TFunction, reason: StatusReason): string {
   if (reason.code === 'open_alert' && reason.trigger) return triggerText(t, reason.trigger)
   if (reason.code === 'missed_occurrence' && reason.trigger?.occurrence) {
     return t('doctor.reasons.missedAt', { data: occurrenceText(t, reason.trigger.occurrence) })
+  }
+  // Kezelve (A6): ki zárta le a riasztást; a Rendbent a megerősítő adat hozza.
+  if (reason.code === 'closed_awaiting_data' && reason.actor) {
+    return t('doctor.reasons.closedBy', { name: reason.actor.name })
   }
   return t(`doctor.reasons.${reason.code}`)
 }

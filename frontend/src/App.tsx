@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 
 import { RequireAuth, RootRedirect } from './auth/RequireAuth'
 import { LoginPage } from './features/auth/LoginPage'
+import { DoctorAlertsPage } from './features/doctor/DoctorAlertsPage'
 import { DoctorPatientsPage } from './features/doctor/DoctorPatientsPage'
 import { PatientDetailPage } from './features/doctor/PatientDetailPage'
 import { RoleHomePage } from './features/home/RoleHomePage'
@@ -23,6 +24,7 @@ export default function App() {
         <Route element={<RequireAuth role="doctor" />}>
           <Route path="/doctor" element={<DoctorPatientsPage />} />
           <Route path="/doctor/patients/:patientId" element={<PatientDetailPage />} />
+          <Route path="/doctor/alerts" element={<DoctorAlertsPage />} />
         </Route>
         <Route element={<RequireAuth role="admin" />}>
           <Route path="/admin" element={<RoleHomePage role="admin" />} />

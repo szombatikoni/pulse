@@ -3,8 +3,12 @@
 // adatához pedig nem fér hozzá. A végén az orvos a követési tervet szerkeszti
 // (M3, A2), indoklással, és a beteg a teendői közt látja a változást (M3, A3);
 // végül a Szabályok fülön a küszöbszabályt módosítja új verzióként (M3, A4).
+// A riasztás-életút (M3, A6): a Riasztások oldal, a megtekintés az adatlap
+// megnyitásakor, a felelőshöz rendelés és a lezárás indoklással és betegüzenettel;
+// a beteglistán Kezelve, a beteg a teendői fölött látja a visszajelzést.
 // Frissen seedelt adatbázist vár (backend/seed), és módosítja az adatokat
-// (Tóth Mária új mérései, kitöltése, testsúly-előírása és küszöbszabálya).
+// (Tóth Mária új mérései, kitöltése, testsúly-előírása és küszöbszabálya, Szabó
+// János két lezárt riasztása, Varga Béla megtekintett riasztásai).
 import { expect, test, type Page } from '@playwright/test'
 
 const PASSWORD = 'pulse-demo-2026'
@@ -423,4 +427,152 @@ test('szabályok, orvos: új szabálynál előbb a típus választható, utána 
   await expect(
     rules.getByRole('group', { name: 'Elmaradt adat' }).getByRole('article'),
   ).toHaveCount(1)
+})
+
+// --- Riasztás-életút (M3, A6) ---------------------------------------------------------
+
+// A Riasztások oldal szűrője: a gomb neve a darabszámmal együtt, pl. „Új (2)".
+const alertFilter = (page: Page, name: string) =>
+  page.getByRole('group', { name: 'Szűrés állapot szerint' }).getByRole('button', { name })
+const alertRows = (page: Page) =>
+  page.getByRole('region', { name: 'Nyitott riasztások' }).locator('.al-row')
+
+test('Riasztások oldal: szűrés állapot szerint, a sorból az adatlapra, ott megtekintett lesz', async ({
+  page,
+}) => {
+  await login(page, 'dr.kovacs@pulse.example')
+  await expect(page).toHaveURL(/\/doctor$/)
+  const nav = page.getByRole('navigation', { name: 'Menü' })
+  const alertsLink = nav.getByRole('link', { name: /Riasztások/ })
+  // A jelvény a felelős nélküli nyitott riasztások száma (Varga Béla 2, Szabó János 2).
+  await expect(alertsLink).toContainText('4')
+  await alertsLink.click()
+  await expect(page).toHaveURL(/\/doctor\/alerts$/)
+  await expect(page.getByRole('heading', { name: 'Riasztások' })).toBeVisible()
+
+  // Szabó János riasztásai a korábbi adatlap-megnyitáskor megtekintettek lettek,
+  // Varga Béláé még újak; felelős még egyiknek sincs.
+  await expect(alertFilter(page, 'Mind (4)')).toHaveAttribute('aria-pressed', 'true')
+  await expect(alertFilter(page, 'Felelősnél (0)')).toBeVisible()
+  await alertFilter(page, 'Megtekintve (2)').click()
+  await expect(alertRows(page)).toHaveCount(2)
+  for (const row of await alertRows(page).all()) {
+    await expect(row).toContainText('Szabó János')
+    await expect(row).toContainText('Megtekintve')
+    await expect(row).toContainText('Nincs felelős')
+  }
+  await alertFilter(page, 'Új (2)').click()
+  await expect(alertRows(page)).toHaveCount(2)
+  // Elöl a súlyosabb: Varga Béla küszöbriasztása.
+  const first = alertRows(page).first()
+  await expect(first).toContainText('Varga Béla')
+  await expect(first).toContainText('Vérnyomás a határ fölött')
+  await expect(first).toContainText('Küszöbszabály, 1. verzió · súlyos')
+
+  // A sorból az adatlapra: a felület a két új riasztást megtekintettnek jelöli.
+  const seen = page.waitForResponse(
+    (r) => r.url().includes('/seen') && r.request().method() === 'POST',
+  )
+  await first.click()
+  await expect(page).toHaveURL(/\/doctor\/patients\//)
+  expect((await seen).status()).toBe(200)
+  const card = page.getByRole('article', { name: 'Vérnyomás a határ fölött' }).first()
+  await expect(card.locator('.pd-step.done')).toHaveCount(2)
+  // Mindkét kártyáról eltűnt az „Új” jelölés (mindkét megtekintés beérkezett).
+  await expect(page.locator('main article.pd-alert')).toHaveCount(2)
+  await expect(page.locator('main .pd-chip')).toHaveCount(0)
+
+  await alertsLink.click()
+  await expect(alertFilter(page, 'Új (0)')).toBeVisible()
+  await expect(alertFilter(page, 'Megtekintve (4)')).toBeVisible()
+})
+
+test('riasztás-életút, orvos: felelőshöz rendelés, lezárás indoklással és betegüzenettel', async ({
+  page,
+}) => {
+  await login(page, 'dr.kovacs@pulse.example')
+  await expect(page).toHaveURL(/\/doctor$/)
+  await page.getByRole('link', { name: 'Szabó János' }).click()
+  const main = page.locator('main')
+  const card = main.getByRole('article', { name: 'Vérnyomás a határ fölött' })
+  // A megtekintés az első megnyitáskor megtörtént: az életút második lépése kész.
+  await expect(card.locator('.pd-step.done')).toHaveCount(2)
+  await expect(card.locator('.pd-step.now')).toContainText('Felelőshöz rendelve')
+
+  // Felelőshöz rendelés: a beteg orvosai közül, alapból a belépett orvos.
+  await card.getByRole('button', { name: 'Felelőshöz rendelés' }).click()
+  const owner = card.getByLabel('Felelős')
+  await expect(owner.locator('option:checked')).toHaveText('Dr. Kovács Éva (én)')
+  await card.getByRole('button', { name: 'Hozzárendelés' }).click()
+  await expect(card).toContainText('Felelős: Dr. Kovács Éva')
+  await expect(card.getByRole('button', { name: 'Felelőshöz rendelés' })).toHaveCount(0)
+  await expect(card.locator('.pd-step.done')).toHaveCount(3)
+  await expect(main.locator('.pd-status')).toContainText('ebből 1 felelősnél')
+
+  // Lezárás: indoklás nélkül hibaüzenet; gyorsválasztó + szöveg, és üzenet a betegnek.
+  await card.getByRole('button', { name: 'Lezárás…' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Riasztás lezárása' })
+  await expect(dialog).toContainText('Vérnyomás a határ fölött · Szabó János')
+  await dialog.getByRole('button', { name: 'Lezárás', exact: true }).click()
+  await expect(dialog).toContainText('Az indoklás kötelező.')
+  const quick = dialog.getByRole('button', { name: 'Telefonon egyeztetve' })
+  await quick.click()
+  const reason = dialog.getByRole('textbox', { name: /^Indoklás/ })
+  await expect(reason).toHaveValue('Telefonon egyeztetve.')
+  await expect(quick).toHaveAttribute('aria-pressed', 'true')
+  await reason.fill('Telefonon egyeztetve. A gyógyszerelés marad, kontroll két hét múlva.')
+  await expect(dialog).toContainText('A beteg a Teendőim oldalon olvassa. Válaszolni nem tud rá.')
+  await dialog
+    .getByRole('textbox', { name: /^Visszajelzés a betegnek/ })
+    .fill('Átnéztem a méréseit, a gyógyszerelés marad. Két hét múlva újra beszélünk.')
+  await dialog.getByRole('button', { name: 'Lezárás', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+
+  // A kártya lezárt alakra vált: ki és mikor zárta le, az indoklás, kinyitható történet.
+  const closed = main.getByRole('article', { name: 'Vérnyomás a határ fölött, lezárva' })
+  await expect(closed).toContainText(/Lezárva .+ · Dr\. Kovács Éva/)
+  await expect(closed).toContainText('A gyógyszerelés marad, kontroll két hét múlva.')
+  await closed.getByText(/Eseménytörténet/).click()
+  const timeline = closed.locator('.pd-timeline')
+  await expect(timeline.locator('li').first()).toContainText('Lezárva · Dr. Kovács Éva')
+  await expect(timeline.locator('li').first()).toContainText('Indoklás: „Telefonon egyeztetve.')
+  await expect(timeline).toContainText('Felelőshöz rendelve · felelős: Dr. Kovács Éva')
+  await expect(timeline).toContainText('Megtekintve · Dr. Kovács Éva')
+
+  // A kérdőív-riasztás lezárása közvetlenül a megtekintettből (a lépés kihagyható).
+  const other = main.locator('article.pd-alert:not(.closed)')
+  await expect(other).toHaveCount(1)
+  await other.getByRole('button', { name: 'Lezárás…' }).click()
+  await dialog.getByRole('button', { name: 'Nem igényel beavatkozást' }).click()
+  await dialog.getByRole('button', { name: 'Lezárás', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(main.locator('article.pd-alert:not(.closed)')).toHaveCount(0)
+
+  // Lezárás után a státusz Kezelve, amíg megerősítő adat nem érkezik (07-es dokumentum).
+  await expect(main.locator('.pd-status')).toContainText('Kezelve')
+  const nav = page.getByRole('navigation', { name: 'Menü' })
+  await nav.getByRole('link', { name: /Betegeim/ }).click()
+  await expect(page).toHaveURL(/\/doctor$/)
+  await page.locator('.pulse-prow').first().waitFor()
+  const rows = await rowsText(page)
+  expect(rows.map((r) => r.split(' ')[0])).toEqual(['Súlyos', 'Adathiány', 'Kezelve', 'Rendben'])
+  expect(rows[2]).toContain('Szabó János')
+  expect(rows[2]).toContain('Dr. Kovács Éva lezárta, megerősítő adat még nem érkezett')
+  // Két lezárás ugyanattól az orvostól: az ok egyszer szerepel.
+  expect(rows[2].split('lezárta')).toHaveLength(2)
+})
+
+test('a beteg a Teendőim oldalon látja az orvos visszajelzését', async ({ page }) => {
+  await login(page, 'szabo.janos@pulse.example')
+  await expect(page).toHaveURL(/\/patient$/)
+  const feedback = page.getByRole('region', { name: 'Visszajelzések az orvosodtól' })
+  await expect(feedback.locator('.pulse-msg')).toHaveCount(1)
+  await expect(feedback).toContainText(
+    /Dr\. Kovács Éva\s*visszajelzése a\(z\) vérnyomás-riasztás lezárásakor · \S+/,
+  )
+  await expect(feedback).toContainText(
+    'Átnéztem a méréseit, a gyógyszerelés marad. Két hét múlva újra beszélünk.',
+  )
+  // A belső indoklás nem a betegnek szól.
+  await expect(page.locator('main')).not.toContainText('kontroll két hét múlva')
 })

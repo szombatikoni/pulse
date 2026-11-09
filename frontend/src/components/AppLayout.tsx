@@ -1,11 +1,20 @@
 import { AppShell, Box, Burger, UnstyledButton } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { ChartLine, type Icon, House, ShieldCheck, SignOut, Users } from '@phosphor-icons/react'
+import {
+  Bell,
+  ChartLine,
+  type Icon,
+  House,
+  ShieldCheck,
+  SignOut,
+  Users,
+} from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NavLink, useLocation, useNavigate } from 'react-router'
 
+import { useDoctorAlerts } from '../api/alerts'
 import { type CurrentUser, HOME_BY_ROLE, type Role } from '../api/auth'
 import { useDoctorPatients } from '../api/patients'
 import { clearToken } from '../auth/token'
@@ -51,6 +60,13 @@ function useDoctorNav(enabled: boolean): Pick<NavItem, 'count' | 'hot'> {
   }
 }
 
+/** A Riasztások menüpont mellett: hány nyitott riasztásnak nincs még felelőse
+ * (felületterv: a felelős nélküli nyitottak száma). */
+function useAlertsNav(enabled: boolean): Pick<NavItem, 'count'> {
+  const alerts = useDoctorAlerts({ enabled })
+  return { count: (alerts.data ?? []).filter((a) => !a.assigned_to).length }
+}
+
 const initials = (name: string) =>
   name
     .replace(/^Dr\.\s*/, '')
@@ -69,6 +85,7 @@ export function AppLayout({ user, children }: { user: CurrentUser; children: Rea
   const queryClient = useQueryClient()
   const [opened, { toggle, close }] = useDisclosure()
   const doctorNav = useDoctorNav(user.role === 'doctor')
+  const alertsNav = useAlertsNav(user.role === 'doctor')
 
   const logout = () => {
     clearToken()
@@ -77,7 +94,17 @@ export function AppLayout({ user, children }: { user: CurrentUser; children: Rea
   }
 
   const items: Record<Role, NavItem[]> = {
-    doctor: [{ to: '/doctor', label: t('home.doctor.title'), icon: Users, ...doctorNav }],
+    doctor: [
+      {
+        to: '/doctor',
+        label: t('home.doctor.title'),
+        icon: Users,
+        ...doctorNav,
+        // Az adatlap a Betegeimhez tartozik, a Riasztások oldal nem.
+        match: (path) => path === '/doctor' || path.startsWith('/doctor/patients'),
+      },
+      { to: '/doctor/alerts', label: t('alerts.title'), icon: Bell, ...alertsNav },
+    ],
     patient: [
       {
         to: '/patient',
@@ -108,7 +135,6 @@ export function AppLayout({ user, children }: { user: CurrentUser; children: Rea
         </NavLink>
         <nav className="pulse-nav" aria-label={t('layout.nav')}>
           {items[user.role].map(({ to, label, icon: ItemIcon, count, hot, match }) => (
-            // „end” nélkül az adatlap (/doctor/patients/…) alatt is a Betegeim aktív.
             <NavLink
               key={to}
               to={to}

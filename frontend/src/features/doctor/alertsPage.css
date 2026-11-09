@@ -1,0 +1,77 @@
+/* Riasztások oldal, felületterv 2026-10-30 („Riasztások", .arow): soronként a
+   súlyosság jele, a beteg, mi történt, a kiváltó érték, az állapot és a felelős.
+   A keret és a sorköz a beteglistáé (patientList.css: pl-plist, pl-row). */
+.pulse-prow.al-row {
+  display: grid;
+  /* rögzített szélességű oszlopok, hogy a sorok egymás alatt igazodjanak */
+  grid-template-columns: 20px minmax(130px, 0.8fr) minmax(0, 1.6fr) 110px 180px 140px 16px;
+  gap: 16px;
+  align-items: center;
+}
+.al-row .al-what {
+  font-size: 14px;
+}
+.al-row .tt {
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+}
+.al-row .al-val {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--pulse-ink-1);
+  text-align: right;
+  white-space: nowrap;
+}
+.al-row .al-val small {
+  margin-left: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pulse-ink-3);
+}
+.al-row .al-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.al-row .al-owner {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pulse-ink-3);
+}
+
+@media (max-width: 900px) {
+  .pulse-prow.al-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 6px 12px;
+  }
+  .al-row > .pulse-si {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .al-row .c-name {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .al-row .al-val {
+    grid-row: 1;
+    grid-column: 3;
+  }
+  .al-row .al-what {
+    grid-row: 2;
+    grid-column: 2 / -1;
+  }
+  .al-row .al-state {
+    grid-row: 3;
+    grid-column: 2;
+  }
+  .al-row .al-owner {
+    grid-row: 3;
+    grid-column: 3;
+    text-align: right;
+  }
+  .al-row .c-chev {
+    display: none;
+  }
+}

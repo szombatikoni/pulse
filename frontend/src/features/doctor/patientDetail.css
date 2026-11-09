@@ -1322,3 +1322,114 @@
     grid-column: 2;
   }
 }
+
+/* riasztás-életút (M3, A6; felületterv: .alert-foot, .alert-actions): balra az
+   eseménytörténet, jobbra a gombok, a fő gomb a jobb szélen */
+.pd-alert-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pd-alert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+}
+.pd-alert-title .pd-chip-soft {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.pd-assign {
+  max-width: 420px;
+  margin-left: auto;
+  width: 100%;
+}
+.pd-event-reason {
+  display: block;
+  margin-top: 2px;
+  color: var(--pulse-ink-2);
+}
+
+/* lezárás-párbeszéd (felületterv: .modal, .modal-sum, .quick, .hint) */
+.pd-modal.mantine-Modal-content {
+  background: var(--pulse-card);
+  border: 1px solid var(--pulse-line-2);
+  border-radius: 12px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+.pd-modal-head.mantine-Modal-header {
+  background: var(--pulse-card);
+  padding: 24px 24px 0;
+  align-items: flex-start;
+}
+.pd-modal-title.mantine-Modal-title {
+  font-family: var(--pulse-serif);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--pulse-ink-1);
+}
+.pd-modal-body.mantine-Modal-body {
+  padding: 20px 24px 24px;
+}
+.pd-modal-form {
+  display: grid;
+  gap: 20px;
+}
+.pd-modal-sum {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  font-size: 13.5px;
+}
+.pd-modal-sum .t {
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.pd-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pd-quick button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--pulse-line-2);
+  background: transparent;
+  color: var(--pulse-ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pd-quick button:hover {
+  border-color: var(--pulse-ink-3);
+  color: var(--pulse-ink-1);
+}
+.pd-quick button[aria-pressed='true'] {
+  background: var(--pulse-accent);
+  border-color: var(--pulse-accent);
+  color: var(--pulse-on-accent);
+}
+.pd-quick button:focus-visible {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 1px;
+}
+.pd-hint {
+  font-size: 12.5px;
+  color: var(--pulse-ink-3);
+}
+.pd-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}

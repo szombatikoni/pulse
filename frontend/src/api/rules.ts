@@ -41,12 +41,17 @@ export function usePatientRules(patientId: string) {
   })
 }
 
-/** Új szabály és új verzió. Mindkettő a beteg összes lekérdezését frissíti
- * (['patients', id] előtag): a módosítás a nyitott riasztás történetébe is
- * „A szabály módosult" eseményt ír. */
+/** Új szabály és új verzió. Mindkettő a beteg összes lekérdezését (['patients', id]
+ * előtag) és az orvosi listákat (['doctor']: beteglista, Riasztások oldal) frissíti:
+ * a módosítás a nyitott riasztás történetébe is „A szabály módosult" eseményt ír. */
 export function useRuleMutations(patientId: string) {
   const queryClient = useQueryClient()
-  const onSuccess = () => queryClient.invalidateQueries({ queryKey: ['patients', patientId] })
+  const onSuccess = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['patients', patientId] }),
+      queryClient.invalidateQueries({ queryKey: ['doctor'] }),
+    ])
+  }
   return {
     create: useMutation({
       mutationFn: (body: RuleCreate) => apiPost<Rule>(`/patients/${patientId}/rules`, body),

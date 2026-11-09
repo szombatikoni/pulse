@@ -63,30 +63,51 @@ export type RuleVersion = {
   params: RuleParams
 }
 
+/** Egy felhasználó röviden (orvosnál a profil szerinti név); az id a users.id. */
+export type UserRef = { id: string; name: string }
+
 export type AlertEvent = {
   event_type: string
   created_at: string
   rule_version: RuleVersion | null
   triggers: Trigger[]
+  /** Ki váltotta ki; üres = a rendszer (kiértékelés). */
+  actor?: UserRef | null
+  /** Lezárásnál az orvos indoklása. */
+  reason?: string | null
+  /** Felelőshöz rendelésnél: kihez rendelték. */
+  assignee?: UserRef | null
 }
+
+export type AlertState = 'new' | 'seen' | 'assigned' | 'closed'
 
 export type Alert = {
   id: string
-  status: 'new' | 'seen' | 'assigned' | 'closed'
+  status: AlertState
   severity: Severity
   created_at: string
   needs_review: boolean
   rule_version: RuleVersion
   events: AlertEvent[]
+  /** Az aktuális felelős orvos; üres = még nincs felelős. */
+  assigned_to?: UserRef | null
 }
 
 export type StatusReason = {
   status: PatientStatus
-  code: 'open_alert' | 'missed_occurrence' | 'no_data_yet' | 'stale_data' | 'fresh_data'
+  code:
+    | 'open_alert'
+    | 'missed_occurrence'
+    | 'no_data_yet'
+    | 'stale_data'
+    | 'closed_awaiting_data'
+    | 'fresh_data'
   at: string | null
   alert_id: string | null
   severity: Severity | null
   trigger: Trigger | null
+  /** Kezelve oknál (closed_awaiting_data) a lezáró orvos; az at a lezárás ideje. */
+  actor?: UserRef | null
 }
 
 export type PatientSummary = {
