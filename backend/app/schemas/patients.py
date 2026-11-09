@@ -61,11 +61,24 @@ class RuleVersionOut(BaseModel):
     params: dict[str, Any]
 
 
+class UserRefOut(BaseModel):
+    """Egy felhasználó röviden (orvosnál a profil szerinti név)."""
+
+    id: uuid.UUID
+    name: str
+
+
 class AlertEventOut(BaseModel):
     event_type: AlertEventType
     created_at: datetime
     rule_version: RuleVersionOut | None
     triggers: list[TriggerOut]
+    # Ki váltotta ki; üres = a rendszer (pl. kiértékelés).
+    actor: UserRefOut | None = None
+    # Lezárásnál az orvos indoklása.
+    reason: str | None = None
+    # Felelőshöz rendelésnél: kihez rendelték (a korábbi felelősök is látszanak).
+    assignee: UserRefOut | None = None
 
 
 class AlertOut(BaseModel):
@@ -77,17 +90,22 @@ class AlertOut(BaseModel):
     # A riasztást megnyitó szabályverzió; a további eseményeké az events-ben.
     rule_version: RuleVersionOut
     events: list[AlertEventOut]
+    # Az aktuális felelős orvos; üres = még nincs felelős.
+    assigned_to: UserRefOut | None = None
 
 
 class StatusReasonOut(BaseModel):
     status: PatientStatus
     code: str = Field(
-        description="open_alert | missed_occurrence | no_data_yet | stale_data | fresh_data"
+        description="open_alert | missed_occurrence | no_data_yet | stale_data "
+        "| closed_awaiting_data | fresh_data"
     )
     at: datetime | None
     alert_id: uuid.UUID | None
     severity: Severity | None
     trigger: TriggerOut | None
+    # Kezelve oknál (closed_awaiting_data) a lezáró orvos; az at a lezárás ideje.
+    actor: UserRefOut | None = None
 
 
 class PatientSummaryOut(BaseModel):
@@ -138,7 +156,17 @@ def trigger_out(trigger: TriggerExplanation) -> TriggerOut:
     )
 
 
-def alert_out(alert: Alert, events: list[EventExplanation]) -> AlertOut:
+def user_ref(user_id: uuid.UUID | None, names: dict[uuid.UUID, str]) -> UserRefOut | None:
+    """A names a felhasználók neve azonosító szerint (services/alerts.user_names)."""
+    if user_id is None:
+        return None
+    return UserRefOut(id=user_id, name=names.get(user_id, ""))
+
+
+def alert_out(
+    alert: Alert, events: list[EventExplanation], names: dict[uuid.UUID, str] | None = None
+) -> AlertOut:
+    names = names or {}
     return AlertOut(
         id=alert.id,
         status=alert.status,
@@ -152,9 +180,13 @@ def alert_out(alert: Alert, events: list[EventExplanation]) -> AlertOut:
                 created_at=e.event.created_at,
                 rule_version=rule_version_out(e.version) if e.version else None,
                 triggers=[trigger_out(t) for t in e.triggers],
+                actor=user_ref(e.event.actor_id, names),
+                reason=e.event.reason,
+                assignee=user_ref(e.event.assignee_id, names),
             )
             for e in events
         ],
+        assigned_to=user_ref(alert.assigned_to, names),
     )
 
 
@@ -162,9 +194,12 @@ def patient_summary_out(
     patient: PatientProfile,
     result: PatientStatusResult,
     triggers: dict[uuid.UUID, TriggerExplanation | None],
+    names: dict[uuid.UUID, str] | None = None,
 ) -> PatientSummaryOut:
     """A triggers a riasztás okainál a riasztás azonosítója, az elmulasztott
-    alkalom okainál az alkalom azonosítója szerint adja az „Ok" oszlop adatát."""
+    alkalom okainál az alkalom azonosítója szerint adja az „Ok" oszlop adatát.
+    A names a Kezelve okok lezáró orvosainak neve."""
+    names = names or {}
     reasons = []
     for reason in result.reasons:
         key = reason.alert.id if reason.alert else reason.occurrence_id
@@ -177,6 +212,7 @@ def patient_summary_out(
                 alert_id=reason.alert.id if reason.alert else None,
                 severity=reason.alert.severity if reason.alert else None,
                 trigger=trigger_out(trigger) if trigger else None,
+                actor=user_ref(reason.actor_id, names),
             )
         )
     return PatientSummaryOut(

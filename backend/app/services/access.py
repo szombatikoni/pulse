@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from sqlalchemy import ColumnElement, Select, and_, exists, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import DoctorPatient, PatientProfile, User, UserRole
+from app.models import DoctorPatient, DoctorProfile, PatientProfile, User, UserRole
 
 
 def _valid_at(at: datetime) -> ColumnElement[bool]:
@@ -45,6 +45,17 @@ def assigned_patients_query(doctor_id: uuid.UUID, at: datetime) -> Select[tuple[
         select(PatientProfile)
         .join(DoctorPatient, DoctorPatient.patient_id == PatientProfile.id)
         .where(DoctorPatient.doctor_id == doctor_id, _valid_at(at))
+    )
+
+
+def assigned_doctors_query(patient_id: uuid.UUID, at: datetime) -> Select[tuple[DoctorProfile]]:
+    """A beteghez az adott pillanatban rendelt, aktív orvosok (a riasztás
+    felelős-választójához)."""
+    return (
+        select(DoctorProfile)
+        .join(DoctorPatient, DoctorPatient.doctor_id == DoctorProfile.id)
+        .join(User, User.id == DoctorProfile.user_id)
+        .where(DoctorPatient.patient_id == patient_id, _valid_at(at), User.is_active)
     )
 
 

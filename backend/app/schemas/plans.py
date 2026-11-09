@@ -1,11 +1,12 @@
 import uuid
 from datetime import date, datetime, time
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.models import AssignmentTarget, Frequency
+from app.models import AssignmentTarget, Frequency, RuleType
 from app.models.questionnaire import REVOKE_NOTE_MAX
+from app.services.notifications import AlertFeedback
 from app.services.plans import PlanEntry, PlanNotice, PlanParams
 
 # Az orvos indoklása a betegnek (visszavonásnál és módosításnál, nem kötelező).
@@ -126,6 +127,42 @@ class PlanNoticeOut(BaseModel):
     new_interval_days: int | None
     new_due_time: time | None
     new_start_date: date | None
+
+
+class AlertFeedbackNoticeOut(BaseModel):
+    """Jelzés a betegnek: az orvos visszajelzése egy riasztás lezárásakor (M3,
+    A6). Egyirányú, válaszolni nem lehet. A changed_at a létrehozás ideje (a
+    közös rendezéshez ugyanaz a mezőnév, mint az előírás-jelzéseknél)."""
+
+    kind: Literal["alert_feedback"]
+    changed_at: datetime
+    text: str
+    doctor_name: str
+    alert_id: uuid.UUID
+    # Miről szólt a riasztás: a szabály típusa és célpontja (méréstípus vagy
+    # kérdőív kódja és neve), pl. „a vérnyomás-riasztás lezárásakor".
+    rule_type: RuleType
+    target_code: str
+    target_name: str
+
+
+def alert_feedback_out(feedback: AlertFeedback) -> AlertFeedbackNoticeOut:
+    n = feedback.notification
+    assert n.alert_id is not None
+    return AlertFeedbackNoticeOut(
+        kind="alert_feedback",
+        changed_at=n.created_at,
+        text=n.text,
+        doctor_name=feedback.doctor_name,
+        alert_id=n.alert_id,
+        rule_type=feedback.rule_type,
+        target_code=feedback.target_code,
+        target_name=feedback.target_name,
+    )
+
+
+# A betegoldali jelzések egy listában, a kind szerint megkülönböztetve.
+NoticeOut = Annotated[PlanNoticeOut | AlertFeedbackNoticeOut, Field(discriminator="kind")]
 
 
 def plan_notice_out(notice: PlanNotice) -> PlanNoticeOut:

@@ -251,8 +251,15 @@ def add_rule_version(
     Ha a szabálynak van nyitott riasztása, a történetébe „szabály módosult"
     esemény kerül a módosító orvossal és az új verzióval (07_mukodesi_szabalyok.md
     3. rész; Fable-átnézés F2). A riasztás megnyitáskori verziója, súlyossága és
-    kiváltó adatai nem változnak: az új verzió a következő kiértékeléstől számít."""
+    kiváltó adatai nem változnak: az új verzió a következő kiértékeléstől számít.
+
+    Egyidejű mentés: a szabály sora a verziószám olvasása előtt zárolódik
+    (SELECT … FOR UPDATE), így két párhuzamos módosítás egymás után fut, és a
+    második már az első verzióját látja; a (rule_id, version_no) egyediség nem
+    sérülhet. Zárolási sorrend: szabály, majd a nyitott riasztás; az életút-
+    műveletek csak a riasztást zárolják, így körkörös várakozás nem alakulhat ki."""
     now = now or datetime.now(UTC)
+    db.execute(select(Rule.id).where(Rule.id == rule.id).with_for_update())
     last = db.scalar(
         select(RuleVersion)
         .where(RuleVersion.rule_id == rule.id)
@@ -275,7 +282,7 @@ def add_rule_version(
     )
     db.add(version)
     db.flush()
-    alert = open_alert(db, rule.patient_id, rule.id)
+    alert = open_alert(db, rule.patient_id, rule.id, for_update=True)
     if alert is not None:
         db.add(
             AlertEvent(
@@ -353,22 +360,38 @@ def threshold_violations(params: ThresholdParams, measurement: Measurement) -> l
     return violations
 
 
-def open_alert(db: Session, patient_id: uuid.UUID, rule_id: uuid.UUID) -> Alert | None:
-    return db.scalar(
-        select(Alert).where(
-            Alert.patient_id == patient_id,
-            Alert.rule_id == rule_id,
-            Alert.status != AlertStatus.CLOSED,
-        )
+def open_alert(
+    db: Session, patient_id: uuid.UUID, rule_id: uuid.UUID, *, for_update: bool = False
+) -> Alert | None:
+    """A beteg + szabály páros nyitott riasztása (legfeljebb egy van).
+
+    `for_update=True` az írási ágnak való (új esemény kerül a riasztásba): a sort
+    ugyanúgy zárolja (SELECT … FOR UPDATE), mint az életút-műveletek lock_alert-je.
+    Ha közben egy orvos épp lezárja, a kiértékelés megvárja a lezárás végét; a
+    PostgreSQL ekkor a friss soron újra ellenőrzi a feltételt, a lezárt riasztás
+    kiesik, és a hívó új riasztást nyit, nem a lezártba ír. A csak olvasó hívások
+    zár nélkül futnak."""
+    query = select(Alert).where(
+        Alert.patient_id == patient_id,
+        Alert.rule_id == rule_id,
+        Alert.status != AlertStatus.CLOSED,
     )
+    if for_update:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    return db.scalar(query)
 
 
 def _active_rules(
     db: Session, patient_id: uuid.UUID, rule_type: RuleType
 ) -> Iterator[tuple[Rule, RuleVersion]]:
-    """A beteg aktív szabályai az aktuális verziójukkal, egy szabálytípusból."""
+    """A beteg aktív szabályai az aktuális verziójukkal, egy szabálytípusból.
+
+    Rögzített sorrendben, hogy két egyidejű kiértékelés a riasztásokat azonos
+    sorrendben zárolja (_raise_alert), és ne várjanak körkörösen egymásra."""
     rules = db.scalars(
-        select(Rule).where(Rule.patient_id == patient_id, Rule.is_active.is_(True))
+        select(Rule)
+        .where(Rule.patient_id == patient_id, Rule.is_active.is_(True))
+        .order_by(Rule.created_at, Rule.id)
     ).all()
     for rule in rules:
         version = current_version(db, rule.id)
@@ -388,11 +411,15 @@ def _raise_alert(
     „ismételt aktiválódás" esemény hozzá (F18; a súlyosság emelkedhet). Minden
     esemény tárolja az alkalmazott szabályverziót és a kiváltó adatot (F17).
 
+    A nyitott riasztás sorzárral olvasódik (open_alert for_update), így egy
+    egyidejű lezárás után nem a lezártba kerül „ismételt aktiválódás".
+
     TODO M3: két egyidejű kérés ugyanarra a beteg + szabály párosra mindkettőben
-    „nincs nyitott riasztást" láthat; a második ekkor az uq_alerts_open_per_rule
-    indexbe ütközik, és a mérése is visszagördül. Megoldás: a beteg szabályainak
-    zárolása (SELECT … FOR UPDATE) a kiértékelés elején (Fable-átnézés F4)."""
-    alert = open_alert(db, patient_id, rule.id)
+    „nincs nyitott riasztást" láthat (nem létező sort a FOR UPDATE nem zárol); a
+    második ekkor az uq_alerts_open_per_rule indexbe ütközik, és a mérése is
+    visszagördül. Megoldás: a beteg szabályainak zárolása (SELECT … FOR UPDATE) a
+    kiértékelés elején (Fable-átnézés F4)."""
+    alert = open_alert(db, patient_id, rule.id, for_update=True)
     if alert is None:
         alert = Alert(
             patient_id=patient_id,
@@ -545,7 +572,7 @@ class MissedTarget:
     questionnaire_template_id: uuid.UUID | None
 
 
-def _target_id(db: Session, params: MissingDataParams) -> uuid.UUID | None:
+def missing_target_id(db: Session, params: MissingDataParams) -> uuid.UUID | None:
     """A szabály célpontjának azonosítója (kérdőívsablon vagy méréstípus) a
     kódja alapján; None, ha a kód közben megszűnt (létrehozáskor létezett)."""
     if params.questionnaire is not None:
@@ -559,7 +586,7 @@ def _target_id(db: Session, params: MissingDataParams) -> uuid.UUID | None:
     )
 
 
-def _target_column(params: MissingDataParams) -> Any:
+def missing_target_column(params: MissingDataParams) -> Any:
     """Az előírás oszlopa, amely a szabály célpontjára mutat."""
     if params.questionnaire is not None:
         return Assignment.questionnaire_template_id
@@ -589,7 +616,7 @@ def missed_streak(
             .join(Assignment, AssignmentOccurrence.assignment_id == Assignment.id)
             .where(
                 Assignment.patient_id == patient_id,
-                _target_column(params) == target_id,
+                missing_target_column(params) == target_id,
                 AssignmentOccurrence.status != OccurrenceStatus.DUE,
             )
             .order_by(AssignmentOccurrence.due_at.desc(), AssignmentOccurrence.id.desc())
@@ -618,7 +645,7 @@ def evaluate_missed(
         patient_targets = [t for t in targets if t.patient_id == patient_id]
         for rule, version in _active_rules(db, patient_id, RuleType.MISSING_DATA):
             params = MissingDataParams.model_validate(version.params)
-            target_id = _target_id(db, params)
+            target_id = missing_target_id(db, params)
             if target_id is None or not any(_hits(params, target_id, t) for t in patient_targets):
                 continue
             streak = missed_streak(db, patient_id, params, target_id)

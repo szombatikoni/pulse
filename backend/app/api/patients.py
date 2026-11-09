@@ -1,18 +1,28 @@
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query
 
 from app.api.deps import DoctorUser, ensure_patient_access
 from app.core.db import DbSession
-from app.models import PatientProfile
-from app.schemas.patients import AlertOut, PatientSummaryOut, alert_out, patient_summary_out
+from app.models import DoctorProfile, PatientProfile
+from app.schemas.patients import (
+    AlertOut,
+    PatientSummaryOut,
+    UserRefOut,
+    alert_out,
+    patient_summary_out,
+)
 from app.schemas.tasks import task_out
+from app.services.access import assigned_doctors_query
 from app.services.alerts import (
     TriggerExplanation,
+    alert_user_ids,
     explain_alert,
     latest_trigger,
     list_patient_alerts,
     occurrence_triggers,
+    user_names,
 )
 from app.services.status import PatientStatusResult, compute_status, doctor_patient_list
 from app.services.tasks import patient_tasks
@@ -30,7 +40,9 @@ def _summary(
     missed = [r.occurrence.id for r in result.reasons if r.occurrence]
     for occurrence in occurrence_triggers(db, missed):
         triggers[occurrence.occurrence.id] = TriggerExplanation(occurrence=occurrence)
-    summary = patient_summary_out(patient, result, triggers)
+    # A Kezelve okoknál a lezáró orvos neve (csak ha van ilyen ok: plusz egy lekérdezés).
+    names = user_names(db, {r.actor_id for r in result.reasons})
+    summary = patient_summary_out(patient, result, triggers, names)
     summary.tasks = [task_out(t) for t in patient_tasks(db, patient.id)]
     return summary
 
@@ -67,4 +79,19 @@ def patient_alerts(
     mely mérések alapján, melyik határt lépte át. Csak az orvos látja."""
     ensure_patient_access(db, user, patient_id)
     alerts = list_patient_alerts(db, patient_id, open_only=not include_closed)
-    return [alert_out(alert, explain_alert(db, alert)) for alert in alerts]
+    names = user_names(db, alert_user_ids(alerts))
+    return [alert_out(alert, explain_alert(db, alert), names) for alert in alerts]
+
+
+@router.get("/patients/{patient_id}/doctors", responses=FORBIDDEN)
+def patient_doctors(patient_id: uuid.UUID, db: DbSession, user: DoctorUser) -> list[UserRefOut]:
+    """A beteghez ÉPPEN hozzárendelt orvosok (a riasztás felelős-választójához,
+    M3, A6 D2), név szerint. Az id a FELHASZNÁLÓ-azonosító (users.id), mint a
+    POST /alerts/{id}/assign doctor_id-je. Csak a beteg hozzárendelt orvosa éri el."""
+    ensure_patient_access(db, user, patient_id)
+    doctors = db.scalars(
+        assigned_doctors_query(patient_id, datetime.now(UTC)).order_by(
+            DoctorProfile.name, DoctorProfile.id
+        )
+    )
+    return [UserRefOut(id=d.user_id, name=d.name) for d in doctors]

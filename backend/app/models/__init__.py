@@ -18,6 +18,7 @@ from app.models.measurement import (
     MeasurementType,
     MeasurementValue,
 )
+from app.models.notification import Notification, NotificationType
 from app.models.questionnaire import (
     Answer,
     Assignment,
@@ -52,6 +53,8 @@ __all__ = [
     "MeasurementComponent",
     "MeasurementType",
     "MeasurementValue",
+    "Notification",
+    "NotificationType",
     "OccurrenceStatus",
     "PatientProfile",
     "Question",

@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api import (
     admin,
+    alerts,
     auth,
     fhir,
     health,
@@ -23,4 +24,5 @@ api_router.include_router(questionnaires.router)
 api_router.include_router(tasks.router)
 api_router.include_router(plans.router)
 api_router.include_router(rules.router)
+api_router.include_router(alerts.router)
 api_router.include_router(fhir.router)

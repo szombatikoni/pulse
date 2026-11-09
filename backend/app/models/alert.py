@@ -35,7 +35,8 @@ class Severity(StrEnum):
 
 class AlertStatus(StrEnum):
     """A riasztás életútja (4.3): keletkezett → megtekintett → felelőshöz
-    rendelt → lezárt. Az M2-ben csak a keletkezés van; a többi az M3-ban."""
+    rendelt → lezárt. Lépés előre kihagyható, visszaút és újranyitás nincs
+    (a váltások: services/alerts.py, M3 A6)."""
 
     NEW = "new"
     SEEN = "seen"
@@ -107,12 +108,18 @@ class Alert(Base):
     trigger_data_ids: Mapped[list[str]] = mapped_column(JSONB)
     # „Kiváltó adat javítva": az orvosnak kell felülvizsgálnia (F17, M3).
     needs_review: Mapped[bool] = mapped_column(default=False)
+    # Az aktuális felelős orvos (felhasználó); NULL = még nincs felelős. A
+    # korábbi hozzárendelések az eseménytörténetben (assigned) látszanak. Az
+    # összerendelés megszűnése után is megmarad (történeti adat, A6 D2).
+    assigned_to: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     # A kiértékelés idejét a szolgáltatás adja (a tesztekben szimulált idő).
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     rule_version: Mapped[RuleVersion] = relationship()
+    # Azonos időbélyegnél az id a másodlagos kulcs: így a sorrend minden
+    # lekérdezésben ugyanaz (determinisztikus, bár UUID-nál nem a beszúrási sorrend).
     events: Mapped[list["AlertEvent"]] = relationship(
-        back_populates="alert", order_by="AlertEvent.created_at"
+        back_populates="alert", order_by=lambda: [AlertEvent.created_at, AlertEvent.id]
     )
 
     __table_args__ = (
@@ -141,8 +148,12 @@ class AlertEvent(Base):
     )
     rule_version_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("rule_versions.id"))
     trigger_data_ids: Mapped[list[str] | None] = mapped_column(JSONB)
-    # Lezárásnál kötelező indoklás (M3).
+    # Lezárásnál kötelező indoklás (M3, A6).
     reason: Mapped[str | None] = mapped_column(Text)
+    # Felelőshöz rendelésnél: KIHEZ rendelték (az orvos felhasználója). Így
+    # újra-hozzárendelés után is kiolvasható a korábbi felelősök sora; az
+    # aktuális felelős az Alert.assigned_to. Más eseménynél üres.
+    assignee_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     # A kiértékelés idejét a szolgáltatás adja (a tesztekben szimulált idő).
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

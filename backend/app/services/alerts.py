@@ -1,4 +1,11 @@
-"""Riasztások lekérdezése és magyarázata (F10, F17).
+"""Riasztások lekérdezése, magyarázata és életútja (F10, F17, F18).
+
+Az életút (M3, A6; a hallgató döntései, 2026-11-09): keletkezett (new) →
+megtekintett (seen) → felelőshöz rendelt (assigned) → lezárt (closed). Lépés
+előre kihagyható (pl. lezárás közvetlenül new-ból), visszaút és újranyitás
+nincs: lezárás után az új kiváltó adat ÚJ riasztást nyit (07/1. példa).
+Minden váltás AlertEvent a szereplővel. A lezárt riasztáson minden további
+váltás hiba (409, already_closed), a megtekintés is: a lezárás a végállapot.
 
 A magyarázatot nem tároljuk szövegként: az esemény alkalmazott szabályverziójából
 és a kiváltó adatokból állítjuk elő. A kiváltó adat a szabálytípustól függ:
@@ -11,6 +18,7 @@ a magyarázat utólag sem változik.
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -18,17 +26,22 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.models import (
     Alert,
     AlertEvent,
+    AlertEventType,
     AlertStatus,
     Assignment,
     AssignmentOccurrence,
     AssignmentTarget,
     Measurement,
     MeasurementType,
+    Notification,
+    NotificationType,
     QuestionnaireTemplate,
     RuleType,
     RuleVersion,
     Submission,
+    User,
 )
+from app.services.access import active_assignment_exists, assigned_patients_query
 from app.services.measurements import get_measurements
 from app.services.questionnaires import band_for, get_submissions
 from app.services.rules import SEVERITY_RANK, ThresholdParams, Violation, threshold_violations
@@ -155,3 +168,173 @@ def latest_trigger(db: Session, alert: Alert) -> TriggerExplanation | None:
             if triggers:
                 return triggers[-1]
     return None
+
+
+def user_names(db: Session, ids: set[uuid.UUID | None]) -> dict[uuid.UUID, str]:
+    """A felhasználók megjelenítendő neve (orvosnál és betegnél a profil szerinti
+    név, adminnál az e-mail-cím) egy lekérdezéssel."""
+    ids = {i for i in ids if i is not None}
+    if not ids:
+        return {}
+    users = db.scalars(
+        select(User)
+        .where(User.id.in_(ids))
+        .options(selectinload(User.doctor_profile), selectinload(User.patient_profile))
+    )
+    names = {}
+    for user in users:
+        profile = user.doctor_profile or user.patient_profile
+        names[user.id] = profile.name if profile else user.email
+    return names
+
+
+def alert_user_ids(alerts: list[Alert]) -> set[uuid.UUID | None]:
+    """A riasztások eseményeinek szereplői és felelősei, valamint az aktuális
+    felelősök (a névfeloldáshoz)."""
+    ids: set[uuid.UUID | None] = {a.assigned_to for a in alerts}
+    ids.update(e.actor_id for a in alerts for e in a.events)
+    ids.update(e.assignee_id for a in alerts for e in a.events)
+    return ids
+
+
+# --- Életút (M3, A6) -------------------------------------------------------------------
+
+
+class AlertError(ValueError):
+    """Érvénytelen életút-művelet; a `code` alapján a felület a saját nyelvén
+    írja ki (mint a PlanError). A `conflict` a riasztás állapotával ütköző
+    műveletet jelzi (HTTP 409), a többi érvénytelen adat (HTTP 422)."""
+
+    def __init__(self, code: str, conflict: bool = False) -> None:
+        super().__init__(code)
+        self.code = code
+        self.conflict = conflict
+
+
+def lock_alert(db: Session, alert_id: uuid.UUID) -> Alert | None:
+    """A riasztás sorzárral (SELECT … FOR UPDATE): két egyidejű váltás (pl. két
+    orvos egyszerre zár le) egymás után fut, a második már a lezártat látja."""
+    return db.scalar(
+        select(Alert)
+        .where(Alert.id == alert_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
+def _event(
+    db: Session,
+    alert: Alert,
+    event_type: AlertEventType,
+    actor: User,
+    now: datetime,
+    reason: str | None = None,
+    assignee_id: uuid.UUID | None = None,
+) -> AlertEvent:
+    event = AlertEvent(
+        alert_id=alert.id,
+        actor_id=actor.id,
+        event_type=event_type,
+        reason=reason,
+        assignee_id=assignee_id,
+        created_at=now,
+    )
+    db.add(event)
+    db.flush()
+    return event
+
+
+def _ensure_open(alert: Alert) -> None:
+    if alert.status is AlertStatus.CLOSED:
+        raise AlertError("already_closed", conflict=True)
+
+
+def mark_seen(db: Session, alert: Alert, actor: User, now: datetime | None = None) -> bool:
+    """Megtekintett: csak a keletkezett (new) riasztás vált, és csak egyszer;
+    a már megtekintett vagy felelőshöz rendelt riasztásnál nem ír semmit
+    (idempotens). Lezárt riasztásnál hiba. Visszaadja, történt-e váltás."""
+    _ensure_open(alert)
+    if alert.status is not AlertStatus.NEW:
+        return False
+    alert.status = AlertStatus.SEEN
+    _event(db, alert, AlertEventType.SEEN, actor, now or datetime.now(UTC))
+    return True
+
+
+def assign_alert(
+    db: Session, alert: Alert, actor: User, doctor: User | None, now: datetime | None = None
+) -> None:
+    """Felelőshöz rendelés: a felelős csak a beteghez ÉPPEN hozzárendelt orvos
+    lehet, önmaga is (A6 D2). Újra-hozzárendelés megengedett, új eseménnyel.
+    Az esemény szereplője a hozzárendelő orvos, a felelőse (assignee_id) akihez
+    rendelte; az aktuális felelős az Alert.assigned_to mezőbe is bekerül."""
+    _ensure_open(alert)
+    now = now or datetime.now(UTC)
+    if (
+        doctor is None
+        or not doctor.is_active
+        or doctor.doctor_profile is None
+        or not active_assignment_exists(db, doctor.doctor_profile.id, alert.patient_id, now)
+    ):
+        raise AlertError("doctor_not_assigned")
+    alert.status = AlertStatus.ASSIGNED
+    alert.assigned_to = doctor.id
+    _event(db, alert, AlertEventType.ASSIGNED, actor, now, assignee_id=doctor.id)
+
+
+def close_alert(
+    db: Session,
+    alert: Alert,
+    actor: User,
+    reason: str,
+    message: str | None = None,
+    now: datetime | None = None,
+) -> Notification | None:
+    """Lezárás bármely nyitott állapotból, kötelező indoklással (az esemény
+    reason mezőjébe). Ha az orvos a betegnek is üzen, az értesítés ugyanebben a
+    tranzakcióban jön létre (alert_feedback, a lezáró orvossal); ezt adja
+    vissza. Az indoklás és az üzenet szóközök nélkül; üres indoklás hiba."""
+    _ensure_open(alert)
+    reason = reason.strip()
+    if not reason:
+        raise AlertError("reason_required")
+    message = (message or "").strip() or None
+    now = now or datetime.now(UTC)
+    alert.status = AlertStatus.CLOSED
+    _event(db, alert, AlertEventType.CLOSED, actor, now, reason=reason)
+    if message is None:
+        return None
+    notification = Notification(
+        patient_id=alert.patient_id,
+        type=NotificationType.ALERT_FEEDBACK,
+        text=message,
+        alert_id=alert.id,
+        created_by=actor.id,
+        created_at=now,
+    )
+    db.add(notification)
+    db.flush()
+    return notification
+
+
+def list_doctor_alerts(
+    db: Session,
+    doctor_profile_id: uuid.UUID,
+    status: AlertStatus | None = None,
+    now: datetime | None = None,
+) -> list[Alert]:
+    """Az orvos ÉPPEN hozzárendelt betegeinek nyitott riasztásai (a Riasztások
+    oldalhoz), opcionálisan egy állapotra szűrve. Sorrend, mint a beteg
+    riasztásainál: elöl a súlyosabb, azon belül a frissebb."""
+    now = now or datetime.now(UTC)
+    patients = assigned_patients_query(doctor_profile_id, now).subquery()
+    query = (
+        select(Alert)
+        .where(Alert.patient_id.in_(select(patients.c.id)), Alert.status != AlertStatus.CLOSED)
+        .options(selectinload(Alert.rule_version), selectinload(Alert.events))
+    )
+    if status is not None:
+        query = query.where(Alert.status == status)
+    alerts = list(db.scalars(query))
+    alerts.sort(key=lambda a: (SEVERITY_RANK[a.severity], a.created_at), reverse=True)
+    return alerts
