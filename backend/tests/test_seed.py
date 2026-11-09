@@ -1,11 +1,14 @@
 """A seed (mesterséges demóadat, M2-leadandó) gépi ellenőrzése."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
 
+import pytest
 from sqlalchemy import func, select
 
+from app.core.config import settings
 from app.models import (
     Alert,
+    AlertEventType,
     Assignment,
     AssignmentOccurrence,
     DoctorPatient,
@@ -14,11 +17,14 @@ from app.models import (
     OccurrenceStatus,
     QuestionnaireTemplate,
     Rule,
+    RuleType,
+    Severity,
     Submission,
     User,
 )
 from app.services.access import can_access_patient
 from app.services.occurrences import OccurrenceCheck, run_occurrence_check
+from app.services.rules import current_version
 from app.services.status import PatientStatus, doctor_patient_list
 from app.services.users import get_user_by_email
 from seed.demo import ASSIGNMENTS, DEMO_PASSWORD, USERS, seed_demo_data
@@ -86,18 +92,75 @@ def test_seed_opens_and_closes_occurrences_at_once(db):
     assert len(statuses) == 15
 
 
-def test_seeded_doctor_list_shows_every_m2_status(db):
-    # A bemutatóhoz: Kovács doktor listáján minden M2-beli státusz megjelenik,
-    # a valódi szabálykiértékelés eredményeként, priorizálva.
-    seed_demo_data(db)
+@pytest.mark.parametrize("hour", [3, 9, 20])
+def test_seeded_doctor_list_shows_every_status(db, hour):
+    # A bemutatóhoz: Kovács doktor listáján minden státusz megjelenik (a Kezelve
+    # kivételével), a valódi szabálykiértékelés eredményeként, priorizálva, a
+    # futtatás napszakától függetlenül (a mérések reggel, a kitöltések este
+    # vannak, a pótlási ablak 48 óra). A seed holnapi időpontja azért kell,
+    # mert az összerendelés a valódi „most"-tól érvényes.
+    now = datetime.combine(
+        datetime.now(settings.tz).date() + timedelta(days=1), time(hour), tzinfo=settings.tz
+    )
+    seed_demo_data(db, now=now)
     kovacs = get_user_by_email(db, "dr.kovacs@pulse.example")
-    rows = doctor_patient_list(db, kovacs.doctor_profile.id)
-    assert [(p.name, r.status) for p, r in rows] == [
-        ("Varga Béla", PatientStatus.SEVERE),
-        ("Szabó János", PatientStatus.ATTENTION),
-        ("Kiss Ilona", PatientStatus.NO_DATA),
-        ("Molnár Katalin", PatientStatus.OK),
+    rows = doctor_patient_list(db, kovacs.doctor_profile.id, now)
+    assert [(p.name, r.status, [x.code for x in r.reasons]) for p, r in rows] == [
+        # 186 Hgmm (küszöb, súlyos) és tartósan 140/90 felett (időablak); a
+        # Közérzetet nem tölti ki.
+        ("Varga Béla", PatientStatus.SEVERE, ["open_alert", "open_alert", "missed_occurrence"]),
+        # Három 140/90 feletti érték egy héten belül, és figyelmeztető sávú kitöltés.
+        ("Szabó János", PatientStatus.ATTENTION, ["open_alert", "open_alert"]),
+        # A múlt heti Közérzet-alkalma elmaradt (a vérnyomását méri).
+        ("Kiss Ilona", PatientStatus.NO_DATA, ["missed_occurrence"]),
+        ("Molnár Katalin", PatientStatus.OK, ["fresh_data"]),
     ]
+    varga, szabo, kiss, _ = (r for _, r in rows)
+    assert [r.alert.rule_version.rule_type for r in varga.reasons[:2]] == [
+        RuleType.THRESHOLD,
+        RuleType.WINDOW,
+    ]
+    assert [r.alert.rule_version.rule_type for r in szabo.reasons] == [
+        RuleType.WINDOW,
+        RuleType.QUESTIONNAIRE,
+    ]
+    window_events = [e.event_type for e in szabo.reasons[0].alert.events]
+    assert window_events == [AlertEventType.CREATED, AlertEventType.RE_TRIGGERED]
+    assert kiss.reasons[0].occurrence.assignment.questionnaire_template_id is not None
+
+
+def test_seed_rules_follow_the_comparison_setup(db):
+    # 07_mukodesi_szabalyok.md, 5. rész: küszöb csak a kritikus határon, időablak,
+    # kérdőív sáv és trend, elmaradt adat.
+    seed_demo_data(db)
+    molnar = get_user_by_email(db, "molnar.katalin@pulse.example").patient_profile
+    versions = [
+        current_version(db, rule.id)
+        for rule in db.scalars(select(Rule).where(Rule.patient_id == molnar.id))
+    ]
+    by_type = [(v.rule_type, v.severity, v.params) for v in versions]
+    assert (
+        RuleType.THRESHOLD,
+        Severity.SEVERE,
+        {"measurement_type": "blood_pressure", "limits": {"systolic": {"max": 180}}},
+    ) in by_type
+    assert (
+        RuleType.MISSING_DATA,
+        Severity.MODERATE,
+        {"measurement_type": "blood_pressure", "consecutive_missed": 2},
+    ) in by_type
+    assert sorted(v.rule_type for v in versions) == sorted(
+        [
+            RuleType.THRESHOLD,
+            RuleType.WINDOW,
+            RuleType.QUESTIONNAIRE,
+            RuleType.QUESTIONNAIRE,
+            RuleType.QUESTIONNAIRE,
+            RuleType.MISSING_DATA,
+        ]
+    )
+    trend = [v.params for v in versions if v.params.get("trend_count")]
+    assert trend == [{"questionnaire": "wellbeing", "trend_count": 3}]
 
 
 def test_seeded_doctor_sees_only_own_patient(db):

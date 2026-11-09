@@ -6,11 +6,13 @@ bemutató célra való.
 A mérések ugyanazon az úton kerülnek be, mint a felületről (rögzítés +
 kiértékelés), így a riasztásokat a valódi szabálykiértékelés hozza létre. Az
 időpontok a futtatás idejéhez képest relatívak, hogy a bemutatón mindig friss
-adat legyen. Kovács doktor listáján így minden M2-beli státusz megjelenik:
-Varga Béla Súlyos, Szabó János Figyelem, Kiss Ilona Adathiány, Molnár Katalin
-Rendben. A „Közérzet" kérdőívet minden demóbeteg megkapja; Szabó János
-legutóbbi kitöltése a figyelmeztető sávba esik. A végén egy alkalom-ellenőrzés
-megnyitja és lezárja az előírások múltbeli alkalmait, mint a háttérfolyamat.
+adat legyen. Kovács doktor listáján így minden státusz megjelenik (a Kezelve
+kivételével, amihez riasztáslezárás kell): Varga Béla Súlyos (180 feletti
+érték), Szabó János Figyelem (három 140/90 feletti érték egy héten belül, és
+figyelmeztető sávú kitöltés), Kiss Ilona Adathiány (a múlt heti Közérzet-
+kitöltése elmaradt), Molnár Katalin Rendben. A „Közérzet" kérdőívet minden
+demóbeteg hetente megkapja. A végén egy alkalom-ellenőrzés megnyitja és lezárja
+az előírások múltbeli alkalmait, mint a háttérfolyamat.
 """
 
 from datetime import UTC, date, datetime, time, timedelta
@@ -95,21 +97,25 @@ ASSIGNMENTS = [
     ("dr.nagy@pulse.example", "toth.maria@pulse.example"),
 ]
 
-# Minden demóbeteg két vérnyomás-küszöbszabályt és két kérdőívszabályt kap a
-# kezelőorvosától (bemutató-beállítás; a szabályszerkesztő az M3-ban jön).
+# Minden demóbeteg ugyanazt a szabálykészletet kapja a kezelőorvosától, a
+# kiértékelés összehasonlításának beállítása szerint (07_mukodesi_szabalyok.md,
+# 5. rész): küszöbszabály csak a kritikus határon, a tartós eltérésre
+# időablakos szabály, a kérdőívre sáv- és trendszabály, és elmaradt adat.
 DEMO_RULES = [
-    (
-        RuleType.THRESHOLD,
-        Severity.MODERATE,
-        {
-            "measurement_type": "blood_pressure",
-            "limits": {"systolic": {"max": 140}, "diastolic": {"max": 90}},
-        },
-    ),
     (
         RuleType.THRESHOLD,
         Severity.SEVERE,
         {"measurement_type": "blood_pressure", "limits": {"systolic": {"max": 180}}},
+    ),
+    (
+        RuleType.WINDOW,
+        Severity.MODERATE,
+        {
+            "measurement_type": "blood_pressure",
+            "limits": {"systolic": {"max": 140}, "diastolic": {"max": 90}},
+            "count": 3,
+            "window_days": 7,
+        },
     ),
     (
         RuleType.QUESTIONNAIRE,
@@ -120,6 +126,16 @@ DEMO_RULES = [
         RuleType.QUESTIONNAIRE,
         Severity.SEVERE,
         {"questionnaire": WELLBEING_CODE, "bands": ["critical"]},
+    ),
+    (
+        RuleType.QUESTIONNAIRE,
+        Severity.MODERATE,
+        {"questionnaire": WELLBEING_CODE, "trend_count": 3},
+    ),
+    (
+        RuleType.MISSING_DATA,
+        Severity.MODERATE,
+        {"measurement_type": "blood_pressure", "consecutive_missed": 2},
     ),
 ]
 
@@ -138,26 +154,33 @@ DEMO_SUBMISSIONS = {
     # 1 + 1 + 0 = 2 (rendben), majd 2 + 2 + 2 = 6 (figyelmeztető sáv → riasztás)
     "szabo.janos@pulse.example": [(10, 4, 2, "never"), (3, 3, 3, "rarely")],
     "molnar.katalin@pulse.example": [(5, 5, 1, "never")],
-    # A legutóbbi adata így is 12 napos marad (Adathiány).
+    # A múlt heti alkalmát elmulasztotta (Adathiány: elmulasztott alkalom).
     "kiss.ilona@pulse.example": [(13, 4, 2, "never")],
 }
 
 # Vérnyomás-méréssorok: (hány napja, szisztolés, diasztolés).
 # fmt: off
 DEMO_BLOOD_PRESSURE = {
-    # Két 140 feletti érték: az első riasztást nyit, a második ugyanahhoz
-    # kapcsolódik, ismételt aktiválódásként (deduplikáció).
+    # 140/90 feletti értékek a 3. naptól: a harmadik (1 napja) az időablakos
+    # szabály szerint riasztást nyit, a negyedik ugyanahhoz kapcsolódik,
+    # ismételt aktiválódásként (deduplikáció).
     "szabo.janos@pulse.example": [
         (9, 132, 84), (8, 128, 82), (7, 135, 86), (6, 130, 83), (5, 134, 85),
-        (4, 129, 81), (3, 146, 92), (2, 138, 88), (1, 136, 86), (0, 152, 95),
+        (4, 129, 81), (3, 146, 92), (2, 143, 89), (1, 144, 91), (0, 152, 95),
     ],
     # Tartósan magas, egyszer 180 felett: közepes és súlyos riasztás is.
     "varga.bela@pulse.example": [
         (6, 148, 92), (5, 151, 94), (4, 149, 91), (3, 155, 96),
         (2, 158, 97), (1, 186, 104), (0, 162, 98),
     ],
-    # Rendben lévő értékek, de a legutóbbi 12 napos: nincs friss adat.
-    "kiss.ilona@pulse.example": [(15, 128, 80), (14, 131, 82), (13, 126, 79), (12, 129, 81)],
+    # Rendben lévő értékek, egy hosszabb szünettel. A legutóbbi lezárt
+    # vérnyomás-alkalma (3 napja; a pótlási ablak 2 nap) teljesített, így a
+    # napszaktól függetlenül nincs két egymást követő elmulasztás és elmaradt-
+    # adat riasztás: az Adathiányt a kérdőív elmulasztott alkalma adja.
+    "kiss.ilona@pulse.example": [
+        (15, 128, 80), (14, 131, 82), (13, 126, 79), (12, 129, 81),
+        (4, 127, 80), (3, 130, 82), (2, 128, 79),
+    ],
     "molnar.katalin@pulse.example": [
         (6, 122, 78), (5, 125, 80), (4, 119, 76), (3, 124, 79),
         (2, 121, 77), (1, 123, 78), (0, 120, 76),
