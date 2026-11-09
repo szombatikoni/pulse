@@ -8,6 +8,51 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-11-09 — A4: a négy szabálytípus, szabály-API, Szabályok fül
+
+- Eszköz: Claude Code (a kódtervezeteket három Opus agent készítette, lépésenként)
+
+- Az AI szerepe: tervjavaslat az A4-hez a döntendő kérdésekkel (a4_terv_2026-11-09);
+  az időablakos, a romló trend és az elmaradt adat szabálytípus megvalósítása a
+  meglévő szabálymotorban; a szabály-végpontok; az alkalmakra épülő
+  Adathiány-státusz; a Szabályok fül a beteg-adatlapon; a demóadatok igazítása
+  a kiértékelési fejezet rögzített beállításához.
+
+- A saját munkám: a tervjavaslat hat döntési pontját én döntöttem el (a
+  kérdőívszabálynál visszakérdeztem, és a tisztázás után az egy szabály = egy
+  feltétel változatot választottam, mert a riasztás magyarázata így egyértelmű);
+  az agent által felvetett eltéréseket (az ablak-kiértékelés csak határsértő új
+  mérésre fusson; az elmulasztott alkalmak zárása maradjon a háttérfolyamatban)
+  átgondolás után hagytam jóvá; a felületet a futó példányon végigpróbáltam, és
+  két javítást kértem: az eseménytörténet kiváltó adatai soronként, olvashatóan
+  jelenjenek meg, és az ismétlődő értékek helyett csak az átlépett határok
+  szerepeljenek; a hasábok igazítását én vetettem fel (kiderült, hogy a
+  jóváhagyott terv szerint áll); a commitokat logikai egységekre bontottam.
+
+- Saját döntéseim:
+  - egy kérdőívszabály egy feltételt figyel (sáv vagy trend), kettőhöz két
+    szabály kell;
+  - az elmaradt adat szabály célpontonként működik (méréstípus vagy kérdőív),
+    a sorozat az előírás-módosítási láncon átível;
+  - az időablakos szabály csak határsértő új mérésre értékel (a működési
+    szabályok lezárás-példája szerint);
+  - az elmulasztott alkalmak zárása a háttérfolyamatban marad, a legfeljebb
+    egyórás késés elfogadható;
+  - ahol a betegnek van lezárt alkalma, a frissességet az alkalmak teljesítése
+    adja, a 7 napos szabály csak előírás nélkül él;
+  - a demóadat-változások (Szabó, Kiss) és a szigorúbb kliensoldali
+    határ-ellenőrzés jóváhagyva; a „rendben" sáv választható marad.
+
+- Ellenőrzés:
+  - a tesztkészlet lépésenként bővült (620 → 655 → 662, 99% lefedettség), a
+    böngészős teszt 12/12 nulláról újraépített példányon, két új folyamattal
+    (szabálymódosítás verzióváltással, új szabály űrlapja);
+  - az 1. lépés szélső eseteit szándékos elrontással (mutációs próbával) is
+    ellenőriztük: mind az öt elrontásnál elbukott egy teszt;
+  - a felületet képernyőképeken (docs/files/review/kepek_a4_2026-11-09) és a
+    helyi példányon magam is végigpróbáltam; a zsúfolt eseménytörténetet és az
+    értékismétlést én szúrtam ki.
+
 ## 2026-11-01 — A3: tárolt teendőlista; orvosi indoklás; független review és javítások
 
 - Eszköz: Claude Code (a kódtervezeteket Opus agentek készítették; a saját
