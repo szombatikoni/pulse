@@ -53,13 +53,17 @@ export const BANDS: BandName[] = ['normal', 'warning', 'critical']
 /** A szerkesztő ebből indul, és a kulcsa a verziószám: ha a háttérben frissülne
  * (pl. ablakfókuszra), a másik orvos közben mentett verziója szó nélkül felülírná a
  * nem mentett vázlatot. Ezért csak a saját mentés és a „Friss változat betöltése”
- * (mindkettő invalidál) tölti újra; az ütközést a mentéskori 409 jelzi. */
+ * (mindkettő invalidál) tölti újra; az ütközést a mentéskori 409 jelzi.
+ * A gcTime: 0 miatt a szerkesztő elhagyásakor a gyorsítótár törlődik: különben
+ * (staleTime: Infinity mellett) az 5 percen belüli újranyitás a régi verziót mutatná
+ * új lekérés nélkül, ha közben más orvos mentett. */
 export function useQuestionnaireDetail(code: string | undefined) {
   return useQuery({
     queryKey: ['questionnaire-templates', code],
     queryFn: () => apiGet<QuestionnaireDetail>(`/questionnaires/${code}`),
     enabled: !!code,
     staleTime: Infinity,
+    gcTime: 0,
     refetchOnWindowFocus: false,
   })
 }

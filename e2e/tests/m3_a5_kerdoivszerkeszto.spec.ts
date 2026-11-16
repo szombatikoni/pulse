@@ -143,3 +143,61 @@ test('ha közben más orvos ment, a vázlat nem vész el szó nélkül: a menté
   await expect(q1Text).toHaveValue(current.questions[0].text)
   await expect(page.getByRole('button', { name: `Mentés ${base + 2}. verzióként` })).toBeDisabled()
 })
+
+test('a szerkesztő újranyitáskor a közben mentett verziót mutatja, nem a gyorsítótárét', async ({
+  page,
+  request,
+}) => {
+  const tokenResponse = await request.post('/api/auth/login', {
+    data: { email: 'dr.nagy@pulse.example', password: PASSWORD },
+  })
+  expect(tokenResponse.ok()).toBeTruthy()
+  const headers = {
+    Authorization: `Bearer ${(await tokenResponse.json()).access_token}`,
+  }
+  const detailResponse = await request.get('/api/questionnaires/wellbeing', {
+    headers,
+  })
+  expect(detailResponse.ok()).toBeTruthy()
+  const current = (await detailResponse.json()).current
+  const base: number = current.version_no
+
+  // Kovács doktor megnyitja a szerkesztőt, majd visszalép a listára (az alkalmazáson
+  // belül, oldal-újratöltés nélkül, hogy a React Query gyorsítótára megmaradjon).
+  await login(page, 'dr.kovacs@pulse.example')
+  await expect(page).toHaveURL(/\/doctor$/)
+  await page.getByRole('link', { name: 'Kérdőívek' }).click()
+  const editLink = page.getByRole('link', { name: '„Közérzet” szerkesztése' })
+  await editLink.click()
+  await expect(page).toHaveURL(/\/doctor\/questionnaires\/wellbeing$/)
+  const q2Text = page
+    .getByRole('region', { name: '2. kérdés' })
+    .getByLabel('Kérdés', { exact: true })
+  await expect(q2Text).toHaveValue(current.questions[1].text)
+  await page.locator('.pd-crumbs').getByRole('link').click()
+  await expect(page).toHaveURL(/\/doctor\/questionnaires$/)
+
+  // Közben Nagy doktor az API-n át új verziót ment.
+  const nagyText = `Nagy doktor újabb szövege (${Date.now()})`
+  const questions = structuredClone(current.questions)
+  questions[1].text = nagyText
+  const saved = await request.post('/api/questionnaires/wellbeing/versions', {
+    headers,
+    data: {
+      base_version_no: base,
+      questions,
+      scoring_thresholds: current.scoring_thresholds,
+    },
+  })
+  expect(saved.status()).toBe(201)
+
+  // Újranyitáskor friss lekérés megy, és a szerkesztő az új verzióból indul.
+  const refetch = page.waitForRequest(
+    (r) => r.method() === 'GET' && r.url().endsWith('/api/questionnaires/wellbeing'),
+  )
+  await editLink.click()
+  await refetch
+  await expect(page.locator('.pd-ph-meta')).toContainText(`${base + 1}. verzió érvényes`)
+  await expect(q2Text).toHaveValue(nagyText)
+  await expect(page.getByRole('button', { name: `Mentés ${base + 2}. verzióként` })).toBeDisabled()
+})
