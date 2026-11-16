@@ -1457,3 +1457,206 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* NICE-kiértékelés (M3, K2, 3. lépés; vázlat: docs/files/tervezet/k2_felulet_vazlat).
+   Az ítélet szándékosan semleges, szögletes, körvonalas címke szín nélkül: nem
+   téveszthető össze a beteg-státusz teli, kerek, színes címkéjével. */
+.pd-nice-intro {
+  display: grid;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--pulse-ink-2);
+}
+.pd-nice-result {
+  display: grid;
+  gap: 14px;
+}
+.pd-nice-val {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.pd-nice-val .v {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--pulse-ink-1);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.pd-nice-val .u {
+  font-size: 13px;
+  color: var(--pulse-ink-3);
+}
+.pd-nice-val-sub {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--pulse-ink-3);
+}
+.pd-nice-verdict-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.pd-nice-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 11px 0 4px;
+  border-radius: 6px;
+  border: 1px solid var(--pulse-line-2);
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-1);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pd-nice-verdict .g {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--pulse-fill);
+  color: var(--pulse-ink-1);
+}
+.pd-nice-target {
+  font-size: 13px;
+  color: var(--pulse-ink-2);
+}
+.pd-nice-text {
+  font-size: 13.5px;
+  color: var(--pulse-ink-2);
+}
+.pd-nice-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 14px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  font-size: 13px;
+}
+.pd-nice-facts dt {
+  color: var(--pulse-ink-3);
+  font-weight: 500;
+}
+.pd-nice-facts dd {
+  margin: 0;
+  color: var(--pulse-ink-1);
+}
+.pd-nice-facts dd .pd-muted {
+  font-weight: 400;
+}
+.pd-nice-agree {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pulse-line);
+  font-size: 13px;
+  color: var(--pulse-ink-2);
+}
+.pd-nice-agree svg {
+  flex: none;
+  color: var(--pulse-ink-3);
+}
+.pd-nice-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  font-size: 13px;
+  color: var(--pulse-ink-2);
+}
+.pd-nice-notice svg {
+  margin-top: 1px;
+  color: var(--pulse-ink-2);
+}
+.pd-nice-notice.strong {
+  border: 1px solid var(--pulse-line-2);
+}
+.pd-nice-det-body {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+.pd-nice-cmp {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.pd-nice-cmp thead th {
+  padding: 0 8px 6px 0;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--pulse-ink-3);
+}
+.pd-nice-cmp thead td {
+  width: 32%;
+}
+.pd-nice-cmp tbody th,
+.pd-nice-cmp tbody td {
+  padding: 5px 8px 5px 0;
+  border-top: 1px solid var(--pulse-line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.pd-nice-cmp tbody th {
+  font-weight: 500;
+  color: var(--pulse-ink-3);
+}
+.pd-nice-cmp tbody td {
+  color: var(--pulse-ink-2);
+}
+.pd-nice-cmp tr.diff th,
+.pd-nice-cmp tr.diff td {
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+}
+.pd-nice-cmp tr.diff th svg {
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+.pd-nice-kv {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 12.5px;
+}
+.pd-nice-kv dt {
+  color: var(--pulse-ink-3);
+}
+.pd-nice-kv dd {
+  margin: 0;
+  color: var(--pulse-ink-2);
+  overflow-wrap: anywhere;
+}
+.pd-nice-sha {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pd-nice-kv .mono {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11.5px;
+}
+.pd-nice-disc {
+  margin-top: 14px !important;
+  font-size: 12px;
+  color: var(--pulse-ink-4);
+}

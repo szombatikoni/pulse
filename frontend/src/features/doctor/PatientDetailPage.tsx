@@ -19,6 +19,7 @@ import { TaskIcon } from '../patient/TaskList'
 import { AlertCard, ClosedAlert } from './AlertCards'
 import { CarePlan } from './CarePlan'
 import { MeasurementCharts } from './charts/MeasurementCharts'
+import { NicePanel } from './NicePanel'
 import './patientDetail.css'
 import { reasonText } from './reasons'
 import type { RuleTextContext } from './ruleText'
@@ -123,8 +124,8 @@ const TABS = ['overview', 'rules'] as const
 type Tab = (typeof TABS)[number]
 
 /** A beteg adatlapja az orvosnak (F10), a felületterv szerint: fejléc a státusszal,
- * alatta fülek. Az Áttekintés bal hasábjában a nyitott riasztások és a mérések
- * grafikonja, a jobb hasábban a teendők teljesítése, a követési terv (M3) és a
+ * alatta fülek. Az Áttekintés bal hasábjában a nyitott riasztások, a NICE szerinti
+ * otthoni vérnyomásátlag (M3, K2) és a mérések grafikonja, a jobb hasábban a teendők teljesítése, a követési terv (M3) és a
  * kérdőív-kitöltések; a Szabályok fülön a beteg szabályai és a szerkesztő (M3, A4). */
 export function PatientDetailPage() {
   const { t } = useTranslation()
@@ -255,6 +256,7 @@ export function PatientDetailPage() {
                   <ClosedAlert key={alert.id} alert={alert} ctx={ctx} />
                 ))}
               </section>
+              <NicePanel key={patientId} patientId={patientId} />
               <MeasurementCharts
                 patientId={patientId}
                 doctor
