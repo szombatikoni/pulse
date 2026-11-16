@@ -12,7 +12,9 @@
   Visszavonásnál és módosításnál az orvos rövid indoklást adhat (revoke_note,
   nem kötelező; a hallgató döntése, 2026-11-01), amit a beteg is lát.
 - Új előírásnál az aktuális időszak alkalmát a már meglévő adat azonnal
-  teljesíti (occurrences.fulfil_from_existing).
+  teljesíti (occurrences.fulfil_from_existing). Ha az első időszak határideje
+  a létrehozáskor már lejárt, az előírás a következő időszakban kezdődik
+  (review K1, lásd create()).
 - A beteg a teendői közt rövid jelzést kap a közelmúltbeli visszavonásról és
   módosításról (plan_notices); ez is az előírás-adatokból számolódik.
 
@@ -39,7 +41,7 @@ from app.models import (
     User,
 )
 from app.services.measurements import get_type_by_code
-from app.services.occurrences import fulfil_from_existing
+from app.services.occurrences import fulfil_from_existing, period_containing
 
 # A beteg ennyi napig látja a visszavonás / módosítás jelzését.
 NOTICE_DAYS = 7
@@ -267,17 +269,46 @@ def create(
     params: PlanParams,
     now: datetime | None = None,
 ) -> Assignment:
-    """Új előírás. Minden ellenőrzés a beszúrás előtt fut."""
+    """Új előírás. Minden ellenőrzés a beszúrás előtt fut.
+
+    Az első alkalom a következő időszakban (review K1, b megoldás, a hallgató
+    döntése, 2026-11-16): ha az első időszak határideje a létrehozáskor már
+    lejárt (pl. a ma 14:00-kor felírt, 10:00-s határidejű napi mérés), az
+    előírás kezdete a következő időszak első napja. A betegnek így nincs
+    teljesíthetetlen alkalma: nem lesz azonnal Adathiány, és később sem hamis
+    elmulasztás (és abból elmaradt adat riasztás). A tárolt kezdet tolódik,
+    ezért a teendőlista, a háttérfolyamat és a státusz ugyanazt az első
+    időszakot látja. Mivel az időszakok a kezdettől számítanak, ez csak egy
+    napos időszaknál fordulhat elő (napi, vagy 1 naponta); a heti és a több
+    napos első időszak határideje a kezdet után napokkal van. A módosítás
+    (replace) útján nem tolódik: lásd ott."""
+    now = now or datetime.now(UTC)
     today = local_today(now)
     target = _target(db, kind, code)
     start = params.start_date or today
     _check_dates(start, params.end_date, today)
     assignment = _build(patient_id, assigned_by, kind, target, params, start)
+    start = _first_reachable_start(assignment, now)
+    assignment.start_date = start
     _check_overlap(db, patient_id, assignment, start, params.end_date)
     db.add(assignment)
     db.flush()
-    fulfil_from_existing(db, assignment, now or datetime.now(UTC))
+    fulfil_from_existing(db, assignment, now)
     return assignment
+
+
+def _first_reachable_start(assignment: Assignment, now: datetime) -> date:
+    """Az előírás kezdete úgy, hogy az első időszak határideje ne a létrehozás
+    előtt legyen (lásd create). Ha a következő időszak már az előírás vége
+    (end_date) után kezdődne, a kezdet marad (ilyen előírásnak nem volna
+    egyetlen alkalma sem; a régi viselkedés, nyitott kérdés)."""
+    first = period_containing(assignment, assignment.start_date)
+    if first.due_at >= now:
+        return assignment.start_date
+    following = first.end.astimezone(settings.tz).date()
+    if assignment.end_date is not None and following > assignment.end_date:
+        return assignment.start_date
+    return following
 
 
 def get_for_patient(db: Session, patient_id: uuid.UUID, assignment_id: uuid.UUID) -> Assignment:
@@ -358,7 +389,14 @@ def replace(
     A sorrend szándékos: előbb minden ellenőrzés és az új beszúrása, csak utána
     a régi lezárása; ha az új bármin elbukik, a régihez nem nyúltunk. A hívó
     hibánál visszagörget (rollback), így a teljes művelet atomi. Az indoklás
-    a régi előíráshoz kerül."""
+    a régi előíráshoz kerül.
+
+    Az „első alkalom a következő időszakban" szabály (create) itt NEM él
+    (2026-11-16, nyitott kérdés a hallgatónak): a váltás a láncból a régi
+    lezárásának napja = az új kezdete egyezéssel ismerhető fel (_end_meets,
+    _successor), az eltolt kezdet ezt megszakítaná (a beteg „visszavonta"
+    jelzést kapna „módosult" helyett). Ráadásul a régi előírás aznapi
+    kötelezettsége már élt: a határidő utáni módosítás nem tüntetheti el."""
     now = now or datetime.now(UTC)
     today = local_today(now)
     _ensure_changeable(old, today)

@@ -207,7 +207,10 @@ def test_questionnaire_catalog_is_for_doctors(client, db, setup):
 
 
 def test_doctor_creates_and_lists_a_measurement_plan(client, db, setup):
-    response = client.post(url(setup), json=body(), headers=auth(setup["doctor"]))
+    # Heti: az első határidő hat nap múlva van, így a kezdet a futás napszakától
+    # függetlenül ma (a napi 10:00-s előírás 10:00 után holnap indulna, review K1;
+    # azt a test_plan_changes.py K1-tesztjei rögzített idővel vizsgálják).
+    response = client.post(url(setup), json=body(frequency="weekly"), headers=auth(setup["doctor"]))
     assert response.status_code == 201
     created = response.json()
     assert created["kind"] == "measurement"

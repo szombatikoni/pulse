@@ -171,16 +171,10 @@ def test_p1_closing_then_confirming_measurement(db, patient, doctor):
     assert codes(ok) == ["fresh_data"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "07, P1 szövege: ha a lezárás után elmarad a mérés, a következő alkalom "
-        "HATÁRIDEJE után a státusz Adathiány. A kód szerint a mérés alkalma csak "
-        "az időszak vége + 48 óra után (szept. 25. 0:00) lesz elmulasztott, és a "
-        "státusz csak a tárolt elmulasztást olvassa: szept. 22. 10:15-kor Kezelve."
-    ),
-)
 def test_p1_missed_measurement_after_closing_gives_no_data_after_the_deadline(db, patient, doctor):
+    """07, P1 szövege: ha a lezárás után elmarad a mérés, a következő alkalom
+    határideje után a státusz Adathiány (K4, 2026-11-16: a kód ehhez igazodott;
+    az alkalom maga a pótlási idő végéig esedékes marad)."""
     p1_closed_alert(db, patient, doctor)
     daily_bp_plan(db, patient, doctor, start=date(2026, 9, 22))
     now = local(2026, 9, 22, 10, 15)  # a szept. 22-i alkalom határideje után
@@ -224,12 +218,13 @@ def test_p2_occurrence_table_rows_1_2_4_5(db, patient, doctor):
     assert status_of(db, patient, local(2026, 9, 24, 8, 13)).status is PatientStatus.OK
 
 
-P2_ROW_3_REASON = (
+P2_ROW_3A_REASON = (
     "07, P2 táblázat 3. sora: szept. 23. 10:15-kor a határidőig nem jött mérés → "
-    "#2 elmulasztva → Adathiány („az első elmulasztás a státuszt azonnal "
-    "Adathiányra állítja”). A kód szerint a mérés alkalma az időszak vége + 48 óra "
-    "(szept. 26. 0:00) előtt nem elmulasztott, hanem esedékes (DUE), és a státusz "
-    "Rendben (fresh_data)."
+    "#2 elmulasztva. A kód szerint a mérés alkalma az időszak vége + 48 óra "
+    "(szept. 26. 0:00) előtt nem elmulasztott (MISSED), hanem esedékes (DUE), mert "
+    "még pótolható; a MISSED a végleges állapot. A státusz már a határidő után "
+    "Adathiány (K4, 2026-11-16), így a maradék eltérés szóhasználati: a dolgozat "
+    "az „elmulasztva” szót a még pótolható állapotra is használja."
 )
 
 
@@ -242,7 +237,7 @@ def p2_until_row_3(db, patient, doctor):
     return plan, now
 
 
-@pytest.mark.xfail(strict=True, reason=P2_ROW_3_REASON)
+@pytest.mark.xfail(strict=True, reason=P2_ROW_3A_REASON)
 def test_p2_row_3_occurrence_is_missed_after_the_deadline(db, patient, doctor):
     plan, _ = p2_until_row_3(db, patient, doctor)
     _, second = occurrences_of(db, plan)
@@ -250,8 +245,9 @@ def test_p2_row_3_occurrence_is_missed_after_the_deadline(db, patient, doctor):
     assert second.status is OccurrenceStatus.MISSED
 
 
-@pytest.mark.xfail(strict=True, reason=P2_ROW_3_REASON)
 def test_p2_row_3_first_miss_gives_no_data_at_once(db, patient, doctor):
+    """07, P2 táblázat 3. sora és a táblázat utáni bekezdés: „az első
+    elmulasztás a státuszt azonnal Adathiányra állítja” (K4, 2026-11-16)."""
     _, now = p2_until_row_3(db, patient, doctor)
     result = status_of(db, patient, now)
     assert result.status is PatientStatus.NO_DATA

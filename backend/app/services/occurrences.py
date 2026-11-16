@@ -113,6 +113,20 @@ def periods_until(assignment: Assignment, last_day: date) -> Iterator[Period]:
         first_day += step
 
 
+def latest_lapsed_period(assignment: Assignment, now: datetime) -> Period | None:
+    """Az előírás legutóbbi időszaka, amelynek határideje a now előtt lejárt
+    (now > due_at, mint a teendőlista „késésben" állapotánál), vagy None, ha
+    még egy sem. Elég az aktuális és az előző időszakot nézni: az előző
+    időszak határideje mindig a mai nap előtt van. A tárolt alkalomsortól
+    független (a státusz ebből látja a lejárt határidőt sor nélkül is)."""
+    period = period_containing(assignment, now.astimezone(settings.tz).date())
+    if period.due_at < now:
+        return period
+    if period.first_day <= assignment.start_date:
+        return None
+    return period_containing(assignment, period.first_day - timedelta(days=1))
+
+
 def period_end(occurrence: AssignmentOccurrence) -> datetime:
     """Az alkalom időszakának vége: a határidő helyi napját követő éjfél (a
     határidő mindig az utolsó napon van, ezért nem kell külön tárolni)."""

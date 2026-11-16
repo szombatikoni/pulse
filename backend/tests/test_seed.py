@@ -11,6 +11,7 @@ from app.models import (
     AlertEventType,
     Assignment,
     AssignmentOccurrence,
+    AssignmentTarget,
     DoctorPatient,
     Measurement,
     MeasurementType,
@@ -112,8 +113,10 @@ def test_seeded_doctor_list_shows_every_status(db, hour):
         ("Varga Béla", PatientStatus.SEVERE, ["open_alert", "open_alert", "missed_occurrence"]),
         # Három 140/90 feletti érték egy héten belül, és figyelmeztető sávú kitöltés.
         ("Szabó János", PatientStatus.ATTENTION, ["open_alert", "open_alert"]),
-        # A múlt heti Közérzet-alkalma elmaradt (a vérnyomását méri).
-        ("Kiss Ilona", PatientStatus.NO_DATA, ["missed_occurrence"]),
+        # A múlt heti Közérzet-alkalma elmaradt; a vérnyomását 2 napja mérte
+        # utoljára, így a tegnapi vérnyomás-alkalom határideje is lejárt (még
+        # pótolható, de a státusz a határidő után már Adathiány; K4, 2026-11-16).
+        ("Kiss Ilona", PatientStatus.NO_DATA, ["missed_occurrence", "missed_occurrence"]),
         ("Molnár Katalin", PatientStatus.OK, ["fresh_data"]),
     ]
     varga, szabo, kiss, _ = (r for _, r in rows)
@@ -127,7 +130,63 @@ def test_seeded_doctor_list_shows_every_status(db, hour):
     ]
     window_events = [e.event_type for e in szabo.reasons[0].alert.events]
     assert window_events == [AlertEventType.CREATED, AlertEventType.RE_TRIGGERED]
-    assert kiss.reasons[0].occurrence.assignment.questionnaire_template_id is not None
+    # A két ok sorrendje (határidő szerint) a napszaktól függ.
+    by_kind = {r.occurrence.assignment.target_kind: r.occurrence for r in kiss.reasons}
+    assert by_kind[AssignmentTarget.QUESTIONNAIRE].status is OccurrenceStatus.MISSED
+    bp = by_kind[AssignmentTarget.MEASUREMENT]
+    assert bp.status is OccurrenceStatus.DUE
+    assert bp.due_at < now
+
+
+# A seed státuszai egy későbbi időpontban (review K3, 2026-11-16): a mérések
+# horgonya 7:30, a vérnyomás határideje 10:00. A „következő 10:01" a 3 és 9 órás
+# seednél aznap, a 20 órásnál másnap van. A tényleges viselkedést rögzíti: ha a
+# seed után a 10:00-s határidőig nem jön új mérés (hajnali seednél aznap, este
+# seedeltnél másnap), a Rendben beteg (Molnár Katalin) Adathiány lesz, és
+# Vargánál és Szabónál is megjelenik a lejárt vérnyomás-alkalom. Csak a reggel
+# (7:30 és 10:00 között) seedelt adatbázis mutat aznap 10:01-kor is minden
+# státuszt. A bemutató előtt ezért újra kell seedelni (a seed napi frissítése
+# az M4-listán van). A háttérfolyamat futása az eredményen nem változtat (a
+# státusz a sor nélküli lejárt határidőt is látja, review K2).
+NEXT_10_01 = {
+    3: [
+        (
+            "Varga Béla",
+            PatientStatus.SEVERE,
+            ["open_alert", "open_alert"] + ["missed_occurrence"] * 2,
+        ),
+        ("Szabó János", PatientStatus.ATTENTION, ["open_alert", "open_alert", "missed_occurrence"]),
+        ("Kiss Ilona", PatientStatus.NO_DATA, ["missed_occurrence", "missed_occurrence"]),
+        ("Molnár Katalin", PatientStatus.NO_DATA, ["missed_occurrence"]),
+    ],
+    9: [
+        ("Varga Béla", PatientStatus.SEVERE, ["open_alert", "open_alert", "missed_occurrence"]),
+        ("Szabó János", PatientStatus.ATTENTION, ["open_alert", "open_alert"]),
+        ("Kiss Ilona", PatientStatus.NO_DATA, ["missed_occurrence", "missed_occurrence"]),
+        ("Molnár Katalin", PatientStatus.OK, ["fresh_data"]),
+    ],
+}
+NEXT_10_01[20] = NEXT_10_01[3]
+
+
+@pytest.mark.parametrize("worker", [False, True])
+@pytest.mark.parametrize("hour", [3, 9, 20])
+def test_seeded_statuses_at_the_next_10_01(db, hour, worker):
+    day = datetime.now(settings.tz).date() + timedelta(days=1)
+    seed_demo_data(db, now=datetime.combine(day, time(hour), tzinfo=settings.tz))
+    later_day = day if hour < 10 else day + timedelta(days=1)
+    later = datetime.combine(later_day, time(10, 1), tzinfo=settings.tz)
+    if worker:
+        run_occurrence_check(db, later)
+    kovacs = get_user_by_email(db, "dr.kovacs@pulse.example")
+    rows = doctor_patient_list(db, kovacs.doctor_profile.id, later)
+    assert [(p.name, r.status, [x.code for x in r.reasons]) for p, r in rows] == NEXT_10_01[hour]
+    # A vérnyomás-okok a „later" napjának 10:00-s határidejéből jönnek (a többi
+    # elmulasztott ok a Közérzeté): hajnali és esti seednél mind a négy betegnél,
+    # reggelinél csak Kissnél (ő 2 napja mérte utoljára).
+    deadline = datetime.combine(later_day, time(10), tzinfo=settings.tz)
+    lapsed = [p.name for p, r in rows for x in r.reasons if x.at == deadline]
+    assert len(lapsed) == (1 if hour == 9 else 4)
 
 
 def test_seed_rules_follow_the_comparison_setup(db):

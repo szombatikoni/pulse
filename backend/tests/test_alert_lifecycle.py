@@ -407,7 +407,23 @@ def test_missing_data_late_fulfilment_after_closing_gives_ok(db, patient, closed
         select(AssignmentOccurrence).where(AssignmentOccurrence.fulfilled_at.is_not(None))
     )
     assert occurrence.status is OccurrenceStatus.FULFILLED_LATE
+    # A Kezelve ok megszűnt. Az okt. 4-i alkalom határideje (10:00) is lejárt,
+    # és még nem pótolták: a státusz a határidő után Adathiány (K4, 2026-11-16;
+    # előtte ez a pótolható alkalom nem számított, és itt már Rendben volt).
     result = status_of(db, patient, local(2026, 10, 5, 2))
+    assert result.status is PatientStatus.NO_DATA
+    assert codes(result) == ["missed_occurrence"]
+    assert result.reasons[0].occurrence.due_at == local(2026, 10, 4, 10, 0)
+    # Az okt. 4-i pótlása után Rendben.
+    record_measurement(
+        db,
+        patient_id=patient.patient_profile.id,
+        type_code="blood_pressure",
+        values={"systolic": 124, "diastolic": 79},
+        measured_at=local(2026, 10, 4, 8),
+        now=local(2026, 10, 5, 3),
+    )
+    result = status_of(db, patient, local(2026, 10, 5, 4))
     assert result.status is PatientStatus.OK
     assert codes(result) == ["fresh_data"]
 

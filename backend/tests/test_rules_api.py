@@ -42,6 +42,29 @@ def setup(db, measurement_types):
     }
 
 
+class _FrozenDatetime(datetime):
+    """A végpont órája (app.api.patients.datetime) rögzített időponttal."""
+
+    frozen: datetime
+
+    @classmethod
+    def now(cls, tz=None):
+        return cls.frozen.astimezone(tz) if tz else cls.frozen.replace(tzinfo=None)
+
+
+@pytest.fixture
+def frozen_now(monkeypatch):
+    """A mai nap 12:00-ja (helyi idő), a végpont ezt látja „most"-nak (review k6):
+    a napszakfüggő elvárások így nem függnek a futás idejétől, és éjfélkor sem
+    csúszik el a nap a kérés és az elvárás között."""
+    frozen = datetime.combine(datetime.now(settings.tz).date(), time(12, 0), tzinfo=settings.tz)
+    monkeypatch.setattr(_FrozenDatetime, "frozen", frozen, raising=False)
+    # Az orvosi végpontok, a beteg teendőlistája és a mérés mentése (rögzítési idő).
+    for module in ("app.api.patients", "app.services.tasks", "app.services.measurements"):
+        monkeypatch.setattr(f"{module}.datetime", _FrozenDatetime)
+    return frozen
+
+
 WINDOW = {
     "rule_type": "window",
     "severity": "moderate",
@@ -323,9 +346,9 @@ def test_window_alert_triggers_resolve_with_violations(client, db, setup):
     assert reason["trigger"]["violations"][0]["value"] == 152
 
 
-def test_missing_data_alert_triggers_resolve_as_occurrences(client, db, setup):
+def test_missing_data_alert_triggers_resolve_as_occurrences(client, db, setup, frozen_now):
     create(client, setup, body=MISSING)
-    today = datetime.now(settings.tz).date()
+    today = frozen_now.date()
     assign_measurement(
         db,
         patient_id=setup["pid"],
@@ -334,7 +357,7 @@ def test_missing_data_alert_triggers_resolve_as_occurrences(client, db, setup):
         start_date=today - timedelta(days=6),
         due_time=time(10, 0),
     )
-    run_occurrence_check(db)  # a pótlási ablakon túli napok elmulasztva
+    run_occurrence_check(db, frozen_now)  # a pótlási ablakon túli napok elmulasztva
 
     [alert] = client.get(
         f"/api/patients/{setup['pid']}/alerts", headers=auth(setup["doctor"])
@@ -358,10 +381,15 @@ def test_missing_data_alert_triggers_resolve_as_occurrences(client, db, setup):
     codes = [r["code"] for r in row["reasons"]]
     assert codes == ["open_alert", "missed_occurrence", "no_data_yet"]
     # Az „Ok" oszlop adata: a riasztásnál a legutóbbi elmulasztott alkalom, az
-    # Adathiány okánál az előírás legutóbbi lezárt (elmulasztott) alkalma.
+    # Adathiány okánál az előírás legutóbbi lejárt határidejű alkalma (K4,
+    # 2026-11-16): a végpont órája szerint (12:00) a mai, még pótolható, esedékes
+    # alkalom. A lista a státusz előtt megnyitja (teendőlista), így a
+    # háttérfolyamat nélkül is az alkalom adataival jelenik meg.
     alert_reason, missed_reason, _ = row["reasons"]
     assert alert_reason["trigger"]["occurrence"]["id"] == triggers[-1]["occurrence"]["id"]
-    assert missed_reason["trigger"]["occurrence"]["id"] == triggers[-1]["occurrence"]["id"]
+    deadline = datetime.combine(today, time(10, 0), tzinfo=settings.tz)
+    lapsed = missed_reason["trigger"]["occurrence"]
+    assert (lapsed["status"], datetime.fromisoformat(lapsed["due_at"])) == ("due", deadline)
     assert missed_reason["alert_id"] is None
 
 
@@ -392,3 +420,73 @@ def test_missed_questionnaire_occurrence_is_the_no_data_reason(client, db, setup
         WELLBEING_NAME,
     )
     assert occurrence["due_at"] == missed["at"]
+
+
+def test_list_and_detail_show_no_data_after_the_deadline_without_the_worker(
+    client, db, setup, frozen_now
+):
+    # K4 (2026-11-16): a határidő után a státusz Adathiány akkor is, ha a
+    # háttérfolyamat még nem futott (nincs run_occurrence_check). A lista és az
+    # adatlap a státusz előtt megnyitja az alkalmat (teendőlista), így mindkettő
+    # ugyanazt a státuszt és okot mutatja, az alkalom adataival. A végpont órája
+    # rögzített (12:00, review k6), így a mai 10:00-s határidő már lejárt.
+    today = frozen_now.date()
+    assign_measurement(
+        db,
+        patient_id=setup["pid"],
+        measurement_type=get_type_by_code(db, "blood_pressure"),
+        assigned_by=setup["doctor"].id,
+        start_date=today - timedelta(days=1),
+        due_time=time(10, 0),
+    )
+    headers = auth(setup["doctor"])
+    [row] = client.get("/api/doctor/patients", headers=headers).json()
+    detail = client.get(f"/api/patients/{setup['pid']}", headers=headers).json()
+    for summary in (row, detail):
+        assert summary["status"] == "no_data"
+        reason = summary["reasons"][0]
+        assert reason["code"] == "missed_occurrence"
+        occurrence = reason["trigger"]["occurrence"]
+        assert occurrence["status"] == "due"
+        due = datetime.combine(today, time(10, 0), tzinfo=settings.tz)
+        assert datetime.fromisoformat(occurrence["due_at"]) == due
+    assert row["reasons"] == detail["reasons"]
+
+
+def test_late_fulfilment_through_the_api_restores_the_status(client, db, setup, frozen_now):
+    # Pótlás az API-n át (review, 2026-11-16): a mai 10:00-s határidő lejárt
+    # (a végpontok órája 12:00), a lista Adathiányt mutat. A beteg rögzíti a
+    # reggeli (9:00-s) mérését: a mai alkalom késve teljesül, és az orvos
+    # listáján a státusz Rendben. A mentés órája is rögzített.
+    today = frozen_now.date()
+    assign_measurement(
+        db,
+        patient_id=setup["pid"],
+        measurement_type=get_type_by_code(db, "blood_pressure"),
+        assigned_by=setup["doctor"].id,
+        start_date=today,
+        due_time=time(10, 0),
+    )
+    doctor = auth(setup["doctor"])
+    [row] = client.get("/api/doctor/patients", headers=doctor).json()
+    assert (row["status"], [r["code"] for r in row["reasons"]]) == (
+        "no_data",
+        ["missed_occurrence", "no_data_yet"],
+    )
+    measured_at = datetime.combine(today, time(9, 0), tzinfo=settings.tz)
+    response = client.post(
+        f"/api/patients/{setup['pid']}/measurements",
+        json={
+            "type_code": "blood_pressure",
+            "values": {"systolic": 124, "diastolic": 79},
+            "measured_at": measured_at.isoformat(),
+        },
+        headers=auth(setup["patient"]),
+    )
+    assert response.status_code == 201
+    [row] = client.get("/api/doctor/patients", headers=doctor).json()
+    assert (row["status"], [r["code"] for r in row["reasons"]]) == ("ok", ["fresh_data"])
+    [task] = client.get(
+        f"/api/patients/{setup['pid']}/tasks", headers=auth(setup["patient"])
+    ).json()
+    assert task["state"] == "done"

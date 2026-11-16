@@ -5,11 +5,18 @@ sorrendben előbb álló érvényes, a felület a többi okot is kiírja:
 Súlyos > Figyelem > Adathiány > Kezelve > Rendben.
 
 Az Adathiány okai (M3, A4 2. lépés, a hallgató döntése):
-- elmulasztott alkalom: a beteg valamelyik érvényes előírásának legutóbbi
-  lezárt (nem esedékes) alkalma elmulasztott ("missed_occurrence"). A késve
-  teljesített (pótolt) alkalom nem az. A visszavont, lejárt és még el nem
-  kezdett előírás nem számít: az előírás-módosítás (visszavonás + új előírás)
-  után a régi elmulasztása nem ragad a betegen;
+- elmulasztott alkalom ("missed_occurrence"): a beteg valamelyik érvényes
+  előírásának legutóbbi lezárt alkalma elmulasztott, vagy a határideje lejárt,
+  és még nem teljesült (K4, a hallgató döntése, 2026-11-16; a dolgozat 7.
+  fejezete szerint a státusz a határidő után azonnal Adathiány). Lezárt az
+  alkalom, ha teljesült (akár a határideje előtt), elmulasztott, vagy a
+  határideje lejárt. A határidő lejárta után az esedékes (DUE) alkalom még
+  pótolható (mérésnél 48 óráig, lásd occurrences.missed_from); a pótlással
+  (késve teljesítés) az ok megszűnik. Elmulasztottra (MISSED) továbbra is a
+  háttérfolyamat zárja. A késve teljesített (pótolt) alkalom nem elmulasztott.
+  A visszavont, lejárt és még el nem kezdett előírás nem számít: az
+  előírás-módosítás (visszavonás + új előírás) után a régi elmulasztása nem
+  ragad a betegen;
 - még nem érkezett adat: se mérés, se kitöltés ("no_data_yet");
 - nincs friss adat ("stale_data"): csak ha a betegnek nincs lezárt alkalma
   érvényes előíráson (nincs előírása, vagy az első határidő még nem járt le).
@@ -37,8 +44,15 @@ feltétel): a frissességben és a megerősítő adatnál csak a javítási lán
 A javított kiváltójú nyitott riasztás needs_review jelölése a státuszt nem
 változtatja (csak jelölés).
 
-Csak a tárolt alkalom-státuszokat olvassa, lezárást nem futtat: az a
-háttérfolyamaté (legfeljebb a futási időköznyi késéssel; a hallgató döntése).
+A tárolt alkalmakat olvassa, és a határidő lejártát a lekérdezés idejéből
+(now) dönti el; semmit nem ír: alkalmat nem nyit és nem zár (az elmulasztottra
+zárás a háttérfolyamaté). Ha a legutóbbi lejárt határidejű időszaknak még
+nincs alkalomsora (a háttérfolyamat, a mentés vagy a teendőlista még nem
+nyitotta meg), azt az előírás időszakaiból számolja (lapsed_without_row;
+review K2, 2026-11-16): a határidő utáni Adathiány így bármely hívónál,
+hívási sorrendtől függetlenül él. Ilyenkor az ok alkalom nélkül megy ki; az
+orvosi végpontok (api/patients.py) ezért a státusz előtt a teendőlistát
+kérik le, ami a sort megnyitja, így ott az ok az alkalom adataival jelenik meg.
 Adat nélkül sosem Rendben a státusz: az adathiány nem ad kedvező jelzést.
 """
 
@@ -75,7 +89,7 @@ from app.models import (
 )
 from app.services.access import assigned_patients_query
 from app.services.alerts import list_patient_alerts
-from app.services.occurrences import valid_on
+from app.services.occurrences import latest_lapsed_period, valid_on
 from app.services.questionnaires import band_for
 from app.services.rules import (
     MissingDataParams,
@@ -108,7 +122,8 @@ class StatusReason:
     code: str
     alert: Alert | None = None
     at: datetime | None = None
-    # Elmulasztott alkalomnál az alkalom (a felület „Ok" oszlopához).
+    # Elmulasztott alkalomnál az alkalom (a felület „Ok" oszlopához); a még sor
+    # nélküli lejárt határidőnél üres (lásd lapsed_without_row).
     occurrence: AssignmentOccurrence | None = None
     # Kezelve oknál a lezáró orvos (felhasználó) azonosítója.
     actor_id: uuid.UUID | None = None
@@ -143,10 +158,13 @@ def last_data_at(db: Session, patient_id: uuid.UUID) -> datetime | None:
 def latest_closed_occurrences(
     db: Session, patient_id: uuid.UUID, now: datetime
 ) -> list[AssignmentOccurrence]:
-    """A beteg ma érvényes előírásainak legutóbbi lezárt (nem esedékes)
-    alkalma, előírásonként egy, határidő szerint. Inaktív kérdőívre szóló
-    előírás nem számít: arra a háttérfolyamat nem nyit alkalmat, így a beteg
-    sem teljesíthetné (mint az open_due_occurrences-ben)."""
+    """A beteg ma érvényes előírásainak legutóbbi lezárt alkalma, előírásonként
+    egy, határidő szerint. Lezárt: teljesített vagy elmulasztott (akár a
+    határidő előtt teljesült), vagy még esedékes, de a határideje lejárt
+    (now > due_at, mint a teendőlista „késésben" állapotánál és a késve
+    teljesítésnél). Inaktív kérdőívre szóló előírás nem számít: arra a
+    háttérfolyamat nem nyit alkalmat, így a beteg sem teljesíthetné (mint az
+    open_due_occurrences-ben)."""
     today = now.astimezone(settings.tz).date()
     latest = db.scalars(
         select(AssignmentOccurrence)
@@ -159,13 +177,57 @@ def latest_closed_occurrences(
                 Assignment.target_kind == AssignmentTarget.MEASUREMENT,
                 QuestionnaireTemplate.is_active.is_(True),
             ),
-            AssignmentOccurrence.status != OccurrenceStatus.DUE,
+            or_(
+                AssignmentOccurrence.status != OccurrenceStatus.DUE,
+                AssignmentOccurrence.due_at < now,
+            ),
         )
         # PostgreSQL DISTINCT ON: előírásonként a legkésőbbi határidejű sor.
         .ext(distinct_on(AssignmentOccurrence.assignment_id))
         .order_by(AssignmentOccurrence.assignment_id, AssignmentOccurrence.due_at.desc())
     ).all()
     return sorted(latest, key=lambda o: (o.due_at, o.id))
+
+
+def lapsed_without_row(
+    db: Session,
+    patient_id: uuid.UUID,
+    now: datetime,
+    stored: list[AssignmentOccurrence],
+) -> dict[uuid.UUID, datetime]:
+    """A tárolt sor nélküli lejárt határidők (review K2, 2026-11-16): a beteg
+    ma érvényes előírásainál (ugyanaz a szűrés, mint latest_closed_occurrences)
+    a legutóbbi lejárt határidejű időszak, ha annak még nincs alkalomsora, és
+    nincs nála későbbi lezárt (tárolt) alkalom sem. Ilyenkor az alkalom nem
+    teljesülhetett (a teljesítés mindig sort hoz létre), tehát lejárt és
+    teljesítetlen: a státusz ugyanúgy Adathiány, mintha a sor meglenne. Így a
+    garancia a hívási sorrendtől (teendőlista, háttérfolyamat) független, és a
+    státusz továbbra sem ír semmit. Előírás szerint a határidő; az előírás
+    régebbi tárolt alkalma helyett ez számít (mint ha a sor meglenne)."""
+    today = now.astimezone(settings.tz).date()
+    assignments = db.scalars(
+        select(Assignment)
+        .outerjoin(Assignment.template)
+        .where(
+            Assignment.patient_id == patient_id,
+            *valid_on(today),
+            or_(
+                Assignment.target_kind == AssignmentTarget.MEASUREMENT,
+                QuestionnaireTemplate.is_active.is_(True),
+            ),
+        )
+    ).all()
+    latest_stored = {o.assignment_id: o.due_at for o in stored}
+    lapsed = {}
+    for assignment in assignments:
+        period = latest_lapsed_period(assignment, now)
+        if period is None:
+            continue
+        known = latest_stored.get(assignment.id)
+        if known is not None and known >= period.due_at:
+            continue
+        lapsed[assignment.id] = period.due_at
+    return lapsed
 
 
 def latest_closed_alerts(db: Session, patient_id: uuid.UUID) -> list[tuple[Alert, AlertEvent]]:
@@ -318,14 +380,27 @@ def compute_status(
         )
         reasons.append(StatusReason(status, "open_alert", alert=alert, at=alert.created_at))
 
-    closed = latest_closed_occurrences(db, patient_id, now)
-    for occurrence in closed:
-        if occurrence.status is OccurrenceStatus.MISSED:
+    stored = latest_closed_occurrences(db, patient_id, now)
+    # Előírásonként a legutóbbi lezárt alkalom: a tárolt, vagy ha a későbbi
+    # lejárt határidejű időszaknak még nincs sora, az (lásd lapsed_without_row;
+    # ilyenkor az okban nincs alkalom). Határidő szerint.
+    rowless = lapsed_without_row(db, patient_id, now, stored)
+    closed: list[tuple[datetime, AssignmentOccurrence | None]] = [
+        (o.due_at, o) for o in stored if o.assignment_id not in rowless
+    ]
+    closed += [(due_at, None) for due_at in rowless.values()]
+    closed.sort(key=lambda c: c[0])
+    for due_at, occurrence in closed:
+        # Elmulasztott, vagy lejárt határidejű és még nem teljesített (pótolható).
+        if occurrence is None or occurrence.status in (
+            OccurrenceStatus.MISSED,
+            OccurrenceStatus.DUE,
+        ):
             reasons.append(
                 StatusReason(
                     PatientStatus.NO_DATA,
                     "missed_occurrence",
-                    at=occurrence.due_at,
+                    at=due_at,
                     occurrence=occurrence,
                 )
             )
@@ -347,12 +422,18 @@ def compute_status(
 
 
 def doctor_patient_list(
-    db: Session, doctor_id: uuid.UUID, now: datetime | None = None
+    db: Session,
+    doctor_id: uuid.UUID,
+    now: datetime | None = None,
+    patients: list[PatientProfile] | None = None,
 ) -> list[tuple[PatientProfile, PatientStatusResult]]:
     """Az orvos éppen hozzá rendelt betegei státusszal, priorizálva (F9):
-    elöl a Súlyos, a végén a Rendben; azonos státuszon belül név szerint."""
+    elöl a Súlyos, a végén a Rendben; azonos státuszon belül név szerint.
+    A patients a hívó által már lekérdezett betegkör (assigned_patients_query
+    ugyanerre az időpontra), hogy egy kérésen belül egyszer fusson (review k3)."""
     now = now or datetime.now(UTC)
-    patients = db.scalars(assigned_patients_query(doctor_id, now)).all()
+    if patients is None:
+        patients = list(db.scalars(assigned_patients_query(doctor_id, now)).all())
     rows = [(p, compute_status(db, p.id, now)) for p in patients]
     rows.sort(key=lambda row: (PRIORITY.index(row[1].status), row[0].name))
     return rows

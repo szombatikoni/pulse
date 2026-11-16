@@ -13,9 +13,10 @@ from app.models import AssignmentOccurrence, AssignmentTarget, Frequency, Occurr
 from app.models.questionnaire import REVOKE_NOTE_MAX
 from app.services import plans
 from app.services.measurements import get_type_by_code, record_measurement
-from app.services.occurrences import fill_version
+from app.services.occurrences import fill_version, run_occurrence_check
 from app.services.plans import NOTICE_DAYS, PlanParams, plan_notices
 from app.services.questionnaires import assign_questionnaire, create_template, submit_questionnaire
+from app.services.status import PatientStatus, compute_status
 from app.services.tasks import TaskState, assign_measurement, patient_tasks
 from seed.questionnaires import WELLBEING_CODE, WELLBEING_NAME, WELLBEING_V1
 from tests.factories import assign, make_admin, make_doctor, make_patient
@@ -94,10 +95,12 @@ def occurrences_of(db, assignment):
 
 
 def test_todays_earlier_measurement_fulfils_a_new_plan(db, setup):
-    """A beteg reggel mért, az orvos délben írja elő: nincs hamis „esedékes"."""
+    """A beteg reggel mért, az orvos délben írja elő: nincs hamis „esedékes".
+    (A határidő 13:00: a 10:00-s már lejárt volna, és az előírás holnap
+    kezdődne, lásd test_plan_created_after_todays_deadline_starts_tomorrow.)"""
     measurement = record(db, setup, local(2026, 10, 17, 7, 30))
     now = local(2026, 10, 17, 12, 0)
-    assignment = create(db, setup, now)
+    assignment = create(db, setup, now, params=daily(due=time(13, 0)))
 
     [occurrence] = occurrences_of(db, assignment)
     assert occurrence.status is OccurrenceStatus.FULFILLED  # rögzítés 7:30 < határidő 10:00
@@ -111,16 +114,28 @@ def test_todays_earlier_measurement_fulfils_a_new_plan(db, setup):
 
 
 def test_existing_measurement_after_the_due_time_fulfils_late(db, setup):
+    # Új előírásnál ez már nem állhat elő: a határidő utáni létrehozásnál az első
+    # alkalom a következő időszakban van (review K1, 2026-11-16). A módosításnál
+    # az új előírás ma indul, így ott a késve teljesítés megmarad.
+    old = assign_measurement(
+        db,
+        patient_id=setup["pid"],
+        measurement_type=get_type_by_code(db, "blood_pressure"),
+        assigned_by=setup["doctor"].id,
+        start_date=date(2026, 10, 10),
+    )
     record(db, setup, local(2026, 10, 17, 11, 0))
-    assignment = create(db, setup, local(2026, 10, 17, 12, 0))
-    [occurrence] = occurrences_of(db, assignment)
+    new = plans.replace(
+        db, old, assigned_by=setup["doctor"].id, params=daily(), now=local(2026, 10, 17, 12, 0)
+    )
+    [occurrence] = occurrences_of(db, new)
     assert occurrence.status is OccurrenceStatus.FULFILLED_LATE
 
 
 def test_the_first_recorded_measurement_counts(db, setup):
     first = record(db, setup, local(2026, 10, 17, 9, 0))
     record(db, setup, local(2026, 10, 17, 8, 0), now=local(2026, 10, 17, 11, 0))  # később rögzítve
-    assignment = create(db, setup, local(2026, 10, 17, 12, 0))
+    assignment = create(db, setup, local(2026, 10, 17, 12, 0), params=daily(due=time(13, 0)))
     [occurrence] = occurrences_of(db, assignment)
     assert occurrence.measurement_id == first.id
     assert occurrence.status is OccurrenceStatus.FULFILLED
@@ -202,6 +217,147 @@ def test_replace_of_a_questionnaire_keeps_the_submissions_reference(db, setup):
     assert task.state is TaskState.DONE
 
 
+# --- Első alkalom a következő időszakban (review K1, b megoldás, 2026-11-16) ---------
+
+
+def heart_rate(db, setup, at):
+    """Friss adat, de nem az előírt méréstípusból."""
+    record_measurement(
+        db,
+        patient_id=setup["pid"],
+        type_code="heart_rate",
+        values={"value": 72},
+        measured_at=at,
+        now=at,
+    )
+
+
+@pytest.mark.parametrize(
+    "params",
+    [daily(), PlanParams(Frequency.EVERY_N_DAYS, 1, time(10, 0), None, None, None)],
+    ids=["daily", "every_1_day"],
+)
+def test_plan_created_after_todays_deadline_starts_tomorrow(db, setup, params):
+    """Okt. 17. 14:00-kor napi, 10:00-s határidejű előírás: a mai alkalom
+    határideje már lejárt, ezért az előírás holnap kezdődik. Ma nincs alkalom,
+    teendő és Adathiány; a háttérfolyamat 48 óra múlva sem zár hamis
+    elmulasztást (és így elmaradt adat riasztás sem lehet belőle)."""
+    heart_rate(db, setup, local(2026, 10, 17, 8, 0))
+    record(db, setup, local(2026, 10, 17, 7, 30))  # a mai reggeli mérés sem számít
+    now = local(2026, 10, 17, 14, 0)
+    assignment = create(db, setup, now, params=params)
+    assert assignment.start_date == date(2026, 10, 18)
+    assert occurrences_of(db, assignment) == []
+    assert patient_tasks(db, setup["pid"], now=now) == []
+    assert run_occurrence_check(db, now).opened == 0
+    assert compute_status(db, setup["pid"], now).status is PatientStatus.OK
+    assert compute_status(db, setup["pid"], now + timedelta(hours=1)).status is PatientStatus.OK
+
+    # Másnap az első alkalom esedékes, a beteg időben mér.
+    tomorrow = local(2026, 10, 18, 8, 0)
+    [task] = patient_tasks(db, setup["pid"], now=tomorrow)
+    assert (task.due_at, task.state, task.previous_missed) == (
+        local(2026, 10, 18, 10, 0),
+        TaskState.DUE,
+        False,
+    )
+    record(db, setup, local(2026, 10, 18, 9, 0))
+    record(db, setup, local(2026, 10, 19, 9, 0))
+    # A régi szabállyal a mai alkalom okt. 20. 0:00-kor (az időszak vége + 48
+    # óra) elmulasztott lett volna; most nincs mit elmulasztani.
+    check = run_occurrence_check(db, local(2026, 10, 20, 0, 1))
+    assert check.missed == 0
+    assert [o.status for o in occurrences_of(db, assignment)] == [
+        OccurrenceStatus.FULFILLED,
+        OccurrenceStatus.FULFILLED,
+        OccurrenceStatus.DUE,
+    ]
+
+
+def test_plan_created_before_todays_deadline_starts_today(db, setup):
+    now = local(2026, 10, 17, 9, 59)
+    assignment = create(db, setup, now)
+    assert assignment.start_date == date(2026, 10, 17)
+    [occurrence] = occurrences_of(db, assignment)
+    assert (occurrence.due_at, occurrence.status) == (
+        local(2026, 10, 17, 10, 0),
+        OccurrenceStatus.DUE,
+    )
+    [task] = patient_tasks(db, setup["pid"], now=now)
+    assert task.state is TaskState.DUE
+
+
+def test_plan_created_exactly_at_the_deadline_starts_today(db, setup):
+    # A határ ugyanaz, mint a státusznál: a határidő pillanatában még nem lejárt.
+    assignment = create(db, setup, local(2026, 10, 17, 10, 0))
+    assert assignment.start_date == date(2026, 10, 17)
+
+
+@pytest.mark.parametrize("hour", [9, 14])
+def test_weekly_plan_mid_week_starts_today_either_way(db, setup, hour):
+    """A heti előírás időszakai a kezdettől számítanak (nem naptári hetek): a
+    szombaton (okt. 17.) felírt heti előírás első határideje okt. 23. 10:00,
+    így a mai 10:00 előtt és után felírva is ma kezdődik."""
+    now = local(2026, 10, 17, hour, 0)
+    assignment = create(db, setup, now, params=daily(frequency=Frequency.WEEKLY))
+    assert assignment.start_date == date(2026, 10, 17)
+    [occurrence] = occurrences_of(db, assignment)
+    assert occurrence.due_at == local(2026, 10, 23, 10, 0)
+    [task] = patient_tasks(db, setup["pid"], now=now)
+    assert task.state is TaskState.DUE
+
+
+def test_plan_with_a_later_start_is_not_shifted(db, setup):
+    params = daily(start=date(2026, 10, 20))
+    assignment = create(db, setup, local(2026, 10, 17, 14, 0), params=params)
+    assert assignment.start_date == date(2026, 10, 20)
+
+
+def test_one_day_plan_after_its_deadline_keeps_its_start(db, setup):
+    """Nyitott kérdés (a hallgató dönt): a ma véget érő napi előírásnak a
+    határidő után nincs következő időszaka. A kezdet marad (a régi viselkedés),
+    így a mai, már lejárt alkalom azonnal Adathiányt ad."""
+    heart_rate(db, setup, local(2026, 10, 17, 8, 0))
+    now = local(2026, 10, 17, 14, 0)
+    params = PlanParams(Frequency.DAILY, None, time(10, 0), None, None, date(2026, 10, 17))
+    assignment = create(db, setup, now, params=params)
+    assert assignment.start_date == date(2026, 10, 17)
+    assert compute_status(db, setup["pid"], now).status is PatientStatus.NO_DATA
+
+
+def test_overlap_is_checked_with_the_shifted_start(db, setup):
+    """A ma véget érő előírás mellé a határidő után felírt új (holnaptól
+    kezdődő) előírás már nem fedi át (a tárolt kezdettel ellenőrzünk)."""
+    first = create(
+        db,
+        setup,
+        local(2026, 10, 15, 8, 0),
+        params=PlanParams(Frequency.DAILY, None, time(10, 0), None, None, date(2026, 10, 17)),
+    )
+    second = create(db, setup, local(2026, 10, 17, 14, 0))
+    assert (first.end_date, second.start_date) == (date(2026, 10, 17), date(2026, 10, 18))
+
+
+def test_replace_after_the_deadline_still_starts_today(db, setup):
+    """A módosításnál a szabály nem él (nyitott kérdés): az új ma indul, hogy a
+    lánc (régi lezárása = új kezdete) megmaradjon; a régi mai, lejárt
+    kötelezettsége így az újon folytatódik (Adathiány)."""
+    old = assign_measurement(
+        db,
+        patient_id=setup["pid"],
+        measurement_type=get_type_by_code(db, "blood_pressure"),
+        assigned_by=setup["doctor"].id,
+        start_date=date(2026, 10, 10),
+    )
+    heart_rate(db, setup, local(2026, 10, 17, 8, 0))
+    now = local(2026, 10, 17, 14, 0)
+    new = plans.replace(db, old, assigned_by=setup["doctor"].id, params=daily(), now=now)
+    assert new.start_date == date(2026, 10, 17)
+    [entry] = [e for e in plans.list_plan(db, setup["pid"], now) if e.assignment.id == old.id]
+    assert entry.replaced_by == new.id
+    assert compute_status(db, setup["pid"], now).status is PatientStatus.NO_DATA
+
+
 def test_doctor_plan_after_todays_measurement_is_done_for_the_patient(client, db, setup):
     """Végponton át: a beteg most mért, az orvos most írja elő."""
     record(db, setup, datetime.now(UTC) - timedelta(seconds=1))
@@ -210,7 +366,9 @@ def test_doctor_plan_after_todays_measurement_is_done_for_the_patient(client, db
         json={
             "kind": "measurement",
             "code": "blood_pressure",
-            "frequency": "daily",
+            # Heti: az első határidő hat nap múlva van, így a futás napszakától
+            # függetlenül ma indul (napi előírás 23:59 után holnap indulna, K1).
+            "frequency": "weekly",
             "due_time": "23:59",
         },
         headers=auth(setup["doctor"]),
@@ -268,7 +426,9 @@ def test_revoke_without_a_note(client, db, setup, payload):
 
 @pytest.mark.parametrize("action", ["revoke", "replace"])
 def test_too_long_note_is_rejected_and_nothing_changes(client, db, setup, action):
-    created = new_plan(client, setup)
+    # Heti: napszaktól függetlenül ma indul, tehát érvényes (a napi 10:00 után
+    # holnap indulna, review K1).
+    created = new_plan(client, setup, frequency="weekly")
     payload = {"note": "x" * (REVOKE_NOTE_MAX + 1)}
     if action == "replace":
         payload |= {"frequency": "weekly", "due_time": "10:00"}
