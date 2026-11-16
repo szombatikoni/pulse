@@ -1,0 +1,130 @@
+/* Kérdőívlista és -szerkesztő (M3, A5). A felülettervben nincs kérdőívszerkesztő;
+   a szabályszerkesztő mintáját követi (docs/design/felulet_2026-10-30, „szabályok"):
+   mezők, mellette álló kiértékelő kártya, „Mentés N. verzióként", verziólista. */
+
+/* lista */
+.pulse-prow.pl-row.qe-row {
+  display: grid;
+  grid-template-columns: 40px minmax(140px, 1fr) minmax(0, 2fr) auto;
+  gap: 18px;
+  align-items: center;
+}
+.qe-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--pulse-ink-3);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* szerkesztő */
+.qe-main {
+  display: grid;
+  gap: 18px;
+}
+.qe-question {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--pulse-raised);
+  border: 1px solid var(--pulse-line-2);
+}
+.qe-q-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+}
+.qe-q-head .pd-seg {
+  justify-self: start;
+}
+.qe-points {
+  font-variant-numeric: tabular-nums;
+  white-space: pre-wrap;
+}
+.qe-options {
+  display: grid;
+  gap: 8px;
+}
+.qe-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px auto;
+  gap: 8px;
+  align-items: start;
+}
+.qe-option .mantine-ActionIcon-root {
+  margin-top: 5px;
+}
+
+/* kiértékelés */
+.qe-max {
+  margin: 0;
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.qe-bands {
+  display: grid;
+  gap: 8px;
+}
+.qe-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+.qe-band-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--pulse-ink-1);
+  font-weight: 600;
+}
+.qe-band-range {
+  display: inline-grid;
+  grid-template-columns: 28px auto 72px;
+  align-items: center;
+  gap: 8px;
+  color: var(--pulse-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.qe-band-range .lo {
+  text-align: right;
+}
+.qe-band-range .hi {
+  padding-left: 12px;
+}
+.qe-band-errors {
+  display: grid;
+  gap: 4px;
+}
+.qe-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  color: var(--pulse-ink-2);
+  font-size: 13.5px;
+}
+
+@media (max-width: 640px) {
+  .pulse-prow.pl-row.qe-row {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+  }
+  .qe-row-meta {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+  .qe-q-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .qe-q-head .pd-seg {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

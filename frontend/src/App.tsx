@@ -5,6 +5,8 @@ import { LoginPage } from './features/auth/LoginPage'
 import { DoctorAlertsPage } from './features/doctor/DoctorAlertsPage'
 import { DoctorPatientsPage } from './features/doctor/DoctorPatientsPage'
 import { PatientDetailPage } from './features/doctor/PatientDetailPage'
+import { QuestionnaireEditorPage } from './features/doctor/QuestionnaireEditorPage'
+import { QuestionnairesPage } from './features/doctor/QuestionnairesPage'
 import { RoleHomePage } from './features/home/RoleHomePage'
 import { PatientHistoryPage } from './features/patient/PatientHistoryPage'
 import { PatientHomePage } from './features/patient/PatientHomePage'
@@ -25,6 +27,16 @@ export default function App() {
           <Route path="/doctor" element={<DoctorPatientsPage />} />
           <Route path="/doctor/patients/:patientId" element={<PatientDetailPage />} />
           <Route path="/doctor/alerts" element={<DoctorAlertsPage />} />
+          <Route path="/doctor/questionnaires" element={<QuestionnairesPage />} />
+          {/* Külön kulcs: az új kérdőív mentése után a szerkesztőoldal újraindul. */}
+          <Route
+            path="/doctor/questionnaires/new"
+            element={<QuestionnaireEditorPage key="new" />}
+          />
+          <Route
+            path="/doctor/questionnaires/:code"
+            element={<QuestionnaireEditorPage key="edit" />}
+          />
         </Route>
         <Route element={<RequireAuth role="admin" />}>
           <Route path="/admin" element={<RoleHomePage role="admin" />} />

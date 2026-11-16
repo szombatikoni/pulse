@@ -45,7 +45,14 @@ export const NOTE_MAX = 500
 
 export type PlanErrorDetail = { code: string }
 
-export type QuestionnaireTemplate = { code: string; name: string }
+/** Egy kirendelhető kérdőív; a kérdőívlistához az aktuális verzió adataival (A5). */
+export type QuestionnaireTemplate = {
+  code: string
+  name: string
+  version_no: number
+  question_count: number
+  max_score: number
+}
 
 export function usePatientPlan(patientId: string) {
   return useQuery({

@@ -189,7 +189,16 @@ def test_questionnaire_catalog_is_for_doctors(client, db, setup):
     db.flush()
     response = client.get("/api/questionnaires", headers=auth(setup["doctor"]))
     assert response.status_code == 200
-    assert response.json() == [{"code": WELLBEING_CODE, "name": WELLBEING_NAME}]
+    # A3: a kód és a név; A5 óta az aktuális verzió adatai is (kérdésszám, max. pont).
+    assert response.json() == [
+        {
+            "code": WELLBEING_CODE,
+            "name": WELLBEING_NAME,
+            "version_no": 1,
+            "question_count": 3,
+            "max_score": 13,
+        }
+    ]
     for role in ("patient", "admin"):
         assert client.get("/api/questionnaires", headers=auth(setup[role])).status_code == 403
 

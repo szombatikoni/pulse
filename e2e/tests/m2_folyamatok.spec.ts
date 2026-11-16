@@ -171,12 +171,14 @@ test('kérdőív-folyamat, beteg: kitöltés és beküldés, a pontszám nem lá
   const fillUrl = page.url()
 
   // Alvás 1, fáradtság 5, szédülés naponta: 4 + 4 + 5 = 13 pont (kritikus sáv).
+  // A mai alkalom már a „Közérzet” 2. verzióját kapja (M3, A5 seed): a kérdések az
+  // elmúlt hétre kérdeznek, a pontozás és a sávok változatlanok.
   await page
-    .getByRole('radiogroup', { name: 'Hogyan aludt az elmúlt éjszaka?' })
+    .getByRole('radiogroup', { name: 'Hogyan aludt az elmúlt héten?' })
     .getByText('1', { exact: true })
     .click()
   await page
-    .getByRole('radiogroup', { name: 'Mennyire fáradt ma?' })
+    .getByRole('radiogroup', { name: 'Mennyire érezte magát fáradtnak az elmúlt héten?' })
     .getByText('5', { exact: true })
     .click()
   await page.getByRole('radio', { name: 'Naponta' }).click()

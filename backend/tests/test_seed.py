@@ -16,6 +16,7 @@ from app.models import (
     MeasurementType,
     OccurrenceStatus,
     QuestionnaireTemplate,
+    QuestionnaireVersion,
     Rule,
     RuleType,
     Severity,
@@ -179,3 +180,81 @@ def test_seeded_accounts_can_log_in(client, db):
             "/api/auth/login", json={"email": spec["email"], "password": DEMO_PASSWORD}
         )
         assert response.status_code == 200, spec["email"]
+
+
+def test_seed_wellbeing_second_version(db):
+    # M3, A5 (D5): a „Közérzet" 2. verziója a régi kitöltések után, az alkalom-
+    # ellenőrzés előtt jön létre; csak a kérdések időszaka változik, a pontozás nem.
+    now = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
+    log = seed_demo_data(db, now=now)
+    assert "kérdőív: Közérzet, 2. verzió" in log
+    template = db.scalar(
+        select(QuestionnaireTemplate).where(QuestionnaireTemplate.code == "wellbeing")
+    )
+    versions = db.scalars(
+        select(QuestionnaireVersion)
+        .where(QuestionnaireVersion.template_id == template.id)
+        .order_by(QuestionnaireVersion.version_no)
+    ).all()
+    assert [v.version_no for v in versions] == [1, 2]
+    v1, v2 = versions
+    assert [q.text for q in v2.questions] == [
+        "Hogyan aludt az elmúlt héten?",
+        "Mennyire érezte magát fáradtnak az elmúlt héten?",
+        "Tapasztalt-e szédülést az elmúlt héten?",
+    ]
+    assert v2.scoring_thresholds == v1.scoring_thresholds
+    assert [q.options_scores for q in v2.questions] == [q.options_scores for q in v1.questions]
+
+    # A régi kitöltések az 1. verzióra hivatkoznak.
+    assert set(db.scalars(select(Submission.version_id))) == {v1.id}
+
+    # A mai alkalmak (a heti időszak első napja) már a 2. verziót kapják.
+    local_today = now.astimezone(settings.tz).date()
+    occurrences = db.execute(
+        select(AssignmentOccurrence.period_start, AssignmentOccurrence.questionnaire_version_id)
+        .join(Assignment)
+        .where(Assignment.questionnaire_template_id == template.id)
+    ).all()
+    today = [
+        vid for start, vid in occurrences if start.astimezone(settings.tz).date() == local_today
+    ]
+    assert today and set(today) == {v2.id}
+    # A kitöltéssel teljesített múltbeli alkalmak (a kitöltéskor nyíltak) az 1.-et;
+    # a kitöltés nélküli múltbeli alkalmak (pl. Kiss Ilona elmulasztott múlt heti
+    # alkalma) viszont csak a záró ellenőrzésben nyílnak meg, ezért a 2.-at. Ezt a
+    # felület sehol nem mutatja (a verzió csak a kitöltéskor számít); a viselkedést
+    # rögzíti a teszt, a döntés a hallgatóé (A5, a terv 4. pontjának nyitott kérdése).
+    submitted_on = {
+        s.occurrence_id for s in db.scalars(select(Submission)) if s.occurrence_id is not None
+    }
+    by_id = dict(
+        db.execute(
+            select(AssignmentOccurrence.id, AssignmentOccurrence.questionnaire_version_id)
+            .join(Assignment)
+            .where(Assignment.questionnaire_template_id == template.id)
+        ).all()
+    )
+    assert {by_id[i] for i in submitted_on} == {v1.id}
+    kiss = get_user_by_email(db, "kiss.ilona@pulse.example").patient_profile
+    missed = db.scalars(
+        select(AssignmentOccurrence.questionnaire_version_id)
+        .join(Assignment)
+        .where(
+            Assignment.patient_id == kiss.id,
+            Assignment.questionnaire_template_id == template.id,
+            AssignmentOccurrence.status == OccurrenceStatus.MISSED,
+        )
+    ).all()
+    assert missed == [v2.id]
+
+    # Ismételt futásnál nem jön újabb verzió.
+    seed_demo_data(db, now=now)
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(QuestionnaireVersion)
+            .where(QuestionnaireVersion.template_id == template.id)
+        )
+        == 2
+    )

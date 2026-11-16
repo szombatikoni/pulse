@@ -11,7 +11,8 @@ kivételével, amihez riasztáslezárás kell): Varga Béla Súlyos (180 feletti
 érték), Szabó János Figyelem (három 140/90 feletti érték egy héten belül, és
 figyelmeztető sávú kitöltés), Kiss Ilona Adathiány (a múlt heti Közérzet-
 kitöltése elmaradt), Molnár Katalin Rendben. A „Közérzet" kérdőívet minden
-demóbeteg hetente megkapja. A végén egy alkalom-ellenőrzés megnyitja és lezárja
+demóbeteg hetente megkapja; a régi kitöltések után a kérdőív 2. verziót kap
+(verzióváltás-bemutató, M3, A5). A végén egy alkalom-ellenőrzés megnyitja és lezárja
 az előírások múltbeli alkalmait, mint a háttérfolyamat.
 """
 
@@ -38,6 +39,7 @@ from app.models import (
 from app.services.measurements import get_type_by_code, record_measurement
 from app.services.occurrences import run_occurrence_check
 from app.services.questionnaires import (
+    add_version,
     assign_questionnaire,
     create_template,
     current_version,
@@ -46,7 +48,7 @@ from app.services.questionnaires import (
 from app.services.rules import create_rule
 from app.services.tasks import assign_measurement
 from app.services.users import create_user, get_user_by_email
-from seed.questionnaires import WELLBEING_CODE, WELLBEING_NAME, WELLBEING_V1
+from seed.questionnaires import WELLBEING_CODE, WELLBEING_NAME, WELLBEING_V1, WELLBEING_V2
 from seed.reference import seed_measurement_types
 
 DEMO_PASSWORD = "pulse-demo-2026"
@@ -241,6 +243,7 @@ def seed_demo_data(db: Session, now: datetime | None = None) -> list[str]:
     log += _seed_rules(db)
     log += _seed_measurements(db, now)
     log += _seed_submissions(db, now)
+    log += _seed_questionnaire_v2(db)
     log += _check_occurrences(db, now)
     db.commit()
     return log
@@ -291,6 +294,21 @@ def _seed_questionnaire(db: Session, now: datetime) -> list[str]:
             )
             log.append(f"kirendelés: {WELLBEING_NAME} – {patient.name}")
     return log
+
+
+def _seed_questionnaire_v2(db: Session) -> list[str]:
+    """A „Közérzet" 2. verziója (M3, A5): a régi kitöltések után, de az
+    alkalom-ellenőrzés előtt jön létre. A heti kirendelés 14 napja kezdődött,
+    így a frissen betöltött adatbázisban a mai nap egy új hét első napja: a
+    régi kitöltések az 1. verzióra hivatkoznak, a mai alkalom már a 2.-at kapja.
+    Ismételt futásnál nem jön létre újabb verzió."""
+    template = db.scalar(
+        select(QuestionnaireTemplate).where(QuestionnaireTemplate.code == WELLBEING_CODE)
+    )
+    if current_version(db, template.id).version_no != 1:
+        return []
+    add_version(db, template, WELLBEING_V2)
+    return [f"kérdőív: {WELLBEING_NAME}, 2. verzió"]
 
 
 def _seed_measurement_plans(db: Session, now: datetime) -> list[str]:

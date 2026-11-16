@@ -3,6 +3,7 @@ import { useDisclosure } from '@mantine/hooks'
 import {
   Bell,
   ChartLine,
+  ClipboardText,
   type Icon,
   House,
   ShieldCheck,
@@ -104,6 +105,8 @@ export function AppLayout({ user, children }: { user: CurrentUser; children: Rea
         match: (path) => path === '/doctor' || path.startsWith('/doctor/patients'),
       },
       { to: '/doctor/alerts', label: t('alerts.title'), icon: Bell, ...alertsNav },
+      // M3, A5: a közös kérdőívsablonok és a szerkesztőjük.
+      { to: '/doctor/questionnaires', label: t('qeditor.nav'), icon: ClipboardText },
     ],
     patient: [
       {

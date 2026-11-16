@@ -3,6 +3,10 @@
 Pontozás: több pont = rosszabb állapot, a skála jobb vége 0 pont. A
 legnagyobb elérhető pontszám 4 + 4 + 5 = 13. A kiértékelési sávok a verzió
 részei: 0–5 rendben, 6–10 figyelmeztető, 11–13 kritikus.
+
+A 2. verzió (M3, A5; a hallgató döntése, D5) a verzióváltás bemutatója: csak a
+kérdések időszaka igazodik a heti kirendeléshez, a szerkezet, a pontozás és a
+sávok maradnak. Így a sávszabályok és a dolgozat számpéldája érvényes marad.
 """
 
 from app.services.questionnaires import VersionSpec
@@ -48,3 +52,9 @@ WELLBEING_V1 = VersionSpec.model_validate(
         ],
     }
 )
+
+# A 2. verzió: ugyanaz, csak a két skálás kérdés is az elmúlt hétre kérdez.
+_V2 = WELLBEING_V1.model_dump()
+_V2["questions"][0]["text"] = "Hogyan aludt az elmúlt héten?"
+_V2["questions"][1]["text"] = "Mennyire érezte magát fáradtnak az elmúlt héten?"
+WELLBEING_V2 = VersionSpec.model_validate(_V2)
