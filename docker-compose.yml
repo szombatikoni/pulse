@@ -76,6 +76,9 @@ services:
     build:
       context: ./integration
       target: szolgaltatas
+    # Ha a folyamat mégis kilép (pl. egy kezeletlen hiba miatt), a Docker
+    # újraindítja; kézi leállítás (docker compose stop) után nem.
+    restart: unless-stopped
     healthcheck:
       # Az alpine image-ben nincs curl/wget; a Node beépített fetch-ével kérdezünk.
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]

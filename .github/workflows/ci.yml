@@ -106,6 +106,11 @@ jobs:
         run: docker compose up --build -d --wait
       - name: Mesterséges demóadat (seed)
         run: docker compose exec -T api python -m seed
+      # A pytest a CQL-szolgáltatást hamis klienssel helyettesíti; itt a teljes
+      # lánc fut a valódi konténerekkel (DB → FHIR-csomag → CQL-motor →
+      # összevetés), egy seedelt betegen, kézzel számolt elvárással.
+      - name: NICE-kiértékelés a valódi CQL-motorral (teljes lánc)
+        run: docker compose exec -T api python -m scripts.nice_lanc_proba
       - uses: actions/setup-node@v7
         with:
           node-version: "24"

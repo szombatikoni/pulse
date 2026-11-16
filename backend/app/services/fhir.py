@@ -294,6 +294,43 @@ def patient_bundle(
         + [observation_resource(m) for m in measurements]
         + [questionnaire_response_resource(s) for s in submissions]
     )
+    return _bundle(resources, now)
+
+
+def measurement_bundle(
+    db: Session,
+    patient: PatientProfile,
+    *,
+    loinc_code: str,
+    start: datetime,
+    end: datetime,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Szűkített csomag (M3, K2, a CQL-motornak): a Patient és az adott
+    LOINC-kódú, érvényes (nem felülírt) mérések a [start, end) időszakból,
+    időrendben, ugyanazzal a leképezéssel, mint a teljes kiadás. Csak olvas."""
+    measurements = db.scalars(
+        select(Measurement)
+        .join(MeasurementType, MeasurementType.id == Measurement.type_id)
+        .where(
+            Measurement.patient_id == patient.id,
+            MeasurementType.loinc_code == loinc_code,
+            Measurement.measured_at >= start,
+            Measurement.measured_at < end,
+            not_superseded(),
+        )
+        .options(
+            selectinload(Measurement.type).selectinload(MeasurementType.components),
+            selectinload(Measurement.values).selectinload(MeasurementValue.component),
+        )
+        .order_by(Measurement.measured_at, Measurement.id)
+    ).all()
+    return _bundle(
+        [patient_resource(patient)] + [observation_resource(m) for m in measurements], now
+    )
+
+
+def _bundle(resources: list[dict[str, Any]], now: datetime | None) -> dict[str, Any]:
     return {
         "resourceType": "Bundle",
         "meta": {"tag": [TEST_DATA_TAG]},

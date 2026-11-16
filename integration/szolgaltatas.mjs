@@ -11,8 +11,8 @@
 //   GET  /health    200, ha az ELM betöltődött (a compose healthcheckje ezt kérdezi)
 //   POST /evaluate  törzs: { bundle, parameters?, evaluationTime? }
 //                   válasz: { library, engine, evaluationTime, result, durationMs }
-// Hibák JSON-ban: { error: <kód>, message: <magyarázat> }; 400 hibás bemenet,
-// 404 ismeretlen útvonal, 405 rossz metódus, 413 túl nagy törzs, 500 hiba a
+// Hibák JSON-ban: { error: <kód>, message: <magyarázat> }; 400 hibás bemenet
+// vagy nem értelmezhető kérés-cím (invalid_request), 404 ismeretlen útvonal, 405 rossz metódus, 413 túl nagy törzs, 500 hiba a
 // kiértékelésben (a folyamat ilyenkor is fut tovább).
 
 import http from 'node:http';
@@ -199,8 +199,16 @@ export async function szolgaltatasLetrehozas() {
 
   const server = http.createServer(async (req, res) => {
     const kezdet = performance.now();
-    const utvonal = new URL(req.url, 'http://localhost').pathname;
+    // A nyers kérés-cím a naplóhoz, ha nem értelmezhető (pl. `GET //`: a
+    // new URL ezt nem fogadja el bázissal sem). Az értelmezés a hibakezelésen
+    // belül van, hogy egy hibás cím ne állítsa le a folyamatot.
+    let utvonal = req.url;
     try {
+      try {
+        utvonal = new URL(req.url, 'http://localhost').pathname;
+      } catch {
+        throw new BemenetiHiba('invalid_request', `A kérés címe nem értelmezhető: ${JSON.stringify(req.url)}`);
+      }
       const metodusok = utvonalak[utvonal];
       if (!metodusok) {
         valasz(res, 404, { error: 'not_found', message: `Ismeretlen útvonal: ${utvonal}` });

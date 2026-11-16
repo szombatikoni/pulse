@@ -12,12 +12,20 @@ két ponton a CQL-fájlt követve, nem azt:
   Series Period méréseiből veszi a minimumot);
 - az életkor a sorozat végének napján számít (`date from end of "Series
   Period"`); a félig nyílt [kezdet, vég) időszak vége a cql-execution szerint a
-  vég előtti ezredmásodperc, így a napja a vég előtti nap, azaz a mai nap.
+  vég előtti ezredmásodperc, így a napja a vég előtti nap, azaz az utolsó
+  lezárt nap (tegnap). A február 29-i születésnap nem szökőévben február 28-án
+  számít betöltöttnek, mint a motorban (age_in_years).
 
-Időszak (a hallgató döntése, D2b): az utolsó 7 helyi nap a mai nappal együtt,
-[ma-6 0:00, holnap 0:00) a settings.tz szerint, az első nap kizárva, legalább 3
+Időszak (a hallgató döntése, D2b, a 7 nap a NICE-hoz igazítva): az utolsó 7
+LEZÁRT helyi naptári nap, [ma-7 0:00, ma 0:00) a settings.tz szerint; a mai,
+még folyamatban lévő nap nem számít bele. Az első nap kizárva, legalább 3
 figyelembe vett nap kell (a CQL alapértékei). A NICE egyszeri sorozatról szól,
 itt az ablak gördül: a legrégebbi mérést tartalmazó nap minden futásnál kiesik.
+
+A motor nem a beteg teljes előzményét kapja, hanem egy szűkített csomagot: a
+Patient és a vérnyomásmérések az időszakból, mindkét irányban 1 nap
+ráhagyással (BUNDLE_MARGIN), hogy az ablakszéleken a szűrést valóban a CQL
+végezze, és a csomag a szolgáltatás 1 MiB-os korlátja alatt maradjon.
 
 Semmit nem tárol, riasztást nem nyit, státuszt nem változtat.
 """
@@ -42,7 +50,7 @@ from app.models import (
     not_superseded,
 )
 from app.services.cql_client import CqlServiceError
-from app.services.fhir import patient_bundle
+from app.services.fhir import measurement_bundle
 
 # A vérnyomás-panel és a két érték LOINC-kódja, és az egység (UCUM), mint a
 # CQL-ben: csak az a mérés számít, amelyben mindkét érték megvan Hgmm-ben.
@@ -51,10 +59,18 @@ SYSTOLIC = "8480-6"
 DIASTOLIC = "8462-4"
 MMHG = "mm[Hg]"
 
-# Az időszak hossza napban, a mai nappal együtt (D2b).
+# Az időszak hossza napban: ennyi lezárt nap, a mai nélkül (D2b).
 WINDOW_DAYS = 7
 
+# A motornak küldött csomag ráhagyása az időszak két szélén.
+BUNDLE_MARGIN = timedelta(days=1)
+
 # Az átlagok egyezésének tűrése: a motor lebegőpontosan számol, mi törtekkel.
+# Ismert eltérés (S1): tizedes értékeknél, ha a pontos átlag éppen a célérték,
+# a motor lebegőpontos átlaga a határ másik oldalára eshet (pl. 138,6, 131,2,
+# 134,8, 137,0, 133,4: pontosan 135, a motornál 134.99999999999997), így a
+# target_met eltér, és a felület eltérést mutat. Szándékosan nem simítjuk el
+# (test_known_difference_float_mean_at_the_target).
 MEAN_TOLERANCE = Fraction(1, 10**9)
 
 FIRST_READING_DAY = "FirstReadingDay"
@@ -154,7 +170,14 @@ ID_FIELDS = {"excluded_reading_ids", "included_reading_ids"}
 
 
 def age_in_years(birth_date: date, on: date) -> int:
-    return on.year - birth_date.year - ((on.month, on.day) < (birth_date.month, birth_date.day))
+    """Betöltött életkor az adott napon, a cql-execution AgeInYearsAt szerint:
+    a február 29-én születettnél nem szökőévben február 28. a születésnap
+    (a motoron kipróbálva: 1944-02-29 2026-02-28-án már 82 éves)."""
+    try:
+        birthday = birth_date.replace(year=on.year)
+    except ValueError:  # február 29., nem szökőév
+        birthday = date(on.year, 2, 28)
+    return on.year - birth_date.year - (on < birthday)
 
 
 def _round_half_up(value: Fraction, precision: int) -> Fraction:
@@ -259,13 +282,13 @@ def compute(
 
 
 def series_period(now: datetime | None = None) -> Period:
-    """Az utolsó 7 helyi nap a mai nappal együtt: [ma-6 0:00, holnap 0:00), a
+    """Az utolsó 7 lezárt helyi nap, a mai nélkül: [ma-7 0:00, ma 0:00), a
     rendszer időzónájában. A két határ eltolása óraátállás körül eltérhet (az
     éjfél Budapesten mindig létezik, az átállás hajnali 2 és 3 óra között van)."""
     today = (now or datetime.now(UTC)).astimezone(settings.tz).date()
     return Period(
-        start=datetime.combine(today - timedelta(days=WINDOW_DAYS - 1), time(), settings.tz),
-        end=datetime.combine(today + timedelta(days=1), time(), settings.tz),
+        start=datetime.combine(today - timedelta(days=WINDOW_DAYS), time(), settings.tz),
+        end=datetime.combine(today, time(), settings.tz),
     )
 
 
@@ -316,7 +339,7 @@ def own_result(
     db: Session, patient: PatientProfile, period: Period, params: NiceParams
 ) -> NiceResult:
     """A saját számítás az adatbázisból. Az életkor a sorozat végének napján:
-    a félig nyílt időszak vége a cql-execution szerint end - 1 ms."""
+    a félig nyílt időszak vége a cql-execution szerint end - 1 ms (tegnap)."""
     return compute(
         load_readings(db, patient.id, period),
         birth_date=patient.birth_date,
@@ -421,16 +444,28 @@ class NiceEvaluation:
 CqlEvaluate = Callable[[dict[str, Any]], dict[str, Any]]
 
 
-def evaluate_patient(
+@dataclass
+class PreparedEvaluation:
+    """Az adatbázisból kiolvasott rész: az időszak, a paraméterek, a saját
+    számítás és a szolgáltatásnak szóló kérés. Ezután az adatbázisra már nincs
+    szükség, így a hívó a HTTP-hívás előtt lezárhatja a tranzakciót."""
+
+    now: datetime
+    period: Period
+    parameters: dict[str, Any]
+    own: NiceResult
+    request: dict[str, Any]
+
+
+def prepare_evaluation(
     db: Session,
     patient_id: uuid.UUID,
-    cql_evaluate: CqlEvaluate,
     now: datetime | None = None,
     params: NiceParams | None = None,
-) -> NiceEvaluation:
-    """A beteg NICE-kiértékelése mindkét úton. A jogosultságot a hívó
-    ellenőrzi. A szolgáltatás hibája CqlServiceError (a végpont 503-at ad);
-    vérnyomás-méréstípus vagy mérés hiánya nem hiba, hanem „nincs elég adat"."""
+) -> PreparedEvaluation:
+    """A kiértékelés adatbázis-oldali része (csak olvas). A motor szűkített
+    csomagot kap: Patient + a vérnyomásmérések az időszakból, BUNDLE_MARGIN
+    ráhagyással (a felülírt mérések nélkül)."""
     now = now or datetime.now(UTC)
     params = params or NiceParams()
     patient = db.get(PatientProfile, patient_id)
@@ -448,13 +483,20 @@ def evaluate_patient(
         },
         **params.cql_parameters(),
     }
-    response = cql_evaluate(
-        {
-            "bundle": patient_bundle(db, patient_id, now=now),
-            "parameters": parameters,
-            "evaluationTime": cql_datetime(now),
-        }
+    bundle = measurement_bundle(
+        db,
+        patient,
+        loinc_code=BP_PANEL,
+        start=period.start - BUNDLE_MARGIN,
+        end=period.end + BUNDLE_MARGIN,
+        now=now,
     )
+    request = {"bundle": bundle, "parameters": parameters, "evaluationTime": cql_datetime(now)}
+    return PreparedEvaluation(now, period, parameters, own, request)
+
+
+def finish_evaluation(prepared: PreparedEvaluation, response: dict[str, Any]) -> NiceEvaluation:
+    """A szolgáltatás válaszának értelmezése és az összevetés (adatbázis nélkül)."""
     cql = parse_cql_result(response.get("result"))
     library, engine = response.get("library"), response.get("engine")
     duration = response.get("durationMs")
@@ -465,13 +507,28 @@ def evaluate_patient(
     ):
         raise CqlServiceError("invalid_response", "a durationMs nem szám")
     return NiceEvaluation(
-        evaluation_time=now.astimezone(settings.tz),
-        period=period,
-        parameters=parameters,
+        evaluation_time=prepared.now.astimezone(settings.tz),
+        period=prepared.period,
+        parameters=prepared.parameters,
         cql=cql,
-        own=own,
-        mismatched_fields=mismatched_fields(cql, own),
+        own=prepared.own,
+        mismatched_fields=mismatched_fields(cql, prepared.own),
         library=library,
         engine=engine,
         duration_ms=duration,
     )
+
+
+def evaluate_patient(
+    db: Session,
+    patient_id: uuid.UUID,
+    cql_evaluate: CqlEvaluate,
+    now: datetime | None = None,
+    params: NiceParams | None = None,
+) -> NiceEvaluation:
+    """A beteg NICE-kiértékelése mindkét úton. A jogosultságot a hívó
+    ellenőrzi. A szolgáltatás hibája CqlServiceError (a végpont 503-at ad);
+    vérnyomás-méréstípus vagy mérés hiánya nem hiba, hanem „nincs elég adat".
+    A végpont a két lépést külön hívja, hogy közben lezárja a tranzakciót."""
+    prepared = prepare_evaluation(db, patient_id, now, params)
+    return finish_evaluation(prepared, cql_evaluate(prepared.request))

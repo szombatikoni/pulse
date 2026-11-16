@@ -12,6 +12,7 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import http from 'node:http';
 import { after, before, describe, test } from 'node:test';
 import { TORZS_KORLAT, szolgaltatasLetrehozas } from '../szolgaltatas.mjs';
 
@@ -112,6 +113,39 @@ describe('POST /evaluate: a PULSE kiadott csomagja', () => {
   });
 });
 
+describe('Életkor február 29-i születésnappal (a motor viselkedése)', () => {
+  // Az életkor a Series Period végének napján számít (a félig nyílt időszak
+  // vége előtti ezredmásodperc napja). A backend (nice.py, age_in_years) ehhez
+  // igazodik: nem szökőévben febr. 28-án már betöltöttnek számít az év.
+  const eletkor = async (szuletes, nap) => {
+    const vege = new Date(`${nap}T00:00:00Z`);
+    vege.setUTCDate(vege.getUTCDate() + 1);
+    const kezdete = new Date(vege);
+    kezdete.setUTCDate(kezdete.getUTCDate() - 7);
+    const iso = (d) => `${d.toISOString().slice(0, 10)}T00:00:00.000+01:00`;
+    const res = await post({
+      bundle: { resourceType: 'Bundle', type: 'collection', entry: [{ resource: { resourceType: 'Patient', id: 'szokoev', birthDate: szuletes } }] },
+      parameters: { 'Series Period': { low: iso(kezdete), high: iso(vege) } },
+      evaluationTime: `${iso(vege).slice(0, 10)}T12:00:00.000+01:00`,
+    });
+    assert.equal(res.status, 200);
+    return (await res.json()).result.ageInYears;
+  };
+
+  for (const [szuletes, nap, vart] of [
+    ['1944-02-29', '2026-02-27', 81],
+    ['1944-02-29', '2026-02-28', 82],
+    ['1944-02-29', '2026-03-01', 82],
+    ['1948-02-29', '2028-02-28', 79],
+    ['1948-02-29', '2028-02-29', 80],
+    ['1948-02-29', '2028-03-01', 80],
+  ]) {
+    test(`${szuletes}, az időszak utolsó napja ${nap}: ${vart} év`, async () => {
+      assert.equal(await eletkor(szuletes, nap), vart);
+    });
+  }
+});
+
 describe('Hibás bemenet: 400', () => {
   const eset = async (torzs, kod) => {
     const res = await post(torzs);
@@ -162,6 +196,28 @@ describe('Útvonal, metódus, méret', () => {
   test('POST /health: 405', async () => {
     const res = await post({}, '/health');
     assert.equal(res.status, 405);
+  });
+
+  test('nem értelmezhető kérés-cím (GET //): 400 JSON, és a folyamat fut tovább', async () => {
+    // Nyers http.request kell: a fetch a címet normalizálná, így a // nem jutna el.
+    const { port } = server.address();
+    const { statusz, tipus, torzs } = await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path: '//', method: 'GET' }, (res) => {
+        let adat = '';
+        res.setEncoding('utf8');
+        res.on('data', (d) => { adat += d; });
+        res.on('end', () => resolve({ statusz: res.statusCode, tipus: res.headers['content-type'], torzs: adat }));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    assert.equal(statusz, 400);
+    assert.match(tipus, /application\/json/);
+    const valasz = JSON.parse(torzs);
+    assert.equal(valasz.error, 'invalid_request');
+    assert.equal(typeof valasz.message, 'string');
+    const utana = await fetch(`${cim}/health`);
+    assert.equal(utana.status, 200);
   });
 
   test('a korlátnál nagyobb törzs: 413', async () => {
