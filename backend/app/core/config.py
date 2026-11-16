@@ -2,7 +2,7 @@
 
 from zoneinfo import ZoneInfo
 
-from pydantic import PositiveInt
+from pydantic import PositiveFloat, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     # az „ellenőrzés most" végpont adja, nem az ütem. A demóhoz és a
     # teljesítményméréshez állítható.
     occurrence_check_interval_seconds: PositiveInt = 3600
+
+    # A CQL-szolgáltatás (M3, K2) címe és a hívás időtúllépése másodpercben
+    # (CQL_SERVICE_URL, CQL_TIMEOUT_SECONDS). Az alapcím a compose belső hálózata;
+    # a szolgáltatás portot nem nyit a gép felé. Ha nem érhető el, csak a NICE-
+    # kiértékelés végpontja ad hibát (503), a riasztás és a státusz nem függ tőle.
+    cql_service_url: str = "http://cql:8080"
+    cql_timeout_seconds: PositiveFloat = 5.0
 
     @property
     def tz(self) -> ZoneInfo:

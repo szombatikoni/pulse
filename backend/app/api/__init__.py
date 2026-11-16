@@ -7,6 +7,7 @@ from app.api import (
     fhir,
     health,
     measurements,
+    nice,
     patients,
     plans,
     questionnaires,
@@ -26,3 +27,4 @@ api_router.include_router(plans.router)
 api_router.include_router(rules.router)
 api_router.include_router(alerts.router)
 api_router.include_router(fhir.router)
+api_router.include_router(nice.router)
