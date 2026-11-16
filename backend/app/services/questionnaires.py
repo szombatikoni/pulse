@@ -12,9 +12,9 @@ import re
 import unicodedata
 import uuid
 from datetime import UTC, date, datetime, time
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -112,18 +112,41 @@ END_LABEL_MAX = 100
 NAME_MAX = 200
 
 
+def check_editor_text(value: str | None) -> str | None:
+    """A szerkesztő szövegmezői (név, kérdés, felirat, végfelirat): vezérlőkarakter
+    (NUL, sortörés, tabulátor…) nem lehet benne (a NUL-t a PostgreSQL el sem
+    tárolná), és nem állhat csak láthatatlan karakterből (szóköz, nulla szélességű
+    szóköz és más formázókarakter), mert a beteg üresnek látná. (A magányos
+    surrogate-ot már a Pydantic szövegellenőrzése elutasítja.)"""
+    if value is None:
+        return None
+    if any(unicodedata.category(c) == "Cc" for c in value):
+        raise ValueError("a szövegben nem lehet vezérlőkarakter")
+    if all(c.isspace() or unicodedata.category(c) == "Cf" for c in value):
+        raise ValueError("a szöveg nem állhat csak láthatatlan karakterből")
+    return value
+
+
+EditorText = Annotated[str, AfterValidator(check_editor_text)]
+# Szigorú egész: a true, az "5" és az 5.5 is 422 (alapból a Pydantic átalakítaná).
+StrictInt = Annotated[int, Field(strict=True)]
+
+
 class EditorOptionSpec(OptionSpec):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    score: int = Field(ge=0, le=OPTION_SCORE_MAX)
+    label: EditorText = Field(min_length=1, max_length=200)
+    score: StrictInt = Field(ge=0, le=OPTION_SCORE_MAX)
 
 
 class EditorQuestionSpec(QuestionSpec):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    text: str = Field(min_length=1, max_length=TEXT_MAX)
-    min_label: str | None = Field(default=None, max_length=END_LABEL_MAX)
-    max_label: str | None = Field(default=None, max_length=END_LABEL_MAX)
+    text: EditorText = Field(min_length=1, max_length=TEXT_MAX)
+    scale_min: StrictInt | None = None
+    scale_max: StrictInt | None = None
+    min_label: EditorText | None = Field(default=None, max_length=END_LABEL_MAX)
+    max_label: EditorText | None = Field(default=None, max_length=END_LABEL_MAX)
     options: list[EditorOptionSpec] = Field(default_factory=list, max_length=OPTIONS_MAX)
 
     @model_validator(mode="after")
@@ -133,12 +156,23 @@ class EditorQuestionSpec(QuestionSpec):
                 raise ValueError("a skála 1–5 vagy 1–10 lehet")
             if self.options:
                 raise ValueError("skálánál a pontokat a jobb vég adja, lehetőség nem adható meg")
+        # A beteg a feliratot látja: két azonos (kis- és nagybetűtől függetlenül)
+        # felirat között nem tudna választani, az orvos a kitöltésben nem tudná
+        # megkülönböztetni. (A belső value egyediségét a QuestionSpec nézi.)
+        labels = [o.label.casefold() for o in self.options]
+        if len(labels) != len(set(labels)):
+            raise ValueError("a válaszlehetőségek felirata egyedi")
         return self
+
+
+class EditorBandSpec(BandSpec):
+    min: StrictInt = Field(ge=0)
+    max: StrictInt = Field(ge=0)
 
 
 class EditorVersionSpec(VersionSpec):
     questions: list[EditorQuestionSpec] = Field(min_length=1, max_length=QUESTIONS_MAX)
-    scoring_thresholds: list[BandSpec] = Field(min_length=3, max_length=3)
+    scoring_thresholds: list[EditorBandSpec] = Field(min_length=3, max_length=3)
 
     @model_validator(mode="after")
     def fixed_bands(self) -> "EditorVersionSpec":

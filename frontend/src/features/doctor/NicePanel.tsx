@@ -305,7 +305,10 @@ function Result({ evaluation }: { evaluation: NiceEvaluation }) {
             </span>
             <span className="u">{unitLabel(t, 'mm[Hg]')}</span>
           </div>
-          <div className="pd-nice-val-sub">{t('doctor.nice.mean')}</div>
+          {/* Eltérésnél a kiemelt szám csak az egyik számítás (a CQL-motor) értéke. */}
+          <div className="pd-nice-val-sub">
+            {t(mismatch ? 'doctor.nice.meanCql' : 'doctor.nice.mean')}
+          </div>
         </div>
       )}
       <div className="pd-nice-verdict-row">
@@ -362,7 +365,7 @@ function Result({ evaluation }: { evaluation: NiceEvaluation }) {
         <dt>{t('doctor.nice.included')}</dt>
         <dd>
           {t('doctor.nice.includedValue', {
-            days: r.included_day_count ?? 0,
+            days: t('doctor.nice.includedDays', { count: r.included_day_count ?? 0 }),
             count: r.included_reading_ids.length,
           })}
         </dd>

@@ -14,7 +14,9 @@ from app.models import (
 )
 from app.services.questionnaires import (
     NAME_MAX,
+    EditorText,
     EditorVersionSpec,
+    StrictInt,
     band_for,
     question_max_score,
     scale_end_labels,
@@ -110,14 +112,14 @@ class QuestionnaireCreate(EditorVersionSpec):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    name: str = Field(min_length=1, max_length=NAME_MAX, examples=["Közérzet"])
+    name: EditorText = Field(min_length=1, max_length=NAME_MAX, examples=["Közérzet"])
 
 
 class QuestionnaireVersionCreate(EditorVersionSpec):
     """Új verzió. A base_version_no az a verzió, amelyből a szerkesztés indult;
     ha közben újabb született, a mentés 409 (stale_version)."""
 
-    base_version_no: int = Field(ge=1)
+    base_version_no: StrictInt = Field(ge=1)
 
 
 class QuestionnaireOut(BaseModel):

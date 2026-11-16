@@ -38,6 +38,7 @@ test('NICE, valódi lánc: Szabó Jánosnál átlag, ítélet és egyezés a gom
   await expect(nice).toContainText(/Kiértékelve ma \d\d:\d\d/)
   // Az átlag egy tizedesre, tizedesvesszővel: „137,7 / 86,8”.
   await expect(nice.locator('.pd-nice-val .v')).toHaveText(/^\d{2,3},\d{1,2} \/ \d{2,3},\d{1,2}$/)
+  await expect(nice.locator('.pd-nice-val-sub')).toHaveText('Átlag, szisztolés / diasztolés')
   await expect(nice.locator('.pd-nice-verdict')).toHaveText(/^Cél (nem )?teljesül$/)
   await expect(nice).toContainText('Célérték: 135 / 85 Hgmm alatt')
   await expect(nice).toContainText('A CQL-motor és a saját számítás egyezik')
@@ -47,6 +48,8 @@ test('NICE, valódi lánc: Szabó Jánosnál átlag, ítélet és egyezés a gom
   await details.locator('summary').click()
   await expect(nice.getByRole('columnheader', { name: 'CQL-motor' })).toBeVisible()
   await expect(nice).toContainText('PulseHbpmAverage 0.1.0')
+  // A beszámított napok és mérések (a magyar szöveg többes számban sem változik).
+  await expect(nice).toContainText(/Beszámítva\s*\d+ nap, \d+ mérés/)
 })
 
 test('NICE, valódi lánc: Kiss Ilonánál kevés a nap, „Nem értékelhető”, nagy átlag nélkül', async ({
@@ -106,6 +109,10 @@ test('NICE, eltérés a két számítás között: nincs ítélet, a Részletek 
   await nice.getByRole('button', { name: 'Kiértékelés' }).click()
 
   await expect(nice.locator('.pd-nice-verdict')).toHaveText('Eltér a két számítás')
+  // A kiemelt átlag ilyenkor csak az egyik fél értéke, ezt a felirat jelzi.
+  await expect(nice.locator('.pd-nice-val-sub')).toHaveText(
+    'Átlag, szisztolés / diasztolés, a CQL-motor szerint',
+  )
   await expect(nice).toContainText(
     'A CQL-motor és a saját számítás eredménye eltér: cél teljesül. Az eredményt ezért nem minősítjük.',
   )

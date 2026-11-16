@@ -149,12 +149,22 @@ export type DraftErrors = {
   question: Record<string, QuestionErrors>
 }
 
+/** Vezérlőkarakter (sortörés, tabulátor, NUL…), mint a szerver check_editor_text-je. */
+const CONTROL = /\p{Cc}/u
+/** Csak szóköz és láthatatlan formázókarakter (pl. nulla szélességű szóköz). */
+const INVISIBLE_ONLY = /^[\s\p{Cf}]*$/u
+
 function textError(t: TFunction, value: string, max: number, required = true) {
   const trimmed = value.trim()
-  if (required && !trimmed) return t('qeditor.errors.required')
+  if (!trimmed && !required) return undefined
+  if (INVISIBLE_ONLY.test(trimmed)) return t('qeditor.errors.required')
+  if (CONTROL.test(trimmed)) return t('qeditor.errors.invalidChars')
   if (trimmed.length > max) return t('qeditor.errors.tooLong', { n: max })
   return undefined
 }
+
+/** A felirat összevetéshez: szóköz nélkül a két végén, kisbetűsen (mint a szerveren). */
+const labelKey = (label: string) => label.trim().toLowerCase()
 
 function questionErrors(t: TFunction, q: QuestionDraft): QuestionErrors {
   const e: QuestionErrors = { option: {} }
@@ -170,9 +180,18 @@ function questionErrors(t: TFunction, q: QuestionDraft): QuestionErrors {
   if (q.options.length > LIMITS.options) {
     e.options = t('qeditor.errors.optionsMax', { n: LIMITS.options })
   }
+  // Két azonos felirat között a beteg nem tudna választani; a hiba minden
+  // ismétlődő lehetőségnél megjelenik.
+  const labelCounts = new Map<string, number>()
+  for (const o of q.options) {
+    labelCounts.set(labelKey(o.label), (labelCounts.get(labelKey(o.label)) ?? 0) + 1)
+  }
   for (const o of q.options) {
     const oe: OptionErrors = {}
     oe.label = textError(t, o.label, LIMITS.optionLabel)
+    if (!oe.label && (labelCounts.get(labelKey(o.label)) ?? 0) > 1) {
+      oe.label = t('qeditor.errors.duplicateLabel')
+    }
     if (!isIntIn(toNumber(o.score), 0, LIMITS.score)) {
       oe.score = t('qeditor.errors.score', { max: LIMITS.score })
     }

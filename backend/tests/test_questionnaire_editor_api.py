@@ -3,6 +3,7 @@
 rájuk hivatkozó kitöltések és a már megnyílt alkalmak nem változnak."""
 
 import copy
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -300,7 +301,10 @@ def test_stale_base_version_is_409(client, db, setup):
     assert fresh.json()["current"]["version_no"] == 3
 
 
-def test_add_version_checks_the_base_under_the_lock(db, setup):
+def test_add_version_rejects_a_stale_base(db, setup):
+    # A szolgáltatás szintjén: elavult alapverzióból nem jön létre új verzió. (A
+    # párhuzamos mentések sorba állítását a sablon sorának zárolása adja; ez a teszt
+    # egy munkamenetben fut, így csak az alapverzió ellenőrzését bizonyítja.)
     template = setup["template"]
     with pytest.raises(QuestionnaireError) as error:
         add_version(db, template, WELLBEING_V1, base_version_no=2)
@@ -420,6 +424,65 @@ OPTS = [{"value": "a", "label": "Nem", "score": 0}, {"value": "b", "label": "Ige
         pytest.param([_scale(text="x" * 301)], _bands(2, 3, 4), id="301-karakter"),
         pytest.param([_scale(text="   ")], _bands(2, 3, 4), id="ures-szoveg"),
         pytest.param([_scale(min_label="x" * 101)], _bands(2, 3, 4), id="hosszu-vegfelirat"),
+        # A5-2: a feliratnak is egyedinek kell lennie (szóköz és kisbetű-nagybetű nem számít).
+        pytest.param(
+            [_single([OPTS[0], {**OPTS[1], "label": " nem "}])],
+            _bands(1, 2, 3),
+            id="azonos-felirat",
+        ),
+        # A5-3, A5-4: vezérlőkarakter és csak láthatatlan karakterből álló szöveg.
+        pytest.param([_scale(text="Szédült?\u0000")], _bands(2, 3, 4), id="nul-a-kerdesben"),
+        pytest.param(
+            [_single([OPTS[0], {**OPTS[1], "label": "Igen\u0000"}])],
+            _bands(1, 2, 3),
+            id="nul-a-feliratban",
+        ),
+        pytest.param([_scale(max_label="jó\u0000")], _bands(2, 3, 4), id="nul-a-vegfeliratban"),
+        pytest.param(
+            [_scale(text="Hogy\térzi magát?")], _bands(2, 3, 4), id="tabulator-a-szovegben"
+        ),
+        pytest.param([_scale(text="\u200b")], _bands(2, 3, 4), id="nulla-szelessegu-szokoz"),
+        pytest.param([_scale(text=" \u2060\ufeff ")], _bands(2, 3, 4), id="lathatatlan-karakterek"),
+        pytest.param(
+            [_single([OPTS[0], {**OPTS[1], "label": "\u200b"}])],
+            _bands(1, 2, 3),
+            id="lathatatlan-felirat",
+        ),
+        pytest.param([_scale(min_label="\u200b")], _bands(2, 3, 4), id="lathatatlan-vegfelirat"),
+        # A5-5: szigorú egész számok.
+        pytest.param(
+            [_single([{**OPTS[0], "score": True}, OPTS[1]])], _bands(1, 2, 3), id="pont-true"
+        ),
+        pytest.param(
+            [_single([OPTS[0], {**OPTS[1], "score": "3"}])], _bands(1, 2, 3), id="pont-szoveg"
+        ),
+        pytest.param(
+            [_single([OPTS[0], {**OPTS[1], "score": 3.5}])], _bands(1, 2, 3), id="pont-tort"
+        ),
+        pytest.param(
+            [_single([OPTS[0], {**OPTS[1], "score": 3.0}])], _bands(1, 2, 3), id="pont-3.0"
+        ),
+        pytest.param([_scale(scale_min="1")], _bands(2, 3, 4), id="skala-min-szoveg"),
+        pytest.param([_scale(scale_max=5.0)], _bands(2, 3, 4), id="skala-max-tort"),
+        pytest.param([_scale(scale_max=True)], _bands(2, 3, 4), id="skala-max-true"),
+        pytest.param(
+            [_scale()],
+            [
+                {"band": "normal", "min": 0, "max": "1"},
+                {"band": "warning", "min": 2, "max": 2},
+                {"band": "critical", "min": 3, "max": 4},
+            ],
+            id="savhatar-szoveg",
+        ),
+        pytest.param(
+            [_scale()],
+            [
+                {"band": "normal", "min": False, "max": 1},
+                {"band": "warning", "min": 2, "max": 2.0},
+                {"band": "critical", "min": 3, "max": 4},
+            ],
+            id="savhatar-bool-es-tort",
+        ),
     ],
 )
 def test_invalid_versions_are_422(client, db, setup, questions, bands):
@@ -456,6 +519,60 @@ def test_limits_are_inclusive(client, setup, questions, bands):
     assert response.status_code == 201, response.json()
 
 
+@pytest.mark.parametrize(
+    ("label", "message"),
+    [
+        (" nem ", "a válaszlehetőségek felirata egyedi"),
+        ("Igen\u0000", "a szövegben nem lehet vezérlőkarakter"),
+        ("\u200b\u200b", "a szöveg nem állhat csak láthatatlan karakterből"),
+    ],
+)
+def test_option_label_errors_name_the_reason(client, setup, label, message):
+    # A 422 a megnevezett okból jön (nem más, véletlenül hibás mezőből).
+    body = {
+        "base_version_no": 1,
+        "questions": [_single([OPTS[0], {**OPTS[1], "label": label}])],
+        "scoring_thresholds": _bands(1, 2, 3),
+    }
+    response = client.post(
+        f"{URL}/{WELLBEING_CODE}/versions", json=body, headers=auth(setup["doctor"])
+    )
+    assert response.status_code == 422
+    assert any(message in e["msg"] for e in response.json()["detail"])
+    # Ugyanez rendes felirattal menthető.
+    body["questions"][0]["options"][1]["label"] = "Igen"
+    ok = client.post(f"{URL}/{WELLBEING_CODE}/versions", json=body, headers=auth(setup["doctor"]))
+    assert ok.status_code == 201
+
+
+@pytest.mark.parametrize("base", ["1", True, 1.0, 1.5])
+def test_base_version_must_be_an_integer(client, setup, base):
+    body = {**version_body(), "base_version_no": base}
+    response = client.post(
+        f"{URL}/{WELLBEING_CODE}/versions", json=body, headers=auth(setup["doctor"])
+    )
+    assert response.status_code == 422
+    assert any(e["loc"][-1] == "base_version_no" for e in response.json()["detail"])
+
+
+def test_lone_surrogate_is_422_not_500(client, setup):
+    # A JSON-ban "\ud800" escape-pel érkező magányos surrogate: már a Pydantic
+    # szövegellenőrzése elutasítja, és a 422-es válasz kiírása sem bukik el
+    # (app/main.py; korábban itt 500 lett).
+    body = {
+        "base_version_no": 1,
+        "questions": [_scale(text="Szédült?\ud800")],
+        "scoring_thresholds": _bands(2, 3, 4),
+    }
+    response = client.post(
+        f"{URL}/{WELLBEING_CODE}/versions",
+        content=json.dumps(body),
+        headers={**auth(setup["doctor"]), "Content-Type": "application/json"},
+    )
+    assert response.status_code == 422
+    assert any(e["loc"][-1] == "text" for e in response.json()["detail"])
+
+
 # --- Új kérdőív ----------------------------------------------------------------
 
 
@@ -488,7 +605,9 @@ def test_taken_code_is_409(client, setup):
     assert response.json()["detail"] == {"code": "code_taken"}
 
 
-@pytest.mark.parametrize("name", ["!!!", "New", "   "])
+@pytest.mark.parametrize(
+    "name", ["!!!", "New", "   ", "Tünet\u0000napló", "sor\ntörés", "\u200b", "Tünet\tnapló"]
+)
 def test_name_without_a_usable_code_is_422(client, setup, name):
     body = {"name": name, "questions": [_scale()], "scoring_thresholds": _bands(2, 3, 4)}
     response = client.post(URL, json=body, headers=auth(setup["doctor"]))
