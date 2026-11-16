@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "forditas": "node forditas.mjs",
-    "futtatas": "node futtatas.mjs"
+    "futtatas": "node futtatas.mjs",
+    "szolgaltatas": "node szolgaltatas.mjs",
+    "teszt": "node --test teszt/szolgaltatas.test.mjs"
   },
   "dependencies": {
     "cql-exec-fhir": "2.2.0",

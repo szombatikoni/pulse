@@ -1,4 +1,8 @@
-# A futtató képbe csak a függőségek leírása kell; a többi fájl kötetként érkezik.
+# Az image-be csak a függőségek leírása, a szolgáltatás kódja és az ELM kerül;
+# az egyszer lefutó szkriptek fájljai kötetként érkeznek.
 *
 !package.json
 !package-lock.json
+!motor.mjs
+!szolgaltatas.mjs
+!elm/

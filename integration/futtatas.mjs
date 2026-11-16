@@ -10,13 +10,10 @@
 // eredmeny/eredmeny.json fájlban. A forgatókönyvek ugyanazt az adatot futtatják
 // más paraméterekkel, hogy látszódjon, melyik kétértelmű pont mit változtat.
 
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import cql from 'cql-execution';
-import cqlfhir from 'cql-exec-fhir';
-
-const ELM_FO = 'elm/PulseHbpmAverage-0.1.0.json';
-const ELM_FHIRHELPERS = 'elm/FHIRHelpers-4.0.1.json';
+import { mkdir, writeFile } from 'node:fs/promises';
+import {
+  ELM_FHIRHELPERS, ELM_FO, cql, csomagVerzio, elmBetoltes, hash, json, kiertekeles, konyvtar, olvas,
+} from './motor.mjs';
 const CSOMAG = 'adat/beteg_hbpm_bundle.json';
 const KIMENET = 'eredmeny/eredmeny.json';
 
@@ -66,41 +63,6 @@ const FORGATOKONYVEK = [
   },
 ];
 
-const olvas = async (utvonal) => JSON.parse(await readFile(utvonal, 'utf8'));
-const hash = async (utvonal) =>
-  createHash('sha256').update(await readFile(utvonal)).digest('hex');
-
-// A telepített csomag verziója (a konténerben a node_modules egy szinttel feljebb van).
-async function csomagVerzio(nev) {
-  for (const hely of [`node_modules/${nev}/package.json`, `../node_modules/${nev}/package.json`]) {
-    try {
-      return (await olvas(hely)).version;
-    } catch {
-      // következő hely
-    }
-  }
-  return 'ismeretlen';
-}
-
-// A motor értékeinek olvasható JSON-alakja.
-function json(ertek) {
-  if (ertek == null) return null;
-  if (Array.isArray(ertek)) return ertek.map(json);
-  if (typeof ertek !== 'object') return ertek;
-  if (ertek.isDate || ertek.isDateTime) return ertek.toString();
-  if (ertek.isInterval) {
-    return {
-      low: json(ertek.low),
-      high: json(ertek.high),
-      lowClosed: ertek.lowClosed,
-      highClosed: ertek.highClosed,
-    };
-  }
-  if (ertek.isQuantity) return { value: ertek.value, unit: ertek.unit };
-  if (ertek._json) return `${ertek._json.resourceType}/${ertek._json.id}`;
-  return Object.fromEntries(Object.entries(ertek).map(([k, v]) => [k, json(v)]));
-}
-
 // Rövid magyar magyarázat a motor eredményéből (bemutató; a végleges szöveg a PULSE dolga).
 function magyarazat(e) {
   const sz = (x) => (x == null ? '–' : x.toFixed(1).replace('.', ','));
@@ -122,13 +84,12 @@ function magyarazat(e) {
 }
 
 async function futtat(forgatokonyv, elm, fhirHelpersElm, csomag) {
-  const konyvtar = new cql.Library(elm, new cql.Repository({ FHIRHelpers: fhirHelpersElm }));
+  const lib = konyvtar(elm, fhirHelpersElm);
   const [tol, ig] = forgatokonyv.sorozat ?? SOROZAT;
   const parameterek = {
     'Series Period': new cql.Interval(cql.DateTime.parse(tol), cql.DateTime.parse(ig), true, false),
     ...forgatokonyv.parameterek,
   };
-  const vegrehajto = new cql.Executor(konyvtar, new cql.CodeService({}), parameterek);
 
   let betegCsomag = csomag;
   if (forgatokonyv.szuletesiDatum) {
@@ -136,25 +97,21 @@ async function futtat(forgatokonyv, elm, fhirHelpersElm, csomag) {
     betegCsomag.entry.find((b) => b.resource.resourceType === 'Patient').resource.birthDate =
       forgatokonyv.szuletesiDatum;
   }
-  const forras = cqlfhir.PatientSource.FHIRv401();
-  forras.loadBundles([betegCsomag]);
 
-  const eredmenyek = await vegrehajto.exec(forras, cql.DateTime.parse(KIERTEKELES_IDOPONTJA));
-  const betegek = Object.keys(eredmenyek.patientResults);
-  if (betegek.length !== 1) throw new Error(`Egy beteget vártam, ennyi jött: ${betegek.length}`);
-  const e = json(eredmenyek.patientResults[betegek[0]]['Evaluation Result']);
+  const { betegId, eredmeny: e } = await kiertekeles(
+    lib, betegCsomag, parameterek, cql.DateTime.parse(KIERTEKELES_IDOPONTJA),
+  );
   return {
     id: forgatokonyv.id,
     leiras: forgatokonyv.leiras,
     parameterek: json(parameterek),
-    beteg: `Patient/${betegek[0]}`,
+    beteg: `Patient/${betegId}`,
     eredmeny: e,
     magyarazat: magyarazat(e),
   };
 }
 
-const elm = await olvas(ELM_FO);
-const fhirHelpersElm = await olvas(ELM_FHIRHELPERS);
+const { elm, fhirHelpersElm, sha256 } = await elmBetoltes();
 const csomag = await olvas(CSOMAG);
 
 const kimenet = {
@@ -164,8 +121,8 @@ const kimenet = {
     node: process.version,
     kiertekelesIdopontja: KIERTEKELES_IDOPONTJA,
     elm: {
-      [ELM_FO]: { konyvtar: `${elm.library.identifier.id} ${elm.library.identifier.version}`, sha256: await hash(ELM_FO) },
-      [ELM_FHIRHELPERS]: { konyvtar: `${fhirHelpersElm.library.identifier.id} ${fhirHelpersElm.library.identifier.version}`, sha256: await hash(ELM_FHIRHELPERS) },
+      [ELM_FO]: { konyvtar: `${elm.library.identifier.id} ${elm.library.identifier.version}`, sha256: sha256[ELM_FO] },
+      [ELM_FHIRHELPERS]: { konyvtar: `${fhirHelpersElm.library.identifier.id} ${fhirHelpersElm.library.identifier.version}`, sha256: sha256[ELM_FHIRHELPERS] },
     },
     csomag: { utvonal: CSOMAG, sha256: await hash(CSOMAG) },
   },

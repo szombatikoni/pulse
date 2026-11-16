@@ -77,6 +77,24 @@ jobs:
       - name: Típusellenőrzés és build
         run: npm run build
 
+  cql:
+    name: CQL-szolgáltatás (node --test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integration
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          # Ugyanaz a főverzió, mint a szolgáltatás image-ében (node:24.21.0-alpine3.24).
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: integration/package-lock.json
+      - run: npm ci
+      - name: A szolgáltatás tesztjei (HTTP-felület, kiértékelés a kézi csomagon)
+        run: npm run teszt
+
   docker:
     name: Docker-image-ek és böngészős teszt
     runs-on: ubuntu-latest

@@ -1,4 +1,5 @@
-# A PULSE teljes rendszere: adatbázis, backend (API), háttérfolyamat (worker) és frontend.
+# A PULSE teljes rendszere: adatbázis, backend (API), háttérfolyamat (worker),
+# CQL-szolgáltatás és frontend.
 # Indítás a repó gyökeréből: docker compose up --build
 # A jelszavak csak helyi fejlesztésre valók; felülírhatók egy .env fájlban
 # (minta: .env.example).
@@ -32,6 +33,11 @@ services:
       # A tokenek aláírókulcsa; az alapérték csak helyi fejlesztésre való.
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-insecure-secret-change-me-0123456789}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      # A CQL-szolgáltatás címe a belső hálózaton (M3, K2). Szándékosan nincs
+      # depends_on rá: az API és a riasztás nélküle is működik.
+      CQL_SERVICE_URL: ${CQL_SERVICE_URL:-http://cql:8080}
+      # A hívás időtúllépése másodpercben; utána a végpont 503-at ad.
+      CQL_TIMEOUT_SECONDS: ${CQL_TIMEOUT_SECONDS:-5}
     depends_on:
       db:
         # Csak akkor indul, ha az adatbázis már fogad kapcsolatot.
@@ -60,6 +66,22 @@ services:
       api:
         # A migrációkat az API futtatja; a worker csak utána indul.
         condition: service_healthy
+
+  cql:
+    # A CQL-motor hosszan futó HTTP-szolgáltatásként (M3, K2): az NICE NG136
+    # szerinti vérnyomásátlag (integration/cql/PulseHbpmAverage.cql) lefordított
+    # ELM-je az image-ben van, és induláskor egyszer töltődik be.
+    # Portot nem nyit a gép felé, csak a compose belső hálózatán érhető el
+    # (http://cql:8080).
+    build:
+      context: ./integration
+      target: szolgaltatas
+    healthcheck:
+      # Az alpine image-ben nincs curl/wget; a Node beépített fetch-ével kérdezünk.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   frontend:
     build: ./frontend

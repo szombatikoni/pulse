@@ -14,30 +14,13 @@
 // Az eredményt az ellenorzes/kiadas_ellenorzes.py veti össze az adatbázis
 // soraival (nem a csomaggal).
 
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import cql from 'cql-execution';
-import cqlfhir from 'cql-exec-fhir';
+import { mkdir, writeFile } from 'node:fs/promises';
+import {
+  ELM_FHIRHELPERS, ELM_FO, cql, cqlfhir, csomagVerzio, elmBetoltes, hash, kiertekeles, konyvtar, olvas,
+} from './motor.mjs';
 
-const ELM_FO = 'elm/PulseHbpmAverage-0.1.0.json';
-const ELM_FHIRHELPERS = 'elm/FHIRHelpers-4.0.1.json';
 const CSOMAG = 'adat/pulse_kiadas_bundle.json';
 const KIMENET = 'eredmeny/kiadas_feldolgozas.json';
-
-const olvas = async (utvonal) => JSON.parse(await readFile(utvonal, 'utf8'));
-const hash = async (utvonal) =>
-  createHash('sha256').update(await readFile(utvonal)).digest('hex');
-
-async function csomagVerzio(nev) {
-  for (const hely of [`node_modules/${nev}/package.json`, `../node_modules/${nev}/package.json`]) {
-    try {
-      return (await olvas(hely)).version;
-    } catch {
-      // következő hely
-    }
-  }
-  return 'ismeretlen';
-}
 
 // Egy FHIR-primitív értéke (a motor saját típusában), vagy null.
 const ertek = (fhirObj) => fhirObj?.get('value') ?? null;
@@ -99,20 +82,6 @@ function questionnaireResponse(r) {
   };
 }
 
-// A motor értékeinek olvasható JSON-alakja (mint a futtatas.mjs-ben).
-function json(e) {
-  if (e == null) return null;
-  if (Array.isArray(e)) return e.map(json);
-  if (typeof e !== 'object') return e;
-  if (e.isDate || e.isDateTime) return e.toString();
-  if (e.isInterval) {
-    return { low: json(e.low), high: json(e.high), lowClosed: e.lowClosed, highClosed: e.highClosed };
-  }
-  if (e.isQuantity) return { value: e.value, unit: e.unit };
-  if (e._json) return `${e._json.resourceType}/${e._json.id}`;
-  return Object.fromEntries(Object.entries(e).map(([k, v]) => [k, json(v)]));
-}
-
 const csomag = await olvas(CSOMAG);
 
 // 1. Beolvasás az adapterrel.
@@ -129,16 +98,10 @@ const beolvasas = {
 // 2. A NICE-szabály a kiadott csomagon. A kiértékelés időpontja a csomag
 // időbélyege, így az életkor és a „ma" a kiadás pillanatához igazodik.
 const kiertekelesIdopontja = csomag.timestamp;
-const elm = await olvas(ELM_FO);
-const fhirHelpersElm = await olvas(ELM_FHIRHELPERS);
-const konyvtar = new cql.Library(elm, new cql.Repository({ FHIRHelpers: fhirHelpersElm }));
-const vegrehajto = new cql.Executor(konyvtar, new cql.CodeService({}), {});
-const nForras = cqlfhir.PatientSource.FHIRv401();
-nForras.loadBundles([csomag]);
-const futas = await vegrehajto.exec(nForras, cql.DateTime.parse(kiertekelesIdopontja));
-const betegek = Object.keys(futas.patientResults);
-if (betegek.length !== 1) throw new Error(`Egy beteget vártam, ennyi jött: ${betegek.length}`);
-const nice = json(futas.patientResults[betegek[0]]['Evaluation Result']);
+const { elm, fhirHelpersElm, sha256 } = await elmBetoltes();
+const { eredmeny: nice } = await kiertekeles(
+  konyvtar(elm, fhirHelpersElm), csomag, {}, cql.DateTime.parse(kiertekelesIdopontja),
+);
 
 const kimenet = {
   futtatas: {
@@ -146,7 +109,7 @@ const kimenet = {
     fhirAdapter: `cql-exec-fhir ${await csomagVerzio('cql-exec-fhir')}, PatientSource.FHIRv401()`,
     node: process.version,
     kiertekelesIdopontja,
-    elm: { [ELM_FO]: { sha256: await hash(ELM_FO) }, [ELM_FHIRHELPERS]: { sha256: await hash(ELM_FHIRHELPERS) } },
+    elm: { [ELM_FO]: { sha256: sha256[ELM_FO] }, [ELM_FHIRHELPERS]: { sha256: sha256[ELM_FHIRHELPERS] } },
     csomag: { utvonal: CSOMAG, sha256: await hash(CSOMAG) },
   },
   beolvasas,
