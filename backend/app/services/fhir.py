@@ -26,6 +26,7 @@ Demonstrációs kiadás, kizárólag mesterséges adathoz: a Bundle ezt jelöli 
 """
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -298,33 +299,16 @@ def patient_bundle(
 
 
 def measurement_bundle(
-    db: Session,
     patient: PatientProfile,
+    measurements: Sequence[Measurement],
     *,
-    loinc_code: str,
-    start: datetime,
-    end: datetime,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Szűkített csomag (M3, K2, a CQL-motornak): a Patient és az adott
-    LOINC-kódú, érvényes (nem felülírt) mérések a [start, end) időszakból,
-    időrendben, ugyanazzal a leképezéssel, mint a teljes kiadás. Csak olvas."""
-    measurements = db.scalars(
-        select(Measurement)
-        .join(MeasurementType, MeasurementType.id == Measurement.type_id)
-        .where(
-            Measurement.patient_id == patient.id,
-            MeasurementType.loinc_code == loinc_code,
-            Measurement.measured_at >= start,
-            Measurement.measured_at < end,
-            not_superseded(),
-        )
-        .options(
-            selectinload(Measurement.type).selectinload(MeasurementType.components),
-            selectinload(Measurement.values).selectinload(MeasurementValue.component),
-        )
-        .order_by(Measurement.measured_at, Measurement.id)
-    ).all()
+    """Szűkített csomag (M3, K2, a CQL-motornak): a Patient és a megadott
+    mérések, a megadott sorrendben, ugyanazzal a leképezéssel, mint a teljes
+    kiadás. A méréseket a hívó tölti be (nice.load_measurements: a típusukkal
+    és az értékeikkel együtt), hogy a saját számítás ugyanabból a listából
+    dolgozzon. Adatbázist nem kérdez."""
     return _bundle(
         [patient_resource(patient)] + [observation_resource(m) for m in measurements], now
     )

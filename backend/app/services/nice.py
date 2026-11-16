@@ -32,7 +32,7 @@ Semmit nem tárol, riasztást nem nyit, státuszt nem változtat.
 
 import math
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from fractions import Fraction
@@ -298,26 +298,43 @@ def cql_datetime(at: datetime) -> str:
     return at.astimezone(settings.tz).isoformat(timespec="milliseconds")
 
 
-def load_readings(db: Session, patient_id: uuid.UUID, period: Period) -> list[Reading]:
-    """A beteg érvényes vérnyomásmérései az időszakban: a felülírt (javított)
-    mérés nélkül (not_superseded), a mérés ideje szerint. Csak az a mérés
-    számít, amelyben a szisztolés és a diasztolés érték is megvan Hgmm-ben
-    (a CQL "Valid Readings" definíciója)."""
-    measurements = db.scalars(
-        select(Measurement)
-        .join(MeasurementType, MeasurementType.id == Measurement.type_id)
-        .where(
-            Measurement.patient_id == patient_id,
-            MeasurementType.loinc_code == BP_PANEL,
-            Measurement.measured_at >= period.start,
-            Measurement.measured_at < period.end,
-            not_superseded(),
-        )
-        .options(selectinload(Measurement.values).selectinload(MeasurementValue.component))
-        .order_by(Measurement.measured_at, Measurement.id)
-    ).all()
+def load_measurements(
+    db: Session, patient_id: uuid.UUID, start: datetime, end: datetime
+) -> list[Measurement]:
+    """A beteg érvényes vérnyomásmérései a [start, end) időszakból: a felülírt
+    (javított) mérés nélkül (not_superseded), a mérés ideje szerint, a típusukkal
+    és az értékeikkel együtt (a FHIR-leképezéshez is). A kiértékelés EGYSZER
+    hívja (ablak ± BUNDLE_MARGIN), és ebből a listából épül a motor csomagja és
+    a saját számítás is, így párhuzamos rögzítésnél sem láthatnak más halmazt."""
+    return list(
+        db.scalars(
+            select(Measurement)
+            .join(MeasurementType, MeasurementType.id == Measurement.type_id)
+            .where(
+                Measurement.patient_id == patient_id,
+                MeasurementType.loinc_code == BP_PANEL,
+                Measurement.measured_at >= start,
+                Measurement.measured_at < end,
+                not_superseded(),
+            )
+            .options(
+                selectinload(Measurement.type).selectinload(MeasurementType.components),
+                selectinload(Measurement.values).selectinload(MeasurementValue.component),
+            )
+            .order_by(Measurement.measured_at, Measurement.id)
+        ).all()
+    )
+
+
+def readings_in(measurements: Sequence[Measurement], period: Period) -> list[Reading]:
+    """A betöltött mérésekből az időszakba esők (félig nyílt: [start, end), mint
+    az adatbázis-szűrés), a sorrendet megtartva. Csak az a mérés számít, amelyben
+    a szisztolés és a diasztolés érték is megvan Hgmm-ben (a CQL "Valid
+    Readings" definíciója)."""
     readings = []
     for m in measurements:
+        if not period.start <= m.measured_at < period.end:
+            continue
         values = {
             v.component.loinc_code: Fraction(str(v.value))
             for v in m.values
@@ -335,13 +352,27 @@ def load_readings(db: Session, patient_id: uuid.UUID, period: Period) -> list[Re
     return readings
 
 
+def load_readings(db: Session, patient_id: uuid.UUID, period: Period) -> list[Reading]:
+    """A beteg érvényes vérnyomásmérései az időszakban (a saját számítás
+    bemenete, ha csak ez kell)."""
+    return readings_in(load_measurements(db, patient_id, period.start, period.end), period)
+
+
 def own_result(
     db: Session, patient: PatientProfile, period: Period, params: NiceParams
 ) -> NiceResult:
-    """A saját számítás az adatbázisból. Az életkor a sorozat végének napján:
-    a félig nyílt időszak vége a cql-execution szerint end - 1 ms (tegnap)."""
+    """A saját számítás az adatbázisból."""
+    return own_result_from(load_readings(db, patient.id, period), patient, period, params)
+
+
+def own_result_from(
+    readings: list[Reading], patient: PatientProfile, period: Period, params: NiceParams
+) -> NiceResult:
+    """A saját számítás a már időszakra szűrt mérésekből. Az életkor a sorozat
+    végének napján: a félig nyílt időszak vége a cql-execution szerint
+    end - 1 ms (tegnap)."""
     return compute(
-        load_readings(db, patient.id, period),
+        readings,
         birth_date=patient.birth_date,
         period_start_day=period.start.date(),
         age_reference_day=(period.end - timedelta(milliseconds=1)).date(),
@@ -354,6 +385,11 @@ def _fraction(value: Any) -> Fraction | None:
         return None
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise TypeError(f"szám kell: {value!r}")
+    # Véges, lebegőpontosan is ábrázolható szám kell (a válasz float-ként megy
+    # tovább): Infinity és 1e999 (a json.loads szerint inf) ValueError, az
+    # óriási egész float()-ja OverflowError.
+    if not math.isfinite(float(value)):
+        raise ValueError(f"nem véges szám: {value!r}")
     return Fraction(value)
 
 
@@ -398,7 +434,7 @@ def parse_cql_result(result: Any) -> NiceResult:
             target_diastolic=_fraction(result["targetDiastolic"]),
             target_met=_optional(result["targetMet"], bool),
         )
-    except (KeyError, TypeError, ValueError) as error:
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
         raise CqlServiceError("invalid_response", f"a result nem értelmezhető: {error}") from error
 
 
@@ -472,7 +508,11 @@ def prepare_evaluation(
     if patient is None:
         raise LookupError(f"Nincs ilyen beteg: {patient_id}")
     period = series_period(now)
-    own = own_result(db, patient, period, params)
+    # Egyetlen lekérdezés: a csomag és a saját számítás ugyanabból a listából.
+    measurements = load_measurements(
+        db, patient.id, period.start - BUNDLE_MARGIN, period.end + BUNDLE_MARGIN
+    )
+    own = own_result_from(readings_in(measurements, period), patient, period, params)
 
     parameters = {
         "Series Period": {
@@ -483,14 +523,7 @@ def prepare_evaluation(
         },
         **params.cql_parameters(),
     }
-    bundle = measurement_bundle(
-        db,
-        patient,
-        loinc_code=BP_PANEL,
-        start=period.start - BUNDLE_MARGIN,
-        end=period.end + BUNDLE_MARGIN,
-        now=now,
-    )
+    bundle = measurement_bundle(patient, measurements, now=now)
     request = {"bundle": bundle, "parameters": parameters, "evaluationTime": cql_datetime(now)}
     return PreparedEvaluation(now, period, parameters, own, request)
 
@@ -502,10 +535,10 @@ def finish_evaluation(prepared: PreparedEvaluation, response: dict[str, Any]) ->
     duration = response.get("durationMs")
     if not isinstance(library, dict) or not isinstance(engine, dict):
         raise CqlServiceError("invalid_response", "hiányzik a library vagy az engine")
-    if duration is not None and (
-        isinstance(duration, bool) or not isinstance(duration, int | float)
-    ):
-        raise CqlServiceError("invalid_response", "a durationMs nem szám")
+    try:
+        _fraction(duration)  # null, vagy véges szám (mint az átlagoknál)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise CqlServiceError("invalid_response", "a durationMs nem véges szám") from error
     return NiceEvaluation(
         evaluation_time=prepared.now.astimezone(settings.tz),
         period=prepared.period,

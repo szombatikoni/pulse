@@ -14,7 +14,7 @@ from fractions import Fraction
 from pathlib import Path
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 
 from app.core.config import settings
 from app.models import (
@@ -39,6 +39,7 @@ from app.services.nice import (
     mismatched_fields,
     own_result,
     parse_cql_result,
+    prepare_evaluation,
     series_period,
 )
 from app.services.status import compute_status
@@ -625,6 +626,11 @@ VALID = cql_json(
         {**VALID, "ageInYears": 66.5},
         {**VALID, "enoughData": 1},
         {**VALID, "includedDayCount": True},
+        # Nem véges vagy float-ként nem ábrázolható szám (korábban 500 lett belőle).
+        {**VALID, "meanSystolic": float("inf")},
+        {**VALID, "meanDiastolic": json.loads("1e999")},
+        {**VALID, "targetSystolic": json.loads("-Infinity")},
+        {**VALID, "targetDiastolic": 10**400},
     ],
 )
 def test_unparsable_result_is_a_service_error(result):
@@ -636,7 +642,14 @@ def test_unparsable_result_is_a_service_error(result):
 
 @pytest.mark.parametrize(
     "change",
-    [{"library": None}, {"engine": "x"}, {"durationMs": "12"}, {"durationMs": True}],
+    [
+        {"library": None},
+        {"engine": "x"},
+        {"durationMs": "12"},
+        {"durationMs": True},
+        {"durationMs": float("inf")},
+        {"durationMs": 10**400},
+    ],
 )
 def test_missing_version_data_is_a_service_error(db, patient, change):
     expected, _ = own(db, patient, NOW)
@@ -780,3 +793,37 @@ def test_engine_gets_only_the_window_with_one_day_margin(db, patient):
     assert str(too_early.id) not in sent and str(too_late.id) not in sent
     assert all(r["code"]["coding"][0]["code"] == BP_PANEL for r in entries[1:])
     assert len(json.dumps(payload).encode()) < 20_000
+
+
+def test_bundle_and_own_result_come_from_one_query(db, patient):
+    """A mérések EGY lekérdezéssel töltődnek be (ablak ± 1 nap), és ebből épül a
+    csomag és a saját számítás is: párhuzamos rögzítésnél sem láthatnak más
+    halmazt. A saját számításba bevont (és kizárt első napi) mérések mind a
+    csomagban vannak."""
+    bp(db, patient, local(2026, 11, 7, 8))  # ráhagyás: csak a csomagba
+    window = [bp(db, patient, local(2026, 11, d, 8), 140, 90) for d in (9, 10, 12, 14)]
+    bp(db, patient, local(2026, 11, 15, 8))  # a mai nap: csak a csomagba
+    db.flush()
+
+    statements = []
+
+    def count(conn, cursor, statement, *args):
+        if re.search(r"\bFROM measurements\b", statement):
+            statements.append(statement)
+
+    connection = db.connection()
+    event.listen(connection, "before_cursor_execute", count)
+    try:
+        prepared = prepare_evaluation(db, patient.patient_profile.id, now=NOW)
+    finally:
+        event.remove(connection, "before_cursor_execute", count)
+
+    assert len(statements) == 1
+    used = prepared.own.excluded_reading_ids + prepared.own.included_reading_ids
+    assert used == [str(m.id) for m in window]
+    sent = {
+        e["resource"]["id"]
+        for e in prepared.request["bundle"]["entry"]
+        if e["resource"]["resourceType"] == "Observation"
+    }
+    assert set(used) <= sent and len(sent) == 6

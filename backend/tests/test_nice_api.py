@@ -4,6 +4,7 @@ hozzárendelt orvos), az 503 okának naplózása, és hogy a HTTP-hívás alatt
 nincs nyitott tranzakció. A CQL-szolgáltatást hamis kliens helyettesíti, az óra
 rögzített (NOW), így a tesztek éjfél körül is ugyanazt az ablakot látják."""
 
+import json
 import logging
 import uuid
 from datetime import UTC, datetime, time, timedelta
@@ -159,6 +160,31 @@ def test_no_open_transaction_during_the_service_call(client, db, setup, cql):
 
 def test_unparsable_service_answer_is_503(client, setup, cql):
     cql.result = {"meanSystolic": 150}
+    response = client.post(url(setup["patient"]), headers=auth(setup["doctor"]))
+    assert response.status_code == 503
+    assert response.json()["detail"] == {"code": "cql_unavailable"}
+
+
+@pytest.mark.parametrize("address", ["http://localhost:abc", "http://a..b:80"])
+def test_invalid_service_url_is_503(client, setup, monkeypatch, address):
+    """Hibás CQL_SERVICE_URL mellett a valódi kliens fut (nincs csere): 503,
+    cql_unavailable, nem 500."""
+    monkeypatch.setattr(settings, "cql_service_url", address)
+    response = client.post(url(setup["patient"]), headers=auth(setup["doctor"]))
+    assert response.status_code == 503
+    assert response.json()["detail"] == {"code": "cql_unavailable"}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"meanSystolic": float("inf")},  # Infinity a válaszban
+        {"meanDiastolic": json.loads("1e999")},  # a json.loads szerint inf
+        {"targetSystolic": 10**400},  # óriási egész: float-ként nem ábrázolható
+    ],
+)
+def test_non_finite_number_in_the_answer_is_503(client, setup, cql, change):
+    cql.result = {**cql.result, **change}
     response = client.post(url(setup["patient"]), headers=auth(setup["doctor"]))
     assert response.status_code == 503
     assert response.json()["detail"] == {"code": "cql_unavailable"}

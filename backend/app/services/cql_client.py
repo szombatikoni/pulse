@@ -1,14 +1,19 @@
 """Vékony HTTP-kliens a CQL-szolgáltatáshoz (M3, K2; integration/szolgaltatas.mjs).
 
 A standard könyvtárral (http.client), új függőség nélkül (a hallgató döntése,
-D6a). Minden hiba egyetlen kivétel (CqlServiceError): időtúllépés, kapcsolódási
-hiba, nem 200-as válasz, túl nagy vagy nem értelmezhető törzs. Automatikus
-újrapróbálás nincs (D7a): a gomb újra megnyomható.
+D6a). Minden hiba egyetlen kivétel (CqlServiceError): hibás cím, időtúllépés,
+kapcsolódási hiba, nem 200-as válasz, túl nagy vagy nem értelmezhető törzs.
+Automatikus újrapróbálás nincs (D7a): a gomb újra megnyomható.
 
-Az időkorlát a TELJES hívásra vonatkozik, nem socket-műveletenként: a kezdéskor
-kiszámolt határidőből minden művelet előtt a maradék idő lesz a socket
-időkorlátja, így egy lassan csöpögtető szolgáltatás sem tarthatja fel tovább.
-A választ darabonként, legfeljebb MAX_RESPONSE_BYTES-ig olvassuk.
+Az időkorlát egy, a kezdéskor kiszámolt határidő, de nem minden lépésre
+egyformán hat. A törzs olvasására a teljes határidő érvényes: minden darab
+előtt a maradék idő lesz a socket időkorlátja, így egy lassan csöpögtető
+szolgáltatás sem tarthatja fel tovább. A kapcsolódásra (és a kérés küldésére),
+valamint a válasz fejlécének olvasására csak műveletenként érvényes a maradék
+idő (a kezdéskori, illetve a küldés utáni): ott egy-egy socket-művelet ennyit
+várhat, több művelet együtt túllépheti. A névfeloldásra (getaddrinfo) a
+határidő nem hat. Mindkettő ismert korlát. A választ darabonként,
+legfeljebb MAX_RESPONSE_BYTES-ig olvassuk.
 
 A http.client a környezeti proxybeállítást (HTTP_PROXY stb.) nem nézi, ezért a
 belső hívás akkor sem megy proxyn át, ha a gépen van ilyen beállítás. (Az
@@ -34,10 +39,11 @@ _CHUNK = 64 * 1024
 
 class CqlServiceError(Exception):
     """A CQL-szolgáltatás nem adott használható választ. A `reason` rövid
-    gépi ok a naplóhoz és a tesztekhez: timeout, unreachable, http_<kód> (pl.
-    http_413 túl nagy kérés, http_400 hibás kérés, http_500 hiba a
-    kiértékelésben), response_too_large, invalid_response. A végpont mindegyikre
-    ugyanazt adja (503, cql_unavailable)."""
+    gépi ok a naplóhoz és a tesztekhez: timeout, unreachable, invalid_url
+    (hibás CQL_SERVICE_URL), http_<kód> (pl. http_413 túl nagy kérés, http_400
+    hibás kérés, http_500 hiba a kiértékelésben), response_too_large,
+    invalid_response. A végpont mindegyikre ugyanazt adja (503,
+    cql_unavailable)."""
 
     def __init__(self, reason: str, message: str = "") -> None:
         super().__init__(f"{reason}: {message}" if message else reason)
@@ -85,15 +91,21 @@ def evaluate(
     engine, evaluationTime, result, durationMs). A cím és az időkorlát
     alapból a beállításokból jön."""
     deadline = _Deadline(timeout or settings.cql_timeout_seconds)
-    target = urllib.parse.urlsplit(url or settings.cql_service_url)
-    if target.scheme != "http" or not target.hostname:
-        raise CqlServiceError("unreachable", f"nem támogatott cím: {target.geturl()}")
+    address = url or settings.cql_service_url
+    try:
+        # Hibás cím (pl. http://[::1, http://localhost:abc, 99999-es port,
+        # szóköz a gépnévben): ValueError vagy InvalidURL, már itt.
+        target = urllib.parse.urlsplit(address)
+        if target.scheme != "http" or not target.hostname:
+            raise CqlServiceError("unreachable", f"nem támogatott cím: {target.geturl()}")
+        connection = http.client.HTTPConnection(
+            target.hostname, target.port or 80, timeout=deadline.remaining()
+        )
+    except (ValueError, http.client.InvalidURL) as error:
+        raise CqlServiceError("invalid_url", str(error)) from error
     path = f"{target.path.rstrip('/')}/evaluate"
     body = json.dumps(payload).encode("utf-8")
 
-    connection = http.client.HTTPConnection(
-        target.hostname, target.port or 80, timeout=deadline.remaining()
-    )
     try:
         connection.request(
             "POST",
@@ -109,6 +121,10 @@ def evaluate(
         data = _read_body(response, sock, deadline)
     except TimeoutError as error:
         raise CqlServiceError("timeout") from error
+    except UnicodeError as error:
+        # A gépnév IDNA-kódolása a névfeloldáskor bukik el (pl. http://a..b:80,
+        # 63 karakternél hosszabb címke): ez is hibás cím.
+        raise CqlServiceError("invalid_url", str(error)) from error
     except (OSError, http.client.HTTPException) as error:
         # Elutasított kapcsolat, névfeloldási hiba, megszakadt válasz ...
         raise CqlServiceError("unreachable", str(error)) from error

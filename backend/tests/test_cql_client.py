@@ -173,6 +173,25 @@ def test_unsupported_address_is_unreachable():
     assert error.value.reason == "unreachable"
 
 
+@pytest.mark.parametrize(
+    "address",
+    [
+        "http://[::1",  # lezáratlan IPv6-cím (urlsplit: ValueError)
+        "http://localhost:abc",  # nem szám port (ValueError)
+        "http://localhost:99999",  # tartományon kívüli port (ValueError)
+        "http://exa mple.hu",  # szóköz a gépnévben (InvalidURL)
+        "http://a..b:80",  # üres címke (UnicodeError a névfeloldáskor)
+        f"http://{'a' * 64}.hu",  # 63 karakternél hosszabb címke (UnicodeError)
+    ],
+)
+def test_invalid_address_is_a_service_error(address):
+    """A hibás CQL_SERVICE_URL is CqlServiceError (a végpont 503-at ad), nem
+    váratlan kivétel (500)."""
+    with pytest.raises(CqlServiceError) as error:
+        evaluate({}, url=address, timeout=2)
+    assert error.value.reason == "invalid_url"
+
+
 def test_connect_timeout_is_reported_as_timeout(monkeypatch):
     """A kapcsolódás közbeni időtúllépés is timeout."""
     import http.client
