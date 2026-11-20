@@ -316,7 +316,8 @@ export const hu = {
     measurementsTitle: 'Mérések',
     submissionsTitle: 'Kérdőív-kitöltések',
     alert: {
-      rule: '{{type}}, {{version}}. verzió · {{severity}}',
+      // A „·" mindkét oldalán nem törhető szóköz: sortörésnél sem marad árván.
+      rule: '{{type}}, {{version}}. verzió\u00a0·\u00a0{{severity}}',
       condition: 'Feltétel: {{condition}}',
       or: ' vagy ',
       events: {
@@ -608,7 +609,7 @@ export const hu = {
       lower: '{{label}} alsó határ',
       noLimit: 'nincs',
       limitsHint:
-        'Az üresen hagyott határ nem számít. A határ maga még rendben van: a „140 fölött” a 141-től riaszt.',
+        'Az üresen hagyott határ nem számít. Maga a határérték még nem riaszt, csak ami túllépi (például 140-es felső határnál a 140 még rendben van, a 141 már riaszt).',
       count: 'Legalább ennyi határsértő mérés',
       countUnit: 'mérés',
       windowDays: 'Ennyi napon belül',

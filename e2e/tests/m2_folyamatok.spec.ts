@@ -359,6 +359,11 @@ test('szabályok, orvos: a küszöbszabály módosítása új verziót hoz létr
       name: 'Vérnyomás: 2 egymást követő alkalom elmulasztva',
     }),
   ).toBeVisible()
+  // Egy típuson belül a létrehozás sorrendje (a seed szabálylistája), minden
+  // újraseedelés után ugyanaz.
+  await expect(
+    rules.getByRole('group', { name: 'Kérdőívszabály' }).getByRole('article'),
+  ).toHaveText([/figyelmeztető vagy kritikus sávban/, /a\(z\) kritikus sávban/, /romlik 3/])
 
   // Szerkesztés: a szerkesztő az aktuális verzióval nyílik; változás nélkül nem menthető.
   await threshold.getByRole('button', { name: 'Szerkesztés' }).click()
@@ -367,6 +372,10 @@ test('szabályok, orvos: a küszöbszabály módosítása új verziót hoz létr
   })
   await expect(editor).toContainText('Küszöbszabály · Vérnyomás')
   await expect(editor).toContainText('1. verzió érvényes')
+  // A határ segédszövege példaként mutatja a szigorú összehasonlítást.
+  await expect(editor).toContainText(
+    'Maga a határérték még nem riaszt, csak ami túllépi (például 140-es felső határnál',
+  )
   const save = editor.getByRole('button', { name: 'Mentés 2. verzióként' })
   await expect(save).toBeDisabled()
 
@@ -442,6 +451,75 @@ const alertFilter = (page: Page, name: string) =>
 const alertRows = (page: Page) =>
   page.getByRole('region', { name: 'Nyitott riasztások' }).locator('.al-row')
 
+// A Riasztások oldal tördelése (csak megnézi, adatot nem módosít): a régi hibás
+// szélességeken (950: oldalsáv nélkül, keskeny oszlop; 1000: oldalsávval, ahol a
+// „mi történt" oszlop összecsukódott és vízszintes görgetés volt; 1265: oldalsávval,
+// a szabály sora törik) nincs vízszintes görgetés, a „mi történt" szövege nem lóg rá
+// az értékre, és a szabálysor „·" elválasztója nem áll egyedül a sor elején vagy végén.
+test('Riasztások oldal: a sorok tördelése keskenyebb ablakban sem hibás', async ({ page }) => {
+  await login(page, 'dr.kovacs@pulse.example')
+  await expect(page).toHaveURL(/\/doctor$/)
+  await page.goto('/doctor/alerts')
+  await expect(alertRows(page).first()).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+
+  for (const width of [950, 1000, 1265]) {
+    await page.setViewportSize({ width, height: 900 })
+    const layout = await page.evaluate(() => {
+      const ink = (el: Element) => {
+        const range = document.createRange()
+        range.selectNodeContents(el)
+        return [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0)
+      }
+      const overlaps = (a: DOMRect, b: DOMRect) =>
+        Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 &&
+        Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1
+      const problems: string[] = []
+      let dots = 0
+      for (const row of document.querySelectorAll('.al-row')) {
+        const what = row.querySelector('.al-what')!
+        const value = row.querySelector('.al-val')!
+        if (ink(what).some((a) => ink(value).some((b) => overlaps(a, b))))
+          problems.push(`átfedés: ${what.textContent}`)
+        // A szabálysor karakterei soronként (a szóközök nélkül): a „·" ne legyen
+        // egy sor első vagy utolsó karaktere.
+        const meta = what.querySelector('.pd-meta')!
+        const lines: { top: number; chars: { left: number; ch: string }[] }[] = []
+        const walker = document.createTreeWalker(meta, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const text = node.textContent ?? ''
+          for (let i = 0; i < text.length; i++) {
+            if (/\s/.test(text[i])) continue
+            const range = document.createRange()
+            range.setStart(node, i)
+            range.setEnd(node, i + 1)
+            const r = range.getClientRects()[0]
+            if (!r) continue
+            const line = lines.find((l) => Math.abs(l.top - r.top) < 4)
+            if (line) line.chars.push({ left: r.left, ch: text[i] })
+            else lines.push({ top: r.top, chars: [{ left: r.left, ch: text[i] }] })
+          }
+        }
+        for (const { chars } of lines) {
+          chars.sort((a, b) => a.left - b.left)
+          if (chars.some((c) => c.ch === '·')) dots++
+          if (chars[0].ch === '·' || chars[chars.length - 1].ch === '·')
+            problems.push(`árva „·": ${meta.textContent}`)
+        }
+      }
+      return {
+        scroll: document.documentElement.scrollWidth - window.innerWidth,
+        dots,
+        problems,
+      }
+    })
+    expect(layout.scroll, `vízszintes görgetés ${width} px-en`).toBeLessThanOrEqual(0)
+    expect(layout.problems, `${width} px`).toEqual([])
+    // A mérés tényleg a „·"-ot tartalmazó szabálysorokat nézte.
+    expect(layout.dots, `${width} px`).toBeGreaterThan(0)
+  }
+})
+
 test('Riasztások oldal: szűrés állapot szerint, a sorból az adatlapra, ott megtekintett lesz', async ({
   page,
 }) => {
@@ -472,7 +550,8 @@ test('Riasztások oldal: szűrés állapot szerint, a sorból az adatlapra, ott 
   const first = alertRows(page).first()
   await expect(first).toContainText('Varga Béla')
   await expect(first).toContainText('Vérnyomás a határ fölött')
-  await expect(first).toContainText('Küszöbszabály, 1. verzió · súlyos')
+  // A szabály sora a cím alatt, elválasztó nélkül (nem marad „·" a cím végén).
+  await expect(first.locator('.al-what .pd-meta')).toHaveText('Küszöbszabály, 1. verzió · súlyos')
 
   // A sorból az adatlapra: a felület a két új riasztást megtekintettnek jelöli.
   const seen = page.waitForResponse(

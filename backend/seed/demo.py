@@ -240,7 +240,7 @@ def seed_demo_data(db: Session, now: datetime | None = None) -> list[str]:
     now = now or datetime.now(UTC)
     log += _seed_questionnaire(db, now)
     log += _seed_measurement_plans(db, now)
-    log += _seed_rules(db)
+    log += _seed_rules(db, now)
     log += _seed_measurements(db, now)
     log += _seed_submissions(db, now)
     log += _seed_questionnaire_v2(db)
@@ -377,14 +377,23 @@ def _seed_submissions(db: Session, now: datetime) -> list[str]:
     return log
 
 
-def _seed_rules(db: Session) -> list[str]:
+# A szabályok létrehozási ideje: a legkorábbi demóadat (a legfeljebb 16 napja
+# kezdődő mérések, a 14 napja induló előírások) előtt, hogy a verzió „… óta"
+# dátuma ne legyen későbbi a rá hivatkozó, visszadátumozott riasztásoknál.
+# Szabályonként egy perccel később: így a lista a DEMO_RULES sorrendjét mutatja.
+# A kiértékelés a létrehozási időt nem olvassa, csak a sorrend és a felület.
+RULES_DAYS_BEFORE = 17
+
+
+def _seed_rules(db: Session, now: datetime) -> list[str]:
     log: list[str] = []
+    since = now - timedelta(days=RULES_DAYS_BEFORE)
     for doctor_email, patient_email in ASSIGNMENTS:
         doctor = _get(db, doctor_email)
         patient = _get(db, patient_email).patient_profile
         if db.scalar(select(exists().where(Rule.patient_id == patient.id))):
             continue
-        for rule_type, severity, params in DEMO_RULES:
+        for i, (rule_type, severity, params) in enumerate(DEMO_RULES):
             create_rule(
                 db,
                 patient_id=patient.id,
@@ -392,6 +401,7 @@ def _seed_rules(db: Session) -> list[str]:
                 rule_type=rule_type,
                 params=params,
                 severity=severity,
+                created_at=since + timedelta(minutes=i),
             )
         log.append(f"szabályok: {patient.name} ({len(DEMO_RULES)} db)")
     return log

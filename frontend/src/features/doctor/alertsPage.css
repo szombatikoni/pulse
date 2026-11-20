@@ -15,6 +15,9 @@
   color: var(--pulse-ink-1);
   font-weight: 600;
 }
+.al-row .al-what > .pd-meta {
+  display: block;
+}
 .al-row .al-val {
   font-size: 15px;
   font-weight: 600;
@@ -41,37 +44,47 @@
   color: var(--pulse-ink-3);
 }
 
-@media (max-width: 900px) {
-  .pulse-prow.al-row {
+/* Keskeny elrendezés (három sor) a lista tényleges szélessége szerint, nem az
+   ablakéból: 992 px-től az oldalsáv 252 px-et elvesz, és a hét oszlop már nem fér
+   el (a „mi történt" oszlop összecsukódna). Oldalsáv nélkül ez ugyanaz a határ,
+   mint a beteglista 900 px-es töréspontja (868 px széles lista, 2 px keret).
+   Az .al-list előtag a beteglista keskeny szabályai (patientList.css,
+   `.pulse-prow.pl-row …`) fölé emeli ezeket: azok a 900 px-es ablakhoz kötöttek,
+   és a név helyét is felülírnák (a név a sor aljára kerülne). */
+.al-list {
+  container: al-list / inline-size;
+}
+@container al-list (max-width: 866px) {
+  .al-list .pulse-prow.al-row {
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 6px 12px;
   }
-  .al-row > .pulse-si {
+  .al-list .pulse-prow.al-row > .pulse-si {
     grid-row: 1;
     grid-column: 1;
   }
-  .al-row .c-name {
+  .al-list .pulse-prow.al-row .c-name {
     grid-row: 1;
     grid-column: 2;
   }
-  .al-row .al-val {
+  .al-list .pulse-prow.al-row .al-val {
     grid-row: 1;
     grid-column: 3;
   }
-  .al-row .al-what {
+  .al-list .pulse-prow.al-row .al-what {
     grid-row: 2;
     grid-column: 2 / -1;
   }
-  .al-row .al-state {
+  .al-list .pulse-prow.al-row .al-state {
     grid-row: 3;
     grid-column: 2;
   }
-  .al-row .al-owner {
+  .al-list .pulse-prow.al-row .al-owner {
     grid-row: 3;
     grid-column: 3;
     text-align: right;
   }
-  .al-row .c-chev {
+  .al-list .pulse-prow.al-row .c-chev {
     display: none;
   }
 }

@@ -318,7 +318,8 @@ export const en: typeof hu = {
     measurementsTitle: 'Measurements',
     submissionsTitle: 'Questionnaire submissions',
     alert: {
-      rule: '{{type}}, version {{version}} · {{severity}}',
+      // A „·" mindkét oldalán nem törhető szóköz: sortörésnél sem marad árván.
+      rule: '{{type}}, version {{version}}\u00a0·\u00a0{{severity}}',
       condition: 'Condition: {{condition}}',
       or: ' or ',
       events: {
@@ -609,7 +610,7 @@ export const en: typeof hu = {
       lower: '{{label}} lower limit',
       noLimit: 'none',
       limitsHint:
-        'An empty limit is ignored. The limit itself is still fine: “above 140” fires from 141.',
+        'An empty limit is ignored. The limit value itself does not fire, only values beyond it (for example, with an upper limit of 140, 140 is still fine and 141 fires).',
       count: 'At least this many out-of-range measurements',
       countUnit: 'meas.',
       windowDays: 'Within this many days',

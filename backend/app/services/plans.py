@@ -46,6 +46,9 @@ from app.services.occurrences import fulfil_from_existing, period_containing
 # A beteg ennyi napig látja a visszavonás / módosítás jelzését.
 NOTICE_DAYS = 7
 
+# Rendezési alsó korlát a még nem visszavont előírás visszavonási idejéhez.
+_EPOCH = datetime.min.replace(tzinfo=UTC)
+
 
 class PlanError(ValueError):
     """Érvénytelen előírás vagy művelet; a `code` alapján a felület a saját
@@ -182,6 +185,19 @@ def list_plan(db: Session, patient_id: uuid.UUID, now: datetime | None = None) -
                 replaced_by=successor.id if successor else None,
             )
         )
+    # Azonos kezdetnél a célpont dönt (előbb a mérések, aztán a kérdőívek, név
+    # szerint), csak végül az azonosító: az előírásnak nincs létrehozási ideje, a
+    # véletlen UUID pedig minden újraseedeléskor más sorrendet adna.
+    entries.sort(
+        key=lambda e: (
+            e.assignment.start_date,
+            e.assignment.revoked_at is None,
+            e.assignment.revoked_at or _EPOCH,
+            e.assignment.target_kind != AssignmentTarget.MEASUREMENT,
+            e.name,
+            str(e.assignment.id),
+        )
+    )
     return entries
 
 

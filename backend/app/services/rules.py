@@ -222,13 +222,26 @@ def create_rule(
     rule_type: RuleType,
     params: dict[str, Any],
     severity: Severity,
+    created_at: datetime | None = None,
 ) -> Rule:
-    """Új szabály az első verziójával."""
+    """Új szabály az első verziójával.
+
+    `created_at`: a szabály és az első verzió létrehozási ideje, ha a hívó adja
+    (a seed a visszadátumozott demóadatok elé teszi); egyébként az adatbázis
+    ideje. A kiértékelés nem olvassa, csak a sorrend és a megjelenítés."""
     rule = Rule(patient_id=patient_id, created_by=created_by)
+    if created_at is not None:
+        rule.created_at = created_at
     db.add(rule)
     db.flush()
     add_rule_version(
-        db, rule, created_by=created_by, rule_type=rule_type, params=params, severity=severity
+        db,
+        rule,
+        created_by=created_by,
+        rule_type=rule_type,
+        params=params,
+        severity=severity,
+        created_at=created_at,
     )
     return rule
 
@@ -242,6 +255,7 @@ def add_rule_version(
     params: dict[str, Any],
     severity: Severity,
     now: datetime | None = None,
+    created_at: datetime | None = None,
 ) -> RuleVersion:
     """Szabálymódosítás = új verzió (F12); a korábbiak változatlanok maradnak.
 
@@ -258,7 +272,10 @@ def add_rule_version(
     (SELECT … FOR UPDATE), így két párhuzamos módosítás egymás után fut, és a
     második már az első verzióját látja; a (rule_id, version_no) egyediség nem
     sérülhet. Zárolási sorrend: szabály, majd a nyitott riasztás; az életút-
-    műveletek csak a riasztást zárolják, így körkörös várakozás nem alakulhat ki."""
+    műveletek csak a riasztást zárolják, így körkörös várakozás nem alakulhat ki.
+
+    `created_at`: a verzió létrehozási ideje, ha a hívó adja (create_rule, seed);
+    a `now` csak a „szabály módosult" esemény ideje, a verzióét nem állítja."""
     now = now or datetime.now(UTC)
     db.execute(select(Rule.id).where(Rule.id == rule.id).with_for_update())
     last = db.scalar(
@@ -281,6 +298,8 @@ def add_rule_version(
         severity=severity,
         created_by=created_by,
     )
+    if created_at is not None:
+        version.created_at = created_at
     db.add(version)
     db.flush()
     alert = open_alert(db, rule.patient_id, rule.id, for_update=True)

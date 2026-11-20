@@ -36,8 +36,9 @@ function AlertRow({ alert, ctx }: { alert: AlertListItem; ctx: RuleTextContext }
       </span>
       <span className="al-what">
         <span className="tt">{alertTitle(t, alert, alert.trigger, ctx)}</span>
+        {/* Külön sorban, elválasztó nélkül (mint a riasztáskártya fejlécében): az
+            oszlop keskeny, egy sorba nem fér ki, és a sortörés előtt a „·" ottmaradna. */}
         <span className="pd-meta">
-          {' · '}
           {t('doctor.alert.rule', {
             type: t(`doctor.ruleTypes.${version.rule_type}`),
             version: version.version_no,
@@ -115,7 +116,7 @@ export function DoctorAlertsPage() {
       {visible.length === 0 ? (
         <p className="pl-no-match">{t(all.length ? 'alerts.noMatch' : 'alerts.empty')}</p>
       ) : (
-        <section className="pl-plist" aria-label={t('alerts.listLabel')}>
+        <section className="pl-plist al-list" aria-label={t('alerts.listLabel')}>
           {visible.map((alert) => (
             <AlertRow key={alert.id} alert={alert} ctx={ctx} />
           ))}

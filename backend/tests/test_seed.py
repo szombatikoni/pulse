@@ -26,10 +26,11 @@ from app.models import (
 )
 from app.services.access import can_access_patient
 from app.services.occurrences import OccurrenceCheck, run_occurrence_check
-from app.services.rules import current_version
+from app.services.plans import list_plan
+from app.services.rules import current_version, list_rules
 from app.services.status import PatientStatus, doctor_patient_list
 from app.services.users import get_user_by_email
-from seed.demo import ASSIGNMENTS, DEMO_PASSWORD, USERS, seed_demo_data
+from seed.demo import ASSIGNMENTS, DEMO_PASSWORD, DEMO_RULES, USERS, seed_demo_data
 
 
 def count(db, model):
@@ -317,3 +318,42 @@ def test_seed_wellbeing_second_version(db):
         )
         == 2
     )
+
+
+def test_seeded_rules_keep_their_order_and_predate_the_data(db):
+    # A szabálylista egy típuson belül is a seed sorrendjét adja (nem a véletlen
+    # UUID-ét), és a szabályverziók a legkorábbi visszadátumozott adat előtt
+    # jönnek létre: a „… óta" dátum nem későbbi a rájuk hivatkozó riasztásnál.
+    # 07:00 helyi idő: a mérések napi 7:30-as horgonya még a tegnapi, így a
+    # legkorábbi mérés a lehető legkorábbi (16 nap és fél óra).
+    now = datetime(2026, 11, 20, 6, 0, tzinfo=UTC)
+    seed_demo_data(db, now=now)
+    for _doctor, email in ASSIGNMENTS:
+        patient = get_user_by_email(db, email).patient_profile
+        entries = list_rules(db, patient.id)
+        assert [(e.current.rule_type, e.current.severity, e.current.params) for e in entries] == [
+            (rule_type, severity, params) for rule_type, severity, params in DEMO_RULES
+        ]
+        latest_version = max(e.current.created_at for e in entries)
+        earliest_data = min(
+            db.scalar(
+                select(func.min(Measurement.measured_at)).where(
+                    Measurement.patient_id == patient.id
+                )
+            ),
+            db.scalar(
+                select(func.min(Submission.submitted_at)).where(Submission.patient_id == patient.id)
+            )
+            or now,
+            db.scalar(select(func.min(Alert.created_at)).where(Alert.patient_id == patient.id))
+            or now,
+        )
+        assert latest_version < earliest_data, email
+        assert latest_version < now - timedelta(days=16)
+
+
+def test_seeded_plan_order_is_stable(db):
+    # Azonos kezdetű előírások: előbb a mérések név szerint, aztán a kérdőív.
+    seed_demo_data(db, now=datetime(2026, 11, 20, 12, 0, tzinfo=UTC))
+    toth = get_user_by_email(db, "toth.maria@pulse.example").patient_profile
+    assert [e.name for e in list_plan(db, toth.id)] == ["Pulzus", "Vérnyomás", "Közérzet"]
