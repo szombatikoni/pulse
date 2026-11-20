@@ -12,6 +12,4 @@ Szakdolgozatomban erre a problémára szeretnék megoldást készíteni: egy oly
 
 Hogy a rendszer valóban azt teszi-e, amit tervezek, mesterséges beteg-forgatókönyveken ellenőrzöm: ugyanazokon az adatokon összevetem egy egyszerű határérték-figyeléssel, és megmutatom, hol és miért tér el tőle a jelzés: mikor vonja össze az ismétlődő eltéréseket, mikor jelez később, és mit ismer fel, amit a határérték-figyelés nem, például az elmaradt adatot. A rendszer demonstrációs célú, kizárólag mesterséges adatokkal működik, és nem helyettesíti az orvosi döntést.
 
-> **Jóváhagyandó (5):** a személyes rész (miért pont ez a téma, mi köt
-> hozzá) még általános; a korábbi „A téma azért is áll közel hozzám…" mondat
-> helyére a forrásolt állítás került, a személyes indokot ide írd meg.
+[KÉSŐBB: a témaválasztás személyes indoka]

@@ -26,9 +26,10 @@ Aláírás
 
 # Köszönetnyilvánítás {-}
 
-*(A dolgozat véglegesítésekor készül el.)*
+[KÉSŐBB: a dolgozat véglegesítésekor]
 
 # Elektronikus melléklet {-}
 
 A rendszer forráskódja, a tervezési dokumentumok és az AI-használati napló a
-https://github.com/szombatikoni/pulse nyilvános repóban érhetők el.
+https://github.com/szombatikoni/pulse nyilvános repó `develop` ágán érhetők
+el.

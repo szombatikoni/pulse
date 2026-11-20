@@ -76,7 +76,7 @@ A megoldási mód:
 :::
 
 ::: {custom-style="Behuzas nelkul"}
-*(A megvalósítás előrehaladtával készül el.)*
+[KÉSŐBB: a dolgozat véglegesítésekor]
 :::
 
 ::: {custom-style="Mezonev"}
@@ -84,7 +84,7 @@ Alkalmazott eszközök, módszerek:
 :::
 
 ::: {custom-style="Behuzas nelkul"}
-*(A megvalósítás előrehaladtával készül el.)*
+[KÉSŐBB: a dolgozat véglegesítésekor]
 :::
 
 ::: {custom-style="Mezonev"}

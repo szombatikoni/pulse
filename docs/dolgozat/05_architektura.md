@@ -95,11 +95,12 @@ váltottam, mert a határidők napi léptékűek, a sűrűbb futás pedig egyetl
 követelményből sem következett. Az eredmény helyességét nem az ütem adja,
 hanem az, hogy az ellenőrzés ismételhető, és kézzel bármikor elindítható.
 
-Az e-mail-értesítés a riasztástól elválasztva működik. A riasztás a
-tranzakción belül jön létre, a levél küldése utána, újrapróbálkozással
-történik, és a kézbesítés állapotát külön tábla követi. Ha a levél nem
-megy ki, a riasztás attól még megvan az adatbázisban. Fejlesztés közben a leveleket egy
-Mailpit-postafiók fogja el, valódi címre semmi nem megy ki.
+Az e-mail-értesítés a terv szerint a riasztástól elválasztva működik majd. A
+riasztás a tranzakción belül jön létre, a levél küldése utána,
+újrapróbálkozással történik, és a kézbesítés állapotát külön tábla követi
+majd. Ha a levél nem megy ki, a riasztás attól még megvan az adatbázisban.
+Fejlesztés közben a leveleket egy Mailpit-postafiók fogja el, valódi címre
+semmi nem megy ki.
 
 ## Futtatókörnyezet és CI
 

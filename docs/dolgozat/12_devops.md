@@ -51,9 +51,13 @@ fejezetet), bemutató előtt az adatbázist törlöm, és újra betöltöm az ad
 
 ## Telepítés
 
-A kipróbáláshoz csak Docker kell (Windowson a Docker Desktop). A repó letöltése után a gyökérmappában:
+A kipróbáláshoz csak Docker kell (Windowson a Docker Desktop). A dolgozat a
+`develop` ág állapotát írja le, a `main` az utolsó lezárt mérföldkőé. A
+letöltés és az indítás (a demófiókokat a repó README-je sorolja fel):
 
 ```bash
+git clone --branch develop https://github.com/szombatikoni/pulse.git
+cd pulse
 docker compose up --build -d          # az image-ek építése és indítás
 docker compose exec api python -m seed  # mesterséges demóadatok
 ```
@@ -76,9 +80,6 @@ A GitHub Actions minden, a `develop` vagy a `main` ágra küldött változtatás
 | Frontend | ESLint, Prettier, majd típusellenőrzés és fordítás |
 | CQL-szolgáltatás | a szolgáltatás saját tesztjei (`node --test`) |
 | Docker | a teljes rendszer felépítése és indítása, a demóadatok betöltése, a NICE-kiértékelés a valódi CQL-motorral és a böngészős tesztek Playwrighttal |
-
-[ÁBRA: a négy CI-feladat és a sorrendjük; a Docker-feladat a backend és a
-frontend sikere után indul]
 
 Az első három párhuzamosan fut, a Docker-feladat csak a backend és a frontend
 sikere után indul. A pytest a CQL-motort helyettesítővel hívja, ezért a valódi

@@ -47,7 +47,9 @@ rögzítette (`recorded_at`). Mérést legfeljebb két napra visszamenőleg lehe
 rögzíteni. A mérés ideje dönti el, melyik alkalomhoz tartozik, a rögzítés
 ideje pedig azt, hogy a határidőn belül vagy késve érkezett (lásd a Működés
 fejezetet). A javítás nem írja felül az eredeti mérést: az
-új mérés a `corrected_from` mezővel hivatkozik rá.
+új mérés a `corrected_from` mezővel hivatkozik rá. A kétnapos határ csak az
+új mérés rögzítésére vonatkozik, a már rögzített mérés értéke időkorlát
+nélkül javítható.
 
 ### Relációs tárolás vagy dokumentum-adatbázis
 

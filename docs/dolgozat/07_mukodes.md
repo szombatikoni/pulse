@@ -70,7 +70,9 @@ utolsó napján, a beállított időpontban van.
 - **Meddig pótolható?** Mérést legfeljebb két napra visszamenőleg lehet
   rögzíteni, a mérés időpontjától számítva. Egy elmulasztott alkalom így
   addig pótolható, amíg az időszakába eső mérés még rögzíthető; utána
-  végleges.
+  végleges. A kétnapos határ csak az új mérés visszadátumozására vonatkozik:
+  a már rögzített mérés értéke időkorlát nélkül javítható, a javítás a mérés
+  időpontját nem változtatja meg.
 
 ![Egy alkalom életciklusa](images/dolgozat_folyamat_kirendeles.png){#abra:alkalom}
 
@@ -84,7 +86,11 @@ utolsó napján, a beállított időpontban van.
 
 Az első elmulasztás a státuszt azonnal Adathiányra állítja. Riasztás csak
 az „elmaradt adatküldés" szabályban beállított számú (alapértelmezés szerint
-két egymást követő) elmulasztás után keletkezik.
+két egymást követő) elmulasztás után keletkezik. Mérésnél az alkalom a
+pótlási idő végéig, az időszak vége után 48 óráig még teljesíthető, ezért a
+szabály csak ezután számolja elmulasztottnak. A riasztás így később
+keletkezik, mint ahogy a határidő lejár, a státusz viszont ettől függetlenül
+már a határidőnél Adathiány.
 
 **Kérdőívnél nincs pótlás.** A kérdőív a kitöltés pillanatának állapotáról
 szól, ezért nem dátumozható vissza: a kitöltés mindig az aktuális alkalomhoz
@@ -267,22 +273,21 @@ eltérés a számábrázolásé: a motor lebegőpontosan számol (84,41666…), 
 A próbában a kétértelmű pontok alapértékei a háttérkutatás javaslatai, nem
 végleges döntések.
 
-> **Jóváhagyandó (a te döntéseid, a beépítés előtt):**
-> 1. Kiessen-e az első nap a kezelés követésénél is (az 1.2.7 a diagnózisról
->    szól)? A próbában: igen.
-> 2. Mi az „első nap": az első mérés napja, vagy a kirendelés kezdőnapja? A
->    próbában: az első mérés napja.
-> 3. Mindkét átlagnak a cél alatt kell lennie, vagy elég az egyiknek? A
->    próbában: mindkettőnek.
-> 4. Hány értékelhető nap kell legalább? A próbában: 3 (az első nappal 4).
-> 5. Kerekítsen-e a rendszer az összevetés előtt? A próbában: nem.
-> 6. Melyik napon számít az életkor? A próbában: a sorozat utolsó napján.
-> 7. A leolvasások egyszerű átlaga, vagy előbb alkalmanként a két leolvasás
->    átlaga? A próbában: minden leolvasás egyszerű átlaga (teljes pároknál a
->    kettő ugyanaz, hiányos párnál eltér).
-> 8. Mi legyen a hiányos (például csak szisztolés) és a javított méréssel? A
->    próbában: a hiányos kimarad, és külön listán látszik; a javított mérés
->    kezelése a harmadik mérföldkő része.
+A kétértelmű pontok és a próbában használt alapértékek:
+
+1. Az első mérési nap a kezelés követésénél is kiesik, bár az ajánlás 1.2.7
+   pontja a diagnózisról szól.
+2. Az „első nap" az első mérés napja, nem a kirendelés kezdőnapja.
+3. Mindkét átlagnak a cél alatt kell lennie, nem elég az egyiknek.
+4. Legalább 3 értékelhető nap kell (az első nappal együtt 4).
+5. Az összevetés előtt nincs kerekítés.
+6. Az életkor a sorozat utolsó napján számít.
+7. Az átlag minden leolvasás egyszerű átlaga, nem az alkalmankénti két
+   leolvasás átlagainak átlaga (teljes pároknál a kettő ugyanaz, hiányos
+   párnál eltér).
+8. A hiányos (például csak szisztolés) mérés kimarad, és külön listán
+   látszik. Javított mérésből a PULSE csak az utolsó változatot adja ki, a
+   felülírt mérés nem kerül a motorhoz.
 
 Ha nincs elég adat, az eredmény „nincs elég adat", a PULSE paneljén „Nem
 értékelhető". A kiértékelés eredménye nem tárolódik, és nem hat a státuszra,

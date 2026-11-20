@@ -56,21 +56,21 @@ esetként jelennek meg, ezért a lefuttatott esetek száma ennél nagyobb.
 | pytest | követési terv, alkalmak, státusz, teendők, háttérfolyamat | 142 |
 | pytest | beteg- és orvosi lekérdezések | 21 |
 | pytest | FHIR-kiadás, NICE-kiértékelés, CQL-kliens | 78 |
-| pytest | demóadat, a Működés fejezet dátumozott példái | 20 |
-| pytest | **összesen** | **710** |
+| pytest | demóadat, a Működés fejezet dátumozott példái | 22 |
+| pytest | **összesen** | **712** |
 | node --test | CQL-szolgáltatás | 38 |
-| Playwright | böngészős folyamatok | 25 |
+| Playwright | böngészős folyamatok | 26 |
 
-A pytest futáskor 983 esetet hajt végre: a legutóbbi teljes futáson
-(2026. november 16.) ebből 982 sikeres volt, 1 pedig várt bukás (lásd lent).
-A Playwright mind a 25 tesztje ugyanekkor sikeres volt.
+A pytest futáskor 985 esetet hajt végre: a legutóbbi teljes futáson
+(2026. november 20.) ebből 984 sikeres volt, 1 pedig várt bukás (lásd lent).
+A Playwright mind a 26 tesztje ugyanekkor sikeres volt.
 A végleges változatban a számokat a leadott kódváltozaton újra lefuttatva
 közlöm.
 
 ## Lefedettség
 
-A backend utasítás-lefedettsége a CI legutóbbi futásán (2026. november 16.)
-99% volt: a 3398 utasításból 31 nem futott le. A CI az `app` csomagot a
+A backend utasítás-lefedettsége a CI legutóbbi futásán (2026. november 20.)
+99% volt: a 3406 utasításból 32 nem futott le. A CI az `app` csomagot a
 demóadat-betöltővel együtt méri, és 70% alatt elbukik. A lefedettséget
 alsó korlátnak tekintem, nem célnak: azt mutatja meg, melyik kódrészhez nem
 nyúl egyetlen teszt sem, azt viszont nem, hogy a tesztek a helyes
