@@ -22,8 +22,8 @@ PULSE — Patient Understanding through Limits, Signals and Evaluation. Chronic 
 
 ## Indítás Dockerrel
 
-A teljes rendszer (adatbázis, backend, webes felület) egyetlen paranccsal
-indul. Pythont, Node.js-t vagy PostgreSQL-t nem kell telepíteni, ezek a
+A teljes rendszer (adatbázis, backend, háttérfolyamat, CQL-szolgáltatás, webes
+felület) két paranccsal indul. Pythont, Node.js-t vagy PostgreSQL-t nem kell telepíteni, ezek a
 konténerekben futnak.
 
 ### Előfeltételek
@@ -38,7 +38,8 @@ konténerekben futnak.
 ### Indítás
 
 ```bash
-git clone https://github.com/szombatikoni/pulse.git
+# A fejlesztés a develop ágon halad; a main az utolsó lezárt mérföldkő állapota
+git clone --branch develop https://github.com/szombatikoni/pulse.git
 cd pulse
 
 # Az image-ek felépítése és a konténerek indítása a háttérben
@@ -66,17 +67,19 @@ Mind mesterséges; a közös jelszó: **`pulse-demo-2026`**.
 | Orvos | `dr.kovacs@pulse.example` | négy beteg, mindegyik más státuszban |
 | Orvos | `dr.nagy@pulse.example` | Tóth Mária kezelőorvosa |
 | Beteg | `varga.bela@pulse.example` | Súlyos: egy mérése 180 Hgmm felett |
-| Beteg | `szabo.janos@pulse.example` | Figyelem: két 140 feletti mérés, és a kérdőíve a figyelmeztető sávban |
-| Beteg | `kiss.ilona@pulse.example` | Adathiány: 12 napja nem mért |
+| Beteg | `szabo.janos@pulse.example` | Figyelem: három 140/90 feletti mérés egy héten belül, és a kérdőíve a figyelmeztető sávban |
+| Beteg | `kiss.ilona@pulse.example` | Adathiány: a múlt heti kérdőívkitöltése elmaradt |
 | Beteg | `molnar.katalin@pulse.example` | Rendben |
-| Beteg | `toth.maria@pulse.example` | Rendben (Nagy doktor betege) |
+| Beteg | `toth.maria@pulse.example` | Adathiány: az előírt esti pulzusmérést és a heti kérdőívet még nem teljesítette (Nagy doktor betege) |
 | Admin | `admin@pulse.example` | betegadatot nem lát |
 
 A mérések időpontjai a seed futtatásához képest relatívak (az utolsó mérés
-a legutóbbi reggel 7:30-as, magyar idő szerint). Mivel 7 napnál régebbi adat
-már nem számít frissnek, **a demó a seed után kb. egy hétig mutatja a fenti
-státuszokat**; utána (vagy bemutató előtt) érdemes tisztán újrakezdeni:
-`docker compose down -v`, majd újra az indítás és a seed.
+a legutóbbi reggel 7:30-as, magyar idő szerint). **A demó a seed napján
+mutatja a fenti státuszokat.** Másnap 10 órától, a napi vérnyomásmérés
+határidejétől a Rendben lévő beteg is Adathiányba kerül, mert az aznapi mérése
+hiányzik. A seed ismételt futtatása a meglévő adatokat nem frissíti, ezért
+bemutató előtt érdemes tisztán újrakezdeni: `docker compose down -v`, majd
+újra az indítás és a seed.
 
 ### Leállítás
 
@@ -92,7 +95,9 @@ másold a `.env.example` fájlt `.env` néven, és írd át. A compose
 automatikusan beolvassa. Nyilvános környezetben a `JWT_SECRET_KEY`-t
 kötelező lecserélni.
 
-A portok (8080, 8000, 5432) csak a saját gépről érhetők el.
+A portok (8080, 8000, 5432) csak a saját gépről érhetők el. Ha valamelyik
+foglalt (például fut már egy PostgreSQL az 5432-esen), a `docker-compose.yml`
+`ports:` sorában írható át.
 
 ## Fejlesztés
 
@@ -105,13 +110,16 @@ A portok (8080, 8000, 5432) csak a saját gépről érhetők el.
 | Kódellenőrzés | `uv run ruff check .` (`backend/`), `npm run lint` (`frontend/`) |
 | Böngészős folyamatteszt ([Playwright](https://playwright.dev/)) | `npm ci`, `npx playwright install chromium`, majd `npx playwright test` (`e2e/`; lásd lent) |
 
-A CI (GitHub Actions) minden pushkor ugyanezeket futtatja: `.github/workflows/ci.yml`.
+A CI (GitHub Actions) a `develop` és a `main` ágra kerülő minden változtatásnál
+ugyanezeket futtatja, a CQL-szolgáltatás tesztjeivel együtt: `.github/workflows/ci.yml`.
 
 ### Böngészős folyamatteszt
 
-Az `e2e/` teszt a két M2-folyamatot a felületen viszi végig: a beteg mér és
+Az `e2e/` tesztek a fő folyamatokat a felületen viszik végig: a beteg mér és
 kérdőívet tölt ki, az orvos a listán és az adatlapon látja a jelzést, idegen
-beteg adatlapját pedig nem nyithatja meg. Futó rendszert és **frissen seedelt**
+beteg adatlapját pedig nem nyithatja meg; emellett a szabályverziókat, a
+riasztás életútját, a mérésjavítást, a követési tervet, a kérdőívszerkesztőt
+és a NICE-kiértékelés paneljét is ellenőrzik. Futó rendszert és **frissen seedelt**
 adatbázist vár, és **módosítja az adatokat**. Hogy a saját demóadataid
 megmaradjanak, külön példányon érdemes futtatni (a fő példány leállítása után,
 mert ugyanazokat a portokat használja):
