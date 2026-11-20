@@ -4,11 +4,11 @@ Ez a fejezet dátumozott példákon mutatja be a működési szabályokat: hogya
 áll elő a beteg státusza, hogyan kezeli a rendszer az ismétlődő teendőket és
 az elmaradást, mi történik szabálymódosításkor és adatjavításkor, és hogyan
 pontoz a kérdőív. A példák mesterséges adatokkal készültek. A státusz, a
-küszöbszabály, a deduplikáció és a kérdőív-pontozás a második mérföldkőben
-már működik, és tesztek ellenőrzik. A beteg teendőlistája (mi esedékes, mi
-kész, mi maradt el, és meddig pótolható) is már az alább leírt szabályokkal
-számolódik, az előírásokból. Az alkalmak tárolása, a riasztáslezárás és a
-javítás a harmadik mérföldkőben készül el. A fejezet végén egy integrációs
+küszöbszabály, a deduplikáció és a kérdőív-pontozás a második mérföldkő óta
+működik, és tesztek ellenőrzik. A harmadik mérföldkőben elkészült a többi
+szabálytípus, az alkalmak tárolása, a riasztás lezárása és a mérésjavítás is;
+a beteg teendőlistája (mi esedékes, mi kész, mi maradt el, és meddig
+pótolható) a tárolt alkalmakból számolódik. A fejezet végén egy integrációs
 próba szerepel: egy klinikai irányelven alapuló szabály, szabványos adatokon,
 meglévő motorral kiértékelve.
 
@@ -35,7 +35,8 @@ feljebb álló érvényes, a felület a többi okot is kiírja.
 A legfontosabb elv, hogy sem a lezárás, sem az adat hiánya nem ad kedvező
 státuszt. Egy frissen felvett beteg, akinek még nincs mérése, Adathiány
 státuszú, nem Rendben. Előírás nélkül akkor friss az adat, ha a legutóbbi
-mérés vagy kitöltés legfeljebb 7 napos.
+mérés vagy kitöltés legfeljebb 7 napos. Ugyanez érvényes addig, amíg az
+előírás első alkalma le nem zárult.
 
 **Példa: lezárás, majd megerősítő mérés**
 
@@ -71,7 +72,7 @@ utolsó napján, a beállított időpontban van.
   addig pótolható, amíg az időszakába eső mérés még rögzíthető; utána
   végleges.
 
-![Egy alkalom életciklusa](images/folyamat_kirendeles.png){#abra:alkalom}
+![Egy alkalom életciklusa](images/dolgozat_folyamat_kirendeles.png){#abra:alkalom}
 
 | Időpont | Esemény | Alkalom |
 |---------|-----------------------------------|---------------|
@@ -89,14 +90,16 @@ két egymást követő) elmulasztás után keletkezik.
 szól, ezért nem dátumozható vissza: a kitöltés mindig az aktuális alkalomhoz
 számít, az elmaradt korábbi alkalom pedig elmulasztva marad. Ugyanezért a
 kérdések időszaka igazodik a kirendelés gyakoriságához: heti kérdőív az elmúlt
-hétre kérdez, napi az aznapra. A mostani demókérdőív ennek még nem felel meg
-(heti kirendelés mellett az előző éjszakára és az aznapra is kérdez); a
-harmadik mérföldkőben új verziót kap, ami egyben a verzióváltást is bemutatja.
+hétre kérdez, napi az aznapra. A demókérdőív első verziója ennek még nem
+felelt meg (heti kirendelés mellett az előző éjszakára és az aznapra is
+kérdezett). A második verzióban a kérdések az elmúlt hétre szólnak, a
+pontozás és a sávok nem változtak; ez egyben a verzióváltást is bemutatja.
 
 ## Riasztás, deduplikáció és szabálymódosítás
 
 A riasztás életútja egy egyszerű állapotgép: keletkezett → megtekintett →
-felelőshöz rendelt → lezárt. Lezárni csak indoklással lehet, és minden váltás
+felelőshöz rendelt → lezárt. Lépés kihagyható, visszaút nincs. Lezárni
+bármelyik nyitott állapotból, de csak indoklással lehet, és minden váltás
 eseményként rögzül (ki, mikor, mit).
 
 ![A riasztás életútja](images/folyamat_riasztas.png){#abra:riasztas}
@@ -104,9 +107,10 @@ eseményként rögzül (ki, mikor, mit).
 A riasztásokat a rendszer beteg és szabály szerint vonja össze. Nyitott
 riasztás mellett ugyanarra a szabályra érkező újabb kiváltó adat nem nyit új
 riasztást, hanem „ismételt aktiválódás" eseményt ad; a súlyosság ilyenkor
-emelkedhet, de nem csökkenhet. A demóadatokban Szabó Jánosnál ez látszik: két
-140 Hgmm feletti mérés után a vérnyomás-küszöbszabályhoz egy riasztás tartozik,
-két eseménnyel.
+emelkedhet, de nem csökkenhet. A demóadatokban Szabó Jánosnál ez látszik: a
+harmadik 140/90 Hgmm feletti mérés megnyitja az időablakos szabály riasztását,
+a negyedik ugyanahhoz kapcsolódik, így egy riasztás tartozik hozzá, két
+eseménnyel.
 
 Szabálymódosításkor ugyanaz a nyitott riasztás folytatódik, az új adatot
 viszont már az új verzió értékeli. Minden esemény tárolja az alkalmazott
@@ -155,8 +159,9 @@ esik. Ezt a rendszer a verzió létrehozásakor ellenőrzi.
 A demókérdőív sávjai: 0–5 rendben, 6–10 figyelmeztető, 11–13 kritikus. A
 fenti számpélda a tesztek között is szerepel. A kérdőívszabály a sávra
 riaszt: a demóadatokban a figyelmeztető vagy kritikus sáv közepes, a
-kritikus sáv súlyos riasztást ad. A vérnyomásnál a demó 140/90 Hgmm felett
-közepes, 180 Hgmm szisztolés felett súlyos riasztást ad. Ezek bemutató
+kritikus sáv súlyos riasztást ad. A vérnyomásnál a demó 7 napon belül három
+140/90 Hgmm feletti mérés után közepes, 180 Hgmm szisztolés felett azonnal
+súlyos riasztást ad. Ezek bemutató
 értékek, nem klinikai ajánlások: a valódi határokat az orvos betegenként
 állítja be.
 
@@ -165,8 +170,8 @@ a riasztást nem. Ennek három oka van: egy orvosi értelmezés nélküli „Sú
 vagy „kritikus" felirat megijesztheti a beteget, vagy épp hamis megnyugvást
 adhat; a riasztás az orvosnak szól, aki eldönti, mit jelent és mi a teendő; és
 ha a beteg látná, melyik válasz mennyi pontot ér, a válaszait is
-befolyásolhatná. Az értelmezést az orvos közli: a tervben a riasztás lezárásakor
-rövid visszajelzést küldhet a betegnek.
+befolyásolhatná. Az értelmezést az orvos közli: a riasztás lezárásakor
+rövid visszajelzést küldhet a betegnek, amelyet a beteg a teendői között lát.
 
 ## Integrációs próba: ajánláson alapuló szabály szabványos adatokon
 
@@ -279,12 +284,15 @@ végleges döntések.
 >    próbában: a hiányos kimarad, és külön listán látszik; a javított mérés
 >    kezelése a harmadik mérföldkő része.
 
-Ha nincs elég adat, az eredmény „nincs elég adat", ami a PULSE-ban Adathiány,
-nem kedvező státusz; ez a meglévő elvből következik.
+Ha nincs elég adat, az eredmény „nincs elég adat", a PULSE paneljén „Nem
+értékelhető". A kiértékelés eredménye nem tárolódik, és nem hat a státuszra,
+így kedvező státuszt sem adhat.
 
 ### Korlátok
 
 A FHIR-csomagot hivatalos validátorral még nem ellenőriztem. A próba egyetlen
-fordító- és motorverzióval futott. A PULSE-ba még nincs beépítve: a saját
-adatbázis marad az elsődleges, a FHIR-kiadás és a CQL-kiértékelés bekötése a
-harmadik mérföldkő feladata.
+fordító- és motorverzióval futott. A próba óta a PULSE a saját adataiból is
+kiad FHIR-csomagot, és a backend egy végpontja a külön konténerben futó
+motorral értékelteti ki a beteg méréseit (lásd az Architektúra fejezetet). Az
+eredményt az orvos az adatlap Áttekintés fülén, tájékoztató panelen látja; a
+státuszra és a riasztásokra nem hat. A saját adatbázis marad az elsődleges.
