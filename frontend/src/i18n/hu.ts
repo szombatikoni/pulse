@@ -24,6 +24,12 @@ export const hu = {
     openMenu: 'Menü megnyitása',
     nav: 'Menü',
   },
+  // Lejárt munkamenet: újrabelépés helyben (M3, A8 D3).
+  session: {
+    title: 'Lejárt a munkamenet',
+    invalidPassword: 'Hibás jelszó.',
+    text: 'Biztonsági okból újra be kell lépned. Az oldal és a beírt adatok megmaradtak: belépés után mentsd el újra, amit elkezdtél.',
+  },
   roles: {
     patient: 'Beteg',
     doctor: 'Orvos',
@@ -139,6 +145,7 @@ export const hu = {
       systolicDot: 'Szisztolés (felső pont)',
       diastolicDot: 'Diasztolés (alsó pont)',
       modLimit: '{{value}}, közepes határ',
+      limitsUnavailable: 'A határvonalak most nem tölthetők be.',
       sevLimit: '{{value}}, súlyos határ',
       overSevere: 'A súlyos határ ({{value}}) fölött',
       overLimit: 'A határ ({{value}}) fölött',
@@ -381,6 +388,18 @@ export const hu = {
       window: 'Időablakos szabály',
       questionnaire: 'Kérdőívszabály',
       missing_data: 'Elmaradt adat',
+    },
+    // Orvosi megjegyzések a beteghez (M3, A8; F16).
+    notes: {
+      title: 'Megjegyzések',
+      meta: 'Csak a beteg orvosai látják, a beteg nem.',
+      headerButton: 'Megjegyzés',
+      add: 'Új',
+      newLabel: 'Új megjegyzés',
+      placeholder: 'Pl. telefonon egyeztetve, a következő lépés…',
+      save: 'Mentés',
+      empty: 'Még nincs megjegyzés.',
+      error: 'A megjegyzést nem sikerült elmenteni.',
     },
     detail: {
       backLabel: 'Vissza',

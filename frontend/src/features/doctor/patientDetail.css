@@ -60,10 +60,26 @@
 .pd-crumbs a:hover {
   color: var(--pulse-ink-1);
 }
+/* A név és az adatok balra, a fejléc gombja (Megjegyzés, A8) jobbra, alul igazítva
+   (felületterv: .ph, .ph-text, .ph-actions). */
 .pd-ph {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  min-width: 0;
+}
+.pd-ph-text {
   display: grid;
   gap: 8px;
   min-width: 0;
+}
+.pd-ph-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 .pd-display {
   font-family: var(--pulse-serif);
@@ -924,6 +940,9 @@
   }
 }
 @media (max-width: 640px) {
+  .pd-ph-actions {
+    width: 100%;
+  }
   .pd-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     row-gap: 14px;
@@ -1037,6 +1056,34 @@
 .pd-plan-actions,
 .pd-plan-wide {
   grid-column: 1 / -1;
+}
+
+/* Megjegyzések (M3, A8; felületterv: notesCard, .notes, .note, .note-form). */
+.pd-notes,
+.pd-note-list {
+  display: grid;
+  gap: 12px;
+}
+.pd-note-form {
+  display: grid;
+  gap: 10px;
+}
+.pd-note {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  font-size: 13.5px;
+}
+.pd-note .txt {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pd-note .by {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pulse-ink-3);
 }
 .pd-confirm {
   display: grid;

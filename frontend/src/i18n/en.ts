@@ -27,6 +27,11 @@ export const en: typeof hu = {
     openMenu: 'Open menu',
     nav: 'Menu',
   },
+  session: {
+    title: 'Your session has expired',
+    invalidPassword: 'Wrong password.',
+    text: 'For security reasons, please sign in again. This page and what you have typed are kept: after signing in, save your changes again.',
+  },
   roles: {
     patient: 'Patient',
     doctor: 'Doctor',
@@ -141,6 +146,7 @@ export const en: typeof hu = {
       systolicDot: 'Systolic (upper dot)',
       diastolicDot: 'Diastolic (lower dot)',
       modLimit: '{{value}}, moderate limit',
+      limitsUnavailable: 'The limit lines cannot be loaded right now.',
       sevLimit: '{{value}}, severe limit',
       overSevere: 'Above the severe limit ({{value}})',
       overLimit: 'Above the limit ({{value}})',
@@ -383,6 +389,17 @@ export const en: typeof hu = {
       window: 'Time-window rule',
       questionnaire: 'Questionnaire rule',
       missing_data: 'Missing data',
+    },
+    notes: {
+      title: 'Notes',
+      meta: "Visible to the patient's doctors only, not to the patient.",
+      headerButton: 'Note',
+      add: 'New',
+      newLabel: 'New note',
+      placeholder: 'E.g. discussed by phone, next step…',
+      save: 'Save',
+      empty: 'No notes yet.',
+      error: 'The note could not be saved.',
     },
     detail: {
       backLabel: 'Back',

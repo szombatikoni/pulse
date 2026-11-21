@@ -30,10 +30,13 @@ export type LinePoint = { id: string; t: Date; v: number; superseded?: boolean }
 export type ScorePoint = { id: string; t: Date; score: number; max: number; band: string }
 
 /** Vérnyomás „súlyzóként": napi pálca, fent a szisztolés, lent a diasztolés pont.
- * A határ fölötti pont a státusz színét kapja, a riasztást kiváltó mérés gyűrűt. */
+ * A határ fölötti pont a státusz színét kapja, a riasztást kiváltó mérés gyűrűt. A
+ * gyűrű csak az orvosnál, de a határvonalaktól függetlenül látszik: azok a
+ * szabálylistából külön töltődnek (M3, A8). */
 export function BpChart({
   points,
   thresholds,
+  doctor,
   days,
   height,
   label,
@@ -41,6 +44,7 @@ export function BpChart({
 }: {
   points: BpPoint[]
   thresholds: Threshold[]
+  doctor: boolean
   days: number
   height: number
   label: string
@@ -100,7 +104,7 @@ export function BpChart({
                     cy={y(p.sys).toFixed(1)}
                     r={r}
                   />
-                  {p.trig && thresholds.length > 0 && (
+                  {p.trig && doctor && (
                     <circle className="trig" cx={X} cy={y(p.sys).toFixed(1)} r={r + 3.5} />
                   )}
                 </g>
@@ -133,7 +137,7 @@ export function BpChart({
                     {t('measurements.charts.overLimit', { value: groups.mod || groups.sev })}
                   </span>
                 )}
-                {p.trig && thresholds.length > 0 && (
+                {p.trig && doctor && (
                   <span className="tf">
                     <Bell size={14} weight="bold" />
                     {t('doctor.flagged')}

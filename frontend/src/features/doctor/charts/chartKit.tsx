@@ -74,10 +74,12 @@ export function ThresholdLines({
 }) {
   return (
     <>
-      {thresholds.map((th) => {
+      {thresholds.map((th, i) => {
         const yy = y(th.value).toFixed(1)
+        // Az érték és a súlyosság együtt sem egyedi (pl. diasztolés max. 90 és
+        // szisztolés min. 90, mindkettő közepes), ezért a sorszám is a kulcs része.
         return (
-          <g key={`${th.kind}-${th.value}`}>
+          <g key={`${th.kind}-${th.value}-${i}`}>
             <line className={`thr thr-${th.kind}`} x1={f.x0} x2={f.x1} y1={yy} y2={yy} />
             <text className="thl" x={f.x1 + 6} y={(Number(yy) + 3.8).toFixed(1)}>
               {th.label}

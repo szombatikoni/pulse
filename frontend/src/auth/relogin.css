@@ -1,0 +1,38 @@
+/* Az újrabelépő ablak (M3, A8 D3), a riasztás-lezáró ablak (patientDetail.css,
+   .pd-modal) mintájára; a betegoldalon is megjelenik, ezért külön fájlban. */
+.pulse-relogin.mantine-Modal-content {
+  background: var(--pulse-card);
+  border: 1px solid var(--pulse-line-2);
+  border-radius: 12px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+.pulse-relogin-head.mantine-Modal-header {
+  background: var(--pulse-card);
+  padding: 24px 24px 0;
+}
+.pulse-relogin-title.mantine-Modal-title {
+  font-family: var(--pulse-serif);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--pulse-ink-1);
+}
+.pulse-relogin-body.mantine-Modal-body {
+  padding: 16px 24px 24px;
+}
+.pulse-relogin-form {
+  display: grid;
+  gap: 16px;
+}
+.pulse-relogin-text {
+  margin: 0;
+  color: var(--pulse-ink-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pulse-relogin-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}

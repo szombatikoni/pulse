@@ -1,7 +1,7 @@
-import { Loader, Text } from '@mantine/core'
-import { ArrowLeft } from '@phosphor-icons/react'
+import { Button, Loader, Text } from '@mantine/core'
+import { ArrowLeft, Note } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useSearchParams } from 'react-router'
 
@@ -11,6 +11,7 @@ import { useMeasurementTypes } from '../../api/measurements'
 import { type Alert, usePatient } from '../../api/patients'
 import { useQuestionnaireTemplates } from '../../api/plans'
 import { usePatientSubmissions } from '../../api/questionnaires'
+import { usePatientRules } from '../../api/rules'
 import type { Task } from '../../api/tasks'
 import { StatusIcon, StatusLabel } from '../../components/StatusLabel'
 import { ageInYears, formatRelative, formatSoon, formatUntil } from '../../format'
@@ -20,6 +21,7 @@ import { AlertCard, ClosedAlert } from './AlertCards'
 import { CarePlan } from './CarePlan'
 import { MeasurementCharts } from './charts/MeasurementCharts'
 import { NicePanel } from './NicePanel'
+import { NOTE_FIELD_ID, NotesCard } from './NotesCard'
 import './patientDetail.css'
 import { reasonText } from './reasons'
 import type { RuleTextContext } from './ruleText'
@@ -27,7 +29,8 @@ import { RulesTab } from './RulesTab'
 import { SubmissionHistory } from './SubmissionHistory'
 
 /** A beteg összes riasztása, a lezártakkal együtt: a lezárt kártyához és a
- * grafikon határvonalaihoz (a szabályverziók a riasztásokban érkeznek). */
+ * grafikonon a riasztást kiváltó mérések jelöléséhez. (A határvonalak a szabálylistából
+ * jönnek, M3, A8.) */
 function useAllAlerts(patientId: string) {
   return useQuery({
     queryKey: ['patients', patientId, 'alerts', 'all'],
@@ -125,8 +128,8 @@ type Tab = (typeof TABS)[number]
 
 /** A beteg adatlapja az orvosnak (F10), a felületterv szerint: fejléc a státusszal,
  * alatta fülek. Az Áttekintés bal hasábjában a nyitott riasztások, a NICE szerinti
- * otthoni vérnyomásátlag (M3, K2) és a mérések grafikonja, a jobb hasábban a teendők teljesítése, a követési terv (M3) és a
- * kérdőív-kitöltések; a Szabályok fülön a beteg szabályai és a szerkesztő (M3, A4). */
+ * otthoni vérnyomásátlag (M3, K2) és a mérések grafikonja, a jobb hasábban a teendők teljesítése, a követési terv (M3), a
+ * kérdőív-kitöltések és az orvosi megjegyzések (M3, A8); a Szabályok fülön a beteg szabályai és a szerkesztő (M3, A4). */
 export function PatientDetailPage() {
   const { t } = useTranslation()
   const { patientId = '' } = useParams()
@@ -137,12 +140,40 @@ export function PatientDetailPage() {
   const submissions = usePatientSubmissions(patientId)
   const types = useMeasurementTypes()
   const templates = useQuestionnaireTemplates()
+  // A grafikon határvonalai a beteg aktív szabályaiból (ugyanaz a lekérdezés, mint a
+  // Szabályok fülé, így a szabály mentése ezt is frissíti).
+  const rules = usePatientRules(patientId)
+  // A megjegyzés-űrlap betegenként nyílik (a fejléc gombja és a kártya „Új” gombja
+  // is ezt nyitja); másik beteg adatlapjára lépve zárva indul. A piszkozat is itt
+  // van, a beteghez kötve: a Szabályok fülre váltva (a kártya ekkor lebomlik) nem
+  // vész el, másik betegnél viszont nem jelenik meg.
+  const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null)
+  const [noteDraft, setNoteDraft] = useState({ patientId: '', text: '' })
+  const noteText = noteDraft.patientId === patientId ? noteDraft.text : ''
+  const [noteFocus, setNoteFocus] = useState(0)
+  const focusedNote = useRef(0)
   // A fül az URL-ben (?tab=rules): frissítés és visszalépés után is megmarad.
   const tab: Tab = search.get('tab') === 'rules' ? 'rules' : 'overview'
   const ctx: RuleTextContext = {
     types: types.data ?? [],
     questionnaires: Object.fromEntries((templates.data ?? []).map((x) => [x.code, x.name])),
   }
+
+  const openNote = () => {
+    if (tab !== 'overview') setSearch({})
+    setNoteOpenFor(patientId)
+    setNoteFocus((n) => n + 1)
+  }
+  // Megnyitáskor a kártyához görget, és a szövegmezőre fókuszál (a Szabályok fülről
+  // előbb az Áttekintés jelenik meg). Kérésenként egyszer: a fülváltás nem görget újra.
+  useEffect(() => {
+    if (tab !== 'overview' || noteFocus === focusedNote.current) return
+    const field = document.getElementById(NOTE_FIELD_ID)
+    if (!field) return
+    focusedNote.current = noteFocus
+    field.closest('section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    field.focus({ preventScroll: true })
+  }, [noteFocus, tab])
 
   if (patient.isPending) return <Loader />
   if (patient.isError) {
@@ -177,15 +208,22 @@ export function PatientDetailPage() {
           </Link>
         </nav>
         <div className="pd-ph">
-          <h1 className="pd-display">{p.name}</h1>
-          <div className="pd-ph-meta">
-            <span>{t('doctor.age', { age: ageInYears(p.birth_date) })}</span>
-            <span>{t('doctor.detail.born', { date: formatBirth(p.birth_date) })}</span>
-            <span>
-              {t('doctor.lastData', {
-                when: p.last_data_at ? formatRelative(t, p.last_data_at) : t('doctor.noData'),
-              })}
-            </span>
+          <div className="pd-ph-text">
+            <h1 className="pd-display">{p.name}</h1>
+            <div className="pd-ph-meta">
+              <span>{t('doctor.age', { age: ageInYears(p.birth_date) })}</span>
+              <span>{t('doctor.detail.born', { date: formatBirth(p.birth_date) })}</span>
+              <span>
+                {t('doctor.lastData', {
+                  when: p.last_data_at ? formatRelative(t, p.last_data_at) : t('doctor.noData'),
+                })}
+              </span>
+            </div>
+          </div>
+          <div className="pd-ph-actions">
+            <Button variant="default" leftSection={<Note size={16} />} onClick={openNote}>
+              {t('doctor.notes.headerButton')}
+            </Button>
           </div>
         </div>
         <div className="pd-status">
@@ -261,6 +299,8 @@ export function PatientDetailPage() {
                 patientId={patientId}
                 doctor
                 alerts={all}
+                rules={rules.data ?? []}
+                rulesError={rules.isError}
                 submissions={submissions.data ?? []}
               />
             </div>
@@ -268,6 +308,15 @@ export function PatientDetailPage() {
               <TaskProgress tasks={p.tasks ?? []} />
               <CarePlan patientId={patientId} />
               <SubmissionHistory patientId={patientId} />
+              <NotesCard
+                key={patientId}
+                patientId={patientId}
+                open={noteOpenFor === patientId}
+                text={noteText}
+                onTextChange={(text) => setNoteDraft({ patientId, text })}
+                onOpen={openNote}
+                onClose={() => setNoteOpenFor(null)}
+              />
             </div>
           </div>
         )}

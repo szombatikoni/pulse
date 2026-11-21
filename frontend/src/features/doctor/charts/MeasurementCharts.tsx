@@ -7,6 +7,7 @@ import { apiGet } from '../../../api/client'
 import { isCurrent, type Measurement } from '../../../api/measurements'
 import type { Alert } from '../../../api/patients'
 import type { Submission } from '../../../api/questionnaires'
+import type { Rule } from '../../../api/rules'
 import { StatusIcon } from '../../../components/StatusLabel'
 import { formatDateTime, formatRelative } from '../../../format'
 import '../patientDetail.css'
@@ -31,21 +32,16 @@ function useMeasurementSeries(patientId: string) {
   })
 }
 
-/** A riasztások szabályverzióiból a méréstípus határai (szabályonként a legújabb
- * verzió). Szabálylista-végpont még nincs (M3), ezért csak a már jelzett szabályok
- * határa látszik; adatot nem találunk ki. */
-function thresholdsFor(alerts: Alert[], typeCode: string): Threshold[] {
-  const latest = new Map<string, Alert['rule_version']>()
-  for (const version of alerts.flatMap((a) => [
-    a.rule_version,
-    ...a.events.flatMap((e) => (e.rule_version ? [e.rule_version] : [])),
-  ])) {
-    const prev = latest.get(version.rule_id)
-    if (!prev || prev.version_no < version.version_no) latest.set(version.rule_id, version)
-  }
+/** A méréstípus határai a beteg aktív szabályainak aktuális verziójából (M3, A8): a
+ * vonal akkor is látszik, ha a szabály még nem riasztott. Határa csak a küszöb- és az
+ * időablakos szabálynak van (limits); a kérdőív- és az elmaradtadat-szabály nem rajzol.
+ * Azonos összetevőn és értéken a súlyos szín győz. A régebbi verzió szerint keletkezett
+ * riasztás magyarázatát a riasztáskártya adja, a vonal mindig a mostani határ. */
+function thresholdsFor(rules: Rule[], typeCode: string): Threshold[] {
   const out = new Map<string, Threshold>()
-  for (const version of latest.values()) {
-    if (version.params.measurement_type !== typeCode) continue
+  for (const rule of rules) {
+    const version = rule.current
+    if (!rule.is_active || version.params.measurement_type !== typeCode) continue
     const kind = version.severity === 'severe' ? 'sev' : 'mod'
     for (const [component, limit] of Object.entries(version.params.limits ?? {})) {
       for (const bound of ['max', 'min'] as const) {
@@ -105,17 +101,23 @@ const valueOf = (m: Measurement, component = 'value') =>
   (m.values.find((v) => v.component === component) ?? m.values[0])?.value ?? 0
 
 /** Mérések grafikonon vagy táblázatban (felületterv: measurementsSection). Az
- * orvos a határvonalakat, a riasztást kiváltó méréseket és a kérdőív-pontszámot is
- * látja; a beteg csak a saját görbéit, értékelés nélkül. */
+ * orvos a határvonalakat (a szabályokból), a riasztást kiváltó méréseket (a
+ * riasztásokból) és a kérdőív-pontszámot is látja; a beteg csak a saját görbéit,
+ * értékelés nélkül (A8 D1). A `rulesError`: a szabálylista nem töltődött be, ezt a
+ * grafikon jelzi, nem rajzol csendben határ nélkül. */
 export function MeasurementCharts({
   patientId,
   doctor = false,
   alerts = [],
+  rules = [],
+  rulesError = false,
   submissions = [],
 }: {
   patientId: string
   doctor?: boolean
   alerts?: Alert[]
+  rules?: Rule[]
+  rulesError?: boolean
   submissions?: Submission[]
 }) {
   const { t } = useTranslation()
@@ -181,7 +183,7 @@ export function MeasurementCharts({
         .flatMap((e) => e.triggers.flatMap((tr) => (tr.measurement ? [tr.measurement.id] : []))),
     ),
   )
-  const bpThr = doctor ? thresholdsFor(alerts, 'blood_pressure') : []
+  const bpThr = doctor ? thresholdsFor(rules, 'blood_pressure') : []
   const groups = thresholdGroups(bpThr)
 
   const bpAll: BpPoint[] = ofType('blood_pressure').map((m) => ({
@@ -224,6 +226,7 @@ export function MeasurementCharts({
     <BpChart
       points={bpCurrent}
       thresholds={bpThr}
+      doctor={doctor}
       days={days}
       height={270}
       label={rangeLabel(t('measurementTypes.blood_pressure'))}
@@ -242,7 +245,7 @@ export function MeasurementCharts({
     const unit = t(`units.${unitCode}`)
     const title = t(`measurementTypes.${code}`)
     const thr = doctor
-      ? thresholdsFor(alerts, code).map((th) => ({ ...th, component: 'value' }))
+      ? thresholdsFor(rules, code).map((th) => ({ ...th, component: 'value' }))
       : []
     multiples.push(
       <div className="pd-card" key={code}>
@@ -374,6 +377,13 @@ export function MeasurementCharts({
               </span>
             )}
           </div>
+        )}
+        {/* Ha a szabálylista nem jött meg, a hiányzó vonal nem „nincs határ”-t jelent. */}
+        {doctor && rulesError && (
+          <span className="pd-err" role="alert">
+            <StatusIcon status="severe" size={14} />
+            {t('measurements.charts.limitsUnavailable')}
+          </span>
         )}
         {bpBody}
       </div>

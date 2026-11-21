@@ -19,6 +19,7 @@ from app.models.measurement import (
     MeasurementValue,
     not_superseded,
 )
+from app.models.note import Note
 from app.models.notification import Notification, NotificationType
 from app.models.questionnaire import (
     Answer,
@@ -54,6 +55,7 @@ __all__ = [
     "MeasurementComponent",
     "MeasurementType",
     "MeasurementValue",
+    "Note",
     "Notification",
     "NotificationType",
     "OccurrenceStatus",
