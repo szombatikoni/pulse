@@ -637,9 +637,11 @@ test('riasztás-életút, orvos: felelőshöz rendelés, lezárás indoklással 
   const nav = page.getByRole('navigation', { name: 'Menü' })
   await nav.getByRole('link', { name: /Betegeim/ }).click()
   await expect(page).toHaveURL(/\/doctor$/)
-  await page.locator('.pulse-prow').first().waitFor()
+  // A lista előbb a gyorsítótárból mutatja a lezárás előtti állapotot, és csak utána frissül.
+  await expect
+    .poll(async () => (await rowsText(page)).map((r) => r.split(' ')[0]))
+    .toEqual(['Súlyos', 'Adathiány', 'Kezelve', 'Rendben'])
   const rows = await rowsText(page)
-  expect(rows.map((r) => r.split(' ')[0])).toEqual(['Súlyos', 'Adathiány', 'Kezelve', 'Rendben'])
   expect(rows[2]).toContain('Szabó János')
   expect(rows[2]).toContain('Dr. Kovács Éva lezárta, megerősítő adat még nem érkezett')
   // Két lezárás ugyanattól az orvostól: az ok egyszer szerepel.
