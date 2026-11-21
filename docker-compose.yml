@@ -1,5 +1,5 @@
 # A PULSE teljes rendszere: adatbázis, backend (API), háttérfolyamat (worker),
-# CQL-szolgáltatás és frontend.
+# CQL-szolgáltatás, fejlesztői postafiók (Mailpit) és frontend.
 # Indítás a repó gyökeréből: docker compose up --build
 # A jelszavak csak helyi fejlesztésre valók; felülírhatók egy .env fájlban
 # (minta: .env.example).
@@ -62,6 +62,16 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pulse}:${POSTGRES_PASSWORD:-pulse}@db:5432/${POSTGRES_DB:-pulse}
       # Két ellenőrzés közti idő másodpercben (alapból óránként).
       OCCURRENCE_CHECK_INTERVAL_SECONDS: ${OCCURRENCE_CHECK_INTERVAL_SECONDS:-3600}
+      # E-mail az orvosnak új riasztásnál (M3, A9): a worker kézbesítő köre
+      # ennyi másodpercenként küldi a várakozó leveleket a Mailpitnek.
+      DELIVERY_INTERVAL_SECONDS: ${DELIVERY_INTERVAL_SECONDS:-30}
+      # Ha nincs megadva, a Mailpit; ha üresen van megadva (SMTP_HOST=), a
+      # küldés ki van kapcsolva, a sorok várnak. Ezért itt „-" és nem „:-".
+      SMTP_HOST: ${SMTP_HOST-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      MAIL_FROM: ${MAIL_FROM:-pulse@pulse.example}
+      # A levélbeli hivatkozás (…/doctor/alerts) címe: a frontend a saját gépen.
+      APP_BASE_URL: ${APP_BASE_URL:-http://127.0.0.1:8080}
     depends_on:
       api:
         # A migrációkat az API futtatja; a worker csak utána indul.
@@ -85,6 +95,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  mailpit:
+    # Fejlesztői és demó-postafiók (M3, A9): minden levelet elkap, valódi címre
+    # nem továbbít. A webes felülete csak a saját gépről érhető el
+    # (http://127.0.0.1:8025); az SMTP-port (1025) csak a compose belső
+    # hálózatán (mailpit:1025), a gép felé nem nyílik. Az image saját
+    # állapot-ellenőrzése (/mailpit readyz) miatt a --wait erre is vár.
+    # Nyilvános demóban a 8025-ös felület nem lehet nyilvános.
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "127.0.0.1:8025:8025"
 
   frontend:
     build: ./frontend

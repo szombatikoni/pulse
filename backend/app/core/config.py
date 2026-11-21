@@ -45,6 +45,22 @@ class Settings(BaseSettings):
     cql_service_url: str = "http://cql:8080"
     cql_timeout_seconds: PositiveFloat = 5.0
 
+    # Az orvosnak szóló e-mail-értesítés (M3, A9). SMTP_HOST üres = a küldés ki
+    # van kapcsolva: a kézbesítési sorok küldés nélkül várakoznak (pl. a pytest
+    # és a helyi futtatás alapból így megy). A compose a Mailpitre irányítja,
+    # amely valódi címre nem továbbít.
+    smtp_host: str = ""
+    smtp_port: PositiveInt = 1025
+    # A feladó címe (MAIL_FROM).
+    mail_from: str = "pulse@pulse.example"
+    # A felület címe a levélbeli hivatkozáshoz (APP_BASE_URL); az alapérték a
+    # compose frontendje a saját gépen.
+    app_base_url: str = "http://127.0.0.1:8080"
+    # A háttérfolyamat kézbesítő körei közti idő másodpercben
+    # (DELIVERY_INTERVAL_SECONDS): ennyi időnként ébred, és küldi a várakozó
+    # leveleket; az alkalom-ellenőrzés a saját ütemében marad.
+    delivery_interval_seconds: PositiveFloat = 30.0
+
     @property
     def tz(self) -> ZoneInfo:
         return ZoneInfo(self.timezone)

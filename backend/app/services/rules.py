@@ -44,6 +44,7 @@ from app.models import (
     Submission,
     not_superseded,
 )
+from app.services.deliveries import queue_alert_email
 from app.services.questionnaires import band_for
 from app.services.questionnaires import current_version as questionnaire_version
 
@@ -452,6 +453,9 @@ def _raise_alert(
         db.add(alert)
         db.flush()
         event_type = AlertEventType.CREATED
+        # Új riasztásnál e-mail az orvos(ok)nak (A9): a kézbesítési sor ebben a
+        # tranzakcióban születik, a küldés a commit után, a háttérfolyamatban.
+        queue_alert_email(db, alert, now)
     else:
         if SEVERITY_RANK[version.severity] > SEVERITY_RANK[alert.severity]:
             alert.severity = version.severity

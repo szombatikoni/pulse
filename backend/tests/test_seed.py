@@ -15,6 +15,7 @@ from app.models import (
     DoctorPatient,
     Measurement,
     MeasurementType,
+    NotificationDelivery,
     OccurrenceStatus,
     QuestionnaireTemplate,
     QuestionnaireVersion,
@@ -71,6 +72,19 @@ def test_seed_is_idempotent(db):
         "kitöltések",
     )
     assert not any(line.startswith(created) for line in second_run)
+
+
+def test_fresh_seed_queues_no_email(db):
+    # A mostani viselkedés rögzítése (A9): a frissen betöltött demóadat egyetlen
+    # e-mailt sem állít sorba. Ennek oka, hogy a címzett az új riasztás
+    # pillanatában érvényes összerendelésből jön, a seed összerendelései a
+    # valódi seedelési időtől érvényesek, a seedelt riasztások viszont
+    # visszadátumozottak (akkor még nem volt hozzárendelt orvos). Ha egy
+    # későbbi seed-módosítás után a seed leveleket kezdene küldeni, ez a teszt
+    # jelez (a döntés a hallgatóé: a seed küldjön-e levelet).
+    seed_demo_data(db)
+    assert count(db, Alert) > 0
+    assert count(db, NotificationDelivery) == 0
 
 
 def test_seed_opens_and_closes_occurrences_at_once(db):

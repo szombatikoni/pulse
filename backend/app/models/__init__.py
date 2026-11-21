@@ -21,6 +21,7 @@ from app.models.measurement import (
 )
 from app.models.note import Note
 from app.models.notification import Notification, NotificationType
+from app.models.notification_delivery import DeliveryKind, DeliveryStatus, NotificationDelivery
 from app.models.questionnaire import (
     Answer,
     Assignment,
@@ -47,6 +48,8 @@ __all__ = [
     "AssignmentOccurrence",
     "AssignmentTarget",
     "Base",
+    "DeliveryKind",
+    "DeliveryStatus",
     "DoctorPatient",
     "DoctorProfile",
     "Frequency",
@@ -57,6 +60,7 @@ __all__ = [
     "MeasurementValue",
     "Note",
     "Notification",
+    "NotificationDelivery",
     "NotificationType",
     "OccurrenceStatus",
     "PatientProfile",

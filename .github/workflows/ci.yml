@@ -99,6 +99,10 @@ jobs:
     name: Docker-image-ek és böngészős teszt
     runs-on: ubuntu-latest
     needs: [backend, frontend]
+    env:
+      # A worker kézbesítő köre itt 5 másodpercenként fut (alapból 30), hogy az
+      # e-mail-lépés ne várjon sokat; a compose ebből a változóból olvassa.
+      DELIVERY_INTERVAL_SECONDS: "5"
     steps:
       - uses: actions/checkout@v7
       # Ugyanaz az indítás, mint a README-ben: tiszta adatbázis, majd a demóadat.
@@ -124,6 +128,37 @@ jobs:
       - name: Böngészős folyamatteszt (a két M2-folyamat a felületen)
         working-directory: e2e
         run: npx playwright test
+      # Az e-mail-értesítés (M3, A9) a valódi konténerekkel: a böngészős teszt
+      # kérdőív-folyamatában Tóth Mária kritikus (13 pontos) kitöltése új, súlyos
+      # riasztást nyit. A seedben nincs kitöltése, így ez nem ismételt
+      # aktiválódás, és nem a seedből jön. A worker a levelet a Mailpitnek küldi
+      # Nagy doktornak (Tóth Mária orvosa); a lépés a Mailpit API-ján legfeljebb
+      # 90 másodpercig várja, majd ellenőrzi, hogy a levélben nincs betegnév, és
+      # a Riasztások oldalra mutat.
+      - name: E-mail-értesítés a Mailpitben (új riasztás után)
+        run: |
+          for i in $(seq 1 30); do
+            id=$(curl -fsS http://127.0.0.1:8025/api/v1/messages | jq -r '[.messages[]
+              | select(.Subject == "PULSE: új riasztás (Súlyos)")
+              | select(any(.To[]; .Address == "dr.nagy@pulse.example"))][0].ID // empty' || true)
+            if [ -n "$id" ]; then
+              text=$(curl -fsS "http://127.0.0.1:8025/api/v1/message/$id" | jq -r .Text)
+              echo "$text"
+              if ! echo "$text" | grep -q "/doctor/alerts"; then
+                echo "A levélből hiányzik a Riasztások oldal címe."
+                exit 1
+              fi
+              if echo "$text" | grep -q "Tóth"; then
+                echo "A levél betegnevet tartalmaz."
+                exit 1
+              fi
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Nem érkezett meg a levél a Mailpitbe."
+          curl -fsS http://127.0.0.1:8025/api/v1/messages | jq .
+          exit 1
       - name: Hiba esetén a képernyőképek és a nyomkövetés feltöltése
         if: failure()
         uses: actions/upload-artifact@v7

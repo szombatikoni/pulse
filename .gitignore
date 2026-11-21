@@ -219,6 +219,7 @@ __marimo__/
 
 # Local Claude context (not for the public repo)
 CLAUDE.md
+.claude/
 docs/email/
 
 # Office lock files
