@@ -6,8 +6,12 @@
   gap: 18px;
 }
 
-/* A táblázat itt kitölti a kártyát, és nem görget külön (a lista rövid). */
+/* A táblázat itt kitölti a kártyát, és nem görget külön (a lista rövid).
+   A relatív pozíció kell: enélkül az utolsó oszlopfej rejtett (abszolút
+   pozicionált) felirata kilóg a táblázat vízszintes vágásából, és telefonon az
+   egész oldalt szélesíti. */
 .ad-card .pd-tbl-wrap {
+  position: relative;
   max-height: none;
 }
 .ad-card .pd-tbl {

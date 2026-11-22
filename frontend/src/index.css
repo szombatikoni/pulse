@@ -259,6 +259,13 @@ body {
     font-size: 16px;
     min-height: 42px;
   }
+  /* Az alapméretű Mantine-gomb (méret nélkül 36 px) telefonon legalább 40 px magas,
+     bármilyen változatban (fő, másodlagos, harmadlagos), így az egy sorban álló
+     gombok egyforma magasak. A Mantine a data-size jelet csak megadott méretnél
+     teszi ki: a kifejezetten kisebb (xs) és nagyobb (md, lg) gomb marad, ahogy van. */
+  .mantine-Button-root:not([data-size]) {
+    min-height: 40px;
+  }
 }
 
 /* Előzmények: napokra bontott lista, az érték jobbra igazítva. */
