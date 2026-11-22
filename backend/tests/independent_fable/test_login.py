@@ -78,8 +78,9 @@ def _failure_signature(response) -> tuple:
 
 
 def test_failed_login_responses_are_indistinguishable(client, db: Session):
-    """Ismeretlen e-mail, rossz jelszó és letiltott fiók (jó és rossz jelszóval is):
-    ugyanaz a státusz, törzs és fejlécek."""
+    """Ismeretlen e-mail, rossz jelszó és letiltott fiók rossz jelszóval: ugyanaz a
+    státusz, törzs és fejlécek. A letiltott fiók HELYES jelszóval (M3, A1, a hallgató
+    döntése, 2026-11-21) külön választ kap: azt csak a jelszó ismerője kapja meg."""
     existing = make_patient(db)
     disabled = make_doctor(db, active=False)
 
@@ -91,12 +92,13 @@ def test_failed_login_responses_are_indistinguishable(client, db: Session):
     signatures = {
         "ismeretlen": _failure_signature(unknown),
         "rossz_jelszo": _failure_signature(wrong_pw),
-        "letiltott_jo_jelszo": _failure_signature(disabled_ok_pw),
         "letiltott_rossz_jelszo": _failure_signature(disabled_bad_pw),
     }
     for name, sig in signatures.items():
         assert sig[0] == 401, name
     assert len(set(map(repr, signatures.values()))) == 1, signatures
+    assert disabled_ok_pw.status_code == 403
+    assert disabled_ok_pw.json() == {"detail": {"code": "account_disabled"}}
 
 
 def test_failed_login_body_does_not_name_the_cause(client, db: Session):
@@ -112,7 +114,9 @@ def test_failed_login_body_does_not_name_the_cause(client, db: Session):
 
 def test_disabled_account_cannot_login_even_with_correct_password(client, db: Session):
     account = make_patient(db, active=False)
-    assert login(client, account.email, account.password).status_code == 401
+    response = login(client, account.email, account.password)
+    assert response.status_code == 403
+    assert "access_token" not in response.text
 
 
 def test_login_with_other_users_password_fails(client, db: Session):
@@ -197,7 +201,7 @@ def test_failed_login_does_not_overwrite_previous_last_login_at(client, db: Sess
 
 def test_disabled_account_login_attempt_does_not_set_last_login_at(client, db: Session):
     account = make_patient(db, active=False)
-    assert login(client, account.email, account.password).status_code == 401
+    assert login(client, account.email, account.password).status_code == 403
     db.refresh(account.user)
     assert account.user.last_login_at is None
 
@@ -262,7 +266,8 @@ def test_failed_login_sends_www_authenticate_bearer(client, db: Session):
     for response in (
         login(client, "senki@pulse-teszt.hu", DEFAULT_PASSWORD),
         login(client, existing.email, "rossz-jelszo-99"),
-        login(client, make_doctor(db, active=False).email, DEFAULT_PASSWORD),
+        # Letiltott fiók rossz jelszóval (helyes jelszóval 403, M3, A1).
+        login(client, make_doctor(db, active=False).email, "rossz-jelszo-99"),
     ):
         assert response.status_code == 401
         assert response.headers.get("www-authenticate") == "Bearer"

@@ -1,0 +1,29 @@
+/* „Letiltva" jel (M3, A1): semleges, körvonalas címke jellel és szóval; a teli,
+   színes státuszcímkétől szándékosan eltér. */
+.pulse-disabled-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--pulse-line-2);
+  color: var(--pulse-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+/* A beteglista névcellájában (rács) a név és az életkor alatt, balra zárva. */
+.c-name > .pulse-disabled-mark {
+  justify-self: start;
+  margin-top: 4px;
+}
+/* Az adatlap fejlécében a jel és a magyarázat egy sorban. */
+.pulse-disabled-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}

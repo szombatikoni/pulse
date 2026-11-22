@@ -7,6 +7,7 @@ import { Link, useNavigate } from 'react-router'
 
 import { type PatientStatus, type PatientSummary, useDoctorPatients } from '../../api/patients'
 import type { Task } from '../../api/tasks'
+import { DisabledMark } from '../../components/DisabledMark'
 import { StatusIcon, StatusLabel } from '../../components/StatusLabel'
 import { ageInYears, formatRelative, formatSoon, formatTime } from '../../format'
 import { reasonText, uniqueReasons } from './reasons'
@@ -123,6 +124,7 @@ function PatientRow({ p, loud }: { p: PatientSummary; loud?: boolean }) {
       <span className="c-name">
         <span className="pl-name">{p.name}</span>
         <span className="pl-age">{t('doctor.age', { age: ageInYears(p.birth_date) })}</span>
+        {!p.is_active && <DisabledMark />}
       </span>
       <span className="c-reason">
         <span className={p.status === 'ok' ? 'pl-r-main calm' : 'pl-r-main'}>

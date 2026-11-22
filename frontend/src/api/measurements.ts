@@ -50,7 +50,10 @@ export function useMeasurementTypes() {
   return useQuery({
     queryKey: ['measurement-types'],
     queryFn: () => apiGet<MeasurementType[]>('/measurement-types'),
-    staleTime: Infinity, // törzsadat, munkamenet közben nem változik
+    // Törzsadat, de a rögzíthető tartományt az admin módosíthatja (M3, A1): öt perc
+    // után (vagy az admin saját mentésekor) újratöltődik. A rögzítést a szerver
+    // mindig a friss tartománnyal ellenőrzi.
+    staleTime: 5 * 60 * 1000,
   })
 }
 

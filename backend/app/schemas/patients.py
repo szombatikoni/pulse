@@ -115,6 +115,9 @@ class PatientSummaryOut(BaseModel):
     id: uuid.UUID
     name: str
     birth_date: date
+    # A beteg fiókja aktív-e; letiltott betegnél a felület „Letiltva" jelet
+    # mutat, az alkalmai nem számítanak elmulasztottnak (M3, A1).
+    is_active: bool
     status: PatientStatus
     # Az összes fennálló ok, a státusz szerinti sorrendben; az első a státuszé.
     reasons: list[StatusReasonOut]
@@ -223,6 +226,7 @@ def patient_summary_out(
         id=patient.id,
         name=patient.name,
         birth_date=patient.birth_date,
+        is_active=patient.user.is_active,
         status=result.status,
         reasons=reasons,
         last_data_at=result.last_data_at,

@@ -87,6 +87,11 @@ function TaskCard({
   const frequency = t(`tasks.frequency.${task.frequency}`, { count: task.interval_days ?? 0 })
   const open = !!form
   const canCatchUp = !open && measurement && task.catch_up_until && task.catch_up_suggested_at
+  // Visszaengedélyezés napja (M3, A1): a mai határidő a letiltás alatt telt le, és a
+  // szerver az előző, letiltás előtti, még pótolható időszakot adja. Ezt az jelzi, hogy
+  // van pótlási ajánlat, de nincs „előző elmaradt" jelzés (máskor a kettő együtt jár).
+  // Ilyenkor csak a pótlás látszik: se állapotsor, se a mai időszakra mentő fő gomb.
+  const catchUpOnly = !!task.catch_up_until && !task.previous_missed
 
   let text: string
   if (task.state === 'done' && task.done_at) {
@@ -111,7 +116,7 @@ function TaskCard({
     task.state === 'done' ? Check : measurement ? (KIND_ICON[task.code] ?? Gauge) : ClipboardText
 
   const action =
-    task.state === 'done' || open ? null : measurement ? (
+    task.state === 'done' || open || catchUpOnly ? null : measurement ? (
       <Button size="lg" onClick={() => onRecord(task.code)}>
         {t('tasks.record')}
       </Button>
@@ -135,9 +140,11 @@ function TaskCard({
             {frequency} · {t('tasks.deadline', { when: formatSoon(t, task.due_at) })}
           </span>
         </h3>
-        <p className="ts">
-          <b>{t(`tasks.state.${task.state}`)}.</b> {text}
-        </p>
+        {!catchUpOnly && (
+          <p className="ts">
+            <b>{t(`tasks.state.${task.state}`)}.</b> {text}
+          </p>
+        )}
       </div>
       {action && <div className="pulse-task-actions">{action}</div>}
       {canCatchUp && (

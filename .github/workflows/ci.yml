@@ -125,12 +125,13 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
-      - name: Böngészős folyamatteszt (a két M2-folyamat a felületen)
+      - name: Böngészős folyamattesztek (M2-folyamatok, NICE, admin-felület, kérdőívszerkesztő, megjegyzés)
         working-directory: e2e
         run: npx playwright test
       # Az e-mail-értesítés (M3, A9) a valódi konténerekkel: a böngészős teszt
       # kérdőív-folyamatában Tóth Mária kritikus (13 pontos) kitöltése új, súlyos
-      # riasztást nyit. A seedben nincs kitöltése, így ez nem ismételt
+      # riasztást nyit (ugyanez a kitöltés egy közepeset is; a lépés a súlyosra
+      # szóló levelet keresi). A seedben nincs kitöltése, így ez nem ismételt
       # aktiválódás, és nem a seedből jön. A worker a levelet a Mailpitnek küldi
       # Nagy doktornak (Tóth Mária orvosa); a lépés a Mailpit API-ján legfeljebb
       # 90 másodpercig várja, majd ellenőrzi, hogy a levélben nincs betegnév, és

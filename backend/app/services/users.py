@@ -57,12 +57,22 @@ def record_login(db: Session, user: User) -> None:
     db.commit()
 
 
+class AccountDisabledError(Exception):
+    """Helyes e-mail és jelszó, de a fiók le van tiltva (M3, A1)."""
+
+
 def authenticate(db: Session, email: str, password: str) -> User | None:
     """A felhasználó, ha az e-mail és a jelszó helyes és a fiók aktív; különben None.
 
     Ismeretlen e-mailnél is lefut egy jelszó-ellenőrzés (DUMMY_HASH), így a
     sikertelen belépés ideje nem árulja el, létezik-e a fiók. A hívó minden
     sikertelen esetben ugyanazt a hibaüzenetet adja.
+
+    Kivétel (M3, A1): ha a jelszó HELYES, de a fiók le van tiltva,
+    AccountDisabledError. Ezt csak az tudhatja meg, aki ismeri a jelszót; rossz
+    jelszóval a letiltott fiók ugyanúgy None, mint bármely sikertelen belépés.
+    Így a letiltott felhasználó egyértelmű üzenetet kap, és a felület nem kéri
+    tőle újra és újra a jelszót.
     """
     user = get_user_by_email(db, email)
     if user is None:
@@ -71,5 +81,5 @@ def authenticate(db: Session, email: str, password: str) -> User | None:
     if not verify_password(password, user.password_hash):
         return None
     if not user.is_active:
-        return None
+        raise AccountDisabledError
     return user

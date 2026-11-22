@@ -16,12 +16,16 @@ Az Adathiány okai (M3, A4 2. lépés, a hallgató döntése):
   háttérfolyamat zárja. A késve teljesített (pótolt) alkalom nem elmulasztott.
   A visszavont, lejárt és még el nem kezdett előírás nem számít: az
   előírás-módosítás (visszavonás + új előírás) után a régi elmulasztása nem
-  ragad a betegen;
+  ragad a betegen. A letiltott időszakba eső határidejű, nem teljesített
+  alkalom sem számít (M3, A1; services/disabled.py), sor nélkül sem: ilyenkor az
+  előtte lévő, nem kimentett alkalom a legutóbbi lezárt;
 - még nem érkezett adat: se mérés, se kitöltés ("no_data_yet");
 - nincs friss adat ("stale_data"): csak ha a betegnek nincs lezárt alkalma
   érvényes előíráson (nincs előírása, vagy az első határidő még nem járt le).
   Ilyenkor a legutóbbi mérés vagy kitöltés legfeljebb 7 napos lehet
-  (rendszerszintű beállítás, data_freshness_days). Ahol már van lezárt
+  (rendszerszintű beállítás, data_freshness_days); a letiltott időszak ebbe
+  nem számít bele (M3, A1; a hallgató döntése, 2026-11-21: az adat kora a
+  letiltott időszakok átfedésével csökken). Ahol már van lezárt
   alkalom, a frissességet az alkalmak teljesítése adja: a havi előírását
   rendben teljesítő beteg 20 napos méréssel is Rendben.
 
@@ -89,7 +93,13 @@ from app.models import (
 )
 from app.services.access import assigned_patients_query
 from app.services.alerts import list_patient_alerts
-from app.services.occurrences import latest_lapsed_period, valid_on
+from app.services.disabled import (
+    disabled_overlap,
+    disabled_periods,
+    excused_due,
+    is_excused,
+)
+from app.services.occurrences import latest_lapsed_period, previous_period, valid_on
 from app.services.questionnaires import band_for
 from app.services.rules import (
     MissingDataParams,
@@ -181,6 +191,12 @@ def latest_closed_occurrences(
                 AssignmentOccurrence.status != OccurrenceStatus.DUE,
                 AssignmentOccurrence.due_at < now,
             ),
+            # A letiltott időszakba eső határidejű, esedékes alkalom nem lezárt (A1).
+            ~excused_due(
+                AssignmentOccurrence.status == OccurrenceStatus.DUE,
+                Assignment.patient_id,
+                AssignmentOccurrence.due_at,
+            ),
         )
         # PostgreSQL DISTINCT ON: előírásonként a legkésőbbi határidejű sor.
         .ext(distinct_on(AssignmentOccurrence.assignment_id))
@@ -218,9 +234,13 @@ def lapsed_without_row(
         )
     ).all()
     latest_stored = {o.assignment_id: o.due_at for o in stored}
+    excused_periods = disabled_periods(db, patient_id)
     lapsed = {}
     for assignment in assignments:
         period = latest_lapsed_period(assignment, now)
+        # A letiltott időszakba eső határidő kimarad: az előtte lévő időszak számít (A1).
+        while period is not None and is_excused(excused_periods, period.due_at):
+            period = previous_period(assignment, period)
         if period is None:
             continue
         known = latest_stored.get(assignment.id)
@@ -367,6 +387,14 @@ def handled_reasons(
     return reasons
 
 
+def data_age(db: Session, patient_id: uuid.UUID, last: datetime, now: datetime) -> timedelta:
+    """A legutóbbi adat kora a frissességi szabályhoz: now - last, a letiltott
+    időszakok [last, now]-ba eső része nélkül (a nyitott időszak mostanáig tart).
+    Így letiltva az adat nem öregszik, visszaengedélyezés után pedig ott folytatódik,
+    ahol a letiltáskor tartott (M3, A1). Sosem letiltott betegnél now - last."""
+    return now - last - disabled_overlap(disabled_periods(db, patient_id), last, now)
+
+
 def compute_status(
     db: Session, patient_id: uuid.UUID, now: datetime | None = None
 ) -> PatientStatusResult:
@@ -408,7 +436,9 @@ def compute_status(
     last = last_data_at(db, patient_id)
     if last is None:
         reasons.append(StatusReason(PatientStatus.NO_DATA, "no_data_yet"))
-    elif not closed and last < now - timedelta(days=settings.data_freshness_days):
+    elif not closed and data_age(db, patient_id, last, now) > timedelta(
+        days=settings.data_freshness_days
+    ):
         # A 7 napos szabály csak lezárt alkalom nélkül él (lásd a modul leírását).
         reasons.append(StatusReason(PatientStatus.NO_DATA, "stale_data", at=last))
 

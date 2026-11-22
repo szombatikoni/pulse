@@ -24,6 +24,14 @@ export function expireSession(): void {
   window.location.replace(`/login?expired=1&next=${encodeURIComponent(next)}`)
 }
 
+/** A fiókot letiltották (M3, A1): kijelentkeztetés, és a belépőoldalra a letiltás
+ * üzenetével (visszatérési cím nélkül, hiszen belépni úgysem tud). Az oldal
+ * újratöltődik, mint az expireSession-nél. */
+export function showAccountDisabled(): void {
+  clearToken()
+  window.location.replace('/login?disabled=1')
+}
+
 /** Újrabelépés helyben (M3, A8 D3): a bejelentkezett oldalak kerete beállít egy
  * kezelőt, amely megnyitja az újrabelépő ablakot, és akkor teljesül, amikor
  * ugyanaz a felhasználó újra belépett. Ha nincs kezelő (pl. az első betöltésnél,
@@ -87,8 +95,17 @@ async function request<T>(
   return (await response.json()) as T
 }
 
+/** A belépés elutasítva, mert a fiók le van tiltva (M3, A1). A szerver ezt csak helyes
+ * jelszó mellett jelzi (403, detail.code: account_disabled). */
+export function accountDisabled(error: ApiError): boolean {
+  const detail = error.detail as { code?: string } | null | undefined
+  return error.status === 403 && detail?.code === 'account_disabled'
+}
+
 export const apiGet = <T>(path: string) => request<T>('GET', path)
 export const apiPost = <T>(path: string, body: unknown) => request<T>('POST', path, body)
+export const apiPatch = <T>(path: string, body: unknown) => request<T>('PATCH', path, body)
+export const apiPut = <T>(path: string, body: unknown) => request<T>('PUT', path, body)
 /** Lekérés egy megadott tokennel (az újrabelépés ellenőrzéséhez, mielőtt a token a
  * tárolóba kerülne). A 401 itt nem nyit újrabelépő ablakot. */
 export const apiGetWithToken = <T>(path: string, token: string) =>

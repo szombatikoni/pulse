@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, func, text
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, String, func, text
 from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -93,5 +93,36 @@ class DoctorPatient(Base):
             (func.tstzrange(text("valid_from"), text("valid_to"), "[)"), "&&"),
             name="ex_doctor_patients_no_overlap",
             using="gist",
+        ),
+    )
+
+
+class UserDisabledPeriod(Base):
+    """Egy letiltott időszak (M3, A1): [disabled_at, enabled_at); üres
+    enabled_at = most is tart. A belépést továbbra is a User.is_active dönti
+    el; a kettőt a szolgáltatás egy tranzakcióban tartja összhangban
+    (services/admin.py): aktív felhasználónak nincs nyitott sora, letiltottnak
+    pontosan egy van.
+
+    Betegnél ez az elmaradt adat számolásához kell (a hallgató döntése,
+    2026-11-16): az az alkalom, amelynek határideje egy letiltott időszakba
+    esik, nem számít elmulasztottnak, utólag sem (services/disabled.py). A
+    letiltás előtti és utáni adatok, alkalmak és riasztások változatlanok."""
+
+    __tablename__ = "user_disabled_periods"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    disabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint("enabled_at IS NULL OR enabled_at > disabled_at", name="valid_period"),
+        # Felhasználónként legfeljebb egy nyitott (még tartó) letiltás.
+        Index(
+            "uq_user_disabled_periods_open",
+            "user_id",
+            unique=True,
+            postgresql_where=text("enabled_at IS NULL"),
         ),
     )

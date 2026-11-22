@@ -30,7 +30,7 @@ from app.models import (
 )
 from app.services import deliveries, mailer
 from app.services.alerts import close_alert
-from app.services.deliveries import alert_email, deliver_due
+from app.services.deliveries import alert_email, deliver_due, hungarian_datetime
 from app.services.measurements import correct_measurement, get_type_by_code
 from app.services.occurrences import run_occurrence_check
 from app.services.questionnaires import (
@@ -507,7 +507,8 @@ def test_email_has_severity_time_link_and_disclaimer_but_no_patient_data(db, set
 
     assert subject == "PULSE: új riasztás (Súlyos)"
     assert "Súlyosság: Súlyos" in body
-    assert "2026. 10. 12. 10:00" in body  # 8:00 UTC, Budapesten nyári időszámítás
+    # 8:00 UTC, Budapesten nyári időszámítás; a hónap neve a területi beállítástól független.
+    assert "Időpont: 2026. október 12. 10:00 (magyar idő szerint)\n" in body
     assert "https://pulse.test/doctor/alerts" in body
     for phrase in ("demonstrációs", "automatikus", "mesterséges", "nem orvosi eszköz"):
         assert phrase in body
@@ -537,6 +538,19 @@ def test_email_has_severity_time_link_and_disclaimer_but_no_patient_data(db, set
     for fragment in forbidden:
         assert fragment not in subject, fragment
         assert fragment not in body, fragment
+
+
+@pytest.mark.parametrize(
+    ("at", "text"),
+    [
+        (datetime(2026, 1, 5, 7, 3, tzinfo=UTC), "2026. január 5. 08:03"),  # téli idő
+        (datetime(2026, 10, 25, 1, 30, tzinfo=UTC), "2026. október 25. 02:30"),  # átállás
+        (datetime(2026, 12, 31, 23, 0, tzinfo=UTC), "2027. január 1. 00:00"),  # évváltás
+        (datetime(2026, 5, 9, 22, 59, tzinfo=UTC), "2026. május 10. 00:59"),
+    ],
+)
+def test_hungarian_datetime(at, text):
+    assert hungarian_datetime(at) == text
 
 
 def test_moderate_severity_label():

@@ -13,6 +13,7 @@ import { useQuestionnaireTemplates } from '../../api/plans'
 import { usePatientSubmissions } from '../../api/questionnaires'
 import { usePatientRules } from '../../api/rules'
 import type { Task } from '../../api/tasks'
+import { DisabledMark } from '../../components/DisabledMark'
 import { StatusIcon, StatusLabel } from '../../components/StatusLabel'
 import { ageInYears, formatRelative, formatSoon, formatUntil } from '../../format'
 import i18n from '../../i18n'
@@ -57,7 +58,7 @@ function useMarkSeen(patientId: string, alerts: Alert[] | undefined) {
 /** A teendők teljesítése az orvos szemszögéből: mi kész, mi esedékes, mi maradt el.
  * A terv 30 napos sávja napi előzményt kívánna; a végpont csak az aktuális
  * időszakot adja, ezért itt az előírásonkénti állapot látszik. */
-function TaskProgress({ tasks }: { tasks: Task[] }) {
+function TaskProgress({ tasks, disabled }: { tasks: Task[]; disabled: boolean }) {
   const { t } = useTranslation()
   return (
     <section className="pd-card" aria-labelledby="pd-h-tasks">
@@ -70,7 +71,9 @@ function TaskProgress({ tasks }: { tasks: Task[] }) {
         </div>
       </div>
       {tasks.length === 0 ? (
-        <p className="pd-muted">{t('doctor.noTasks')}</p>
+        // Letiltott betegnél a szerver nem ad teendőt (M3, A1): az előírásai a
+        // követési tervben látszanak, de amíg le van tiltva, nem számítanak.
+        <p className="pd-muted">{t(disabled ? 'account.noTasks' : 'doctor.noTasks')}</p>
       ) : (
         <div className="pd-adh">
           {tasks.map((task) => {
@@ -230,6 +233,14 @@ export function PatientDetailPage() {
           <StatusLabel status={p.status} />
           <span className="why">{sentence}</span>
         </div>
+        {!p.is_active && (
+          // Letiltott beteg (M3, A1): a korábbi adatai látszanak, az elmaradt adatai
+          // nem számítanak elmulasztottnak.
+          <div className="pulse-disabled-row">
+            <DisabledMark />
+            <span className="pd-meta">{t('account.disabledHint')}</span>
+          </div>
+        )}
       </header>
 
       <div className="pd-tabs" role="tablist" aria-label={t('doctor.detail.tabsLabel')}>
@@ -305,7 +316,7 @@ export function PatientDetailPage() {
               />
             </div>
             <div className="pd-stack-lg">
-              <TaskProgress tasks={p.tasks ?? []} />
+              <TaskProgress tasks={p.tasks ?? []} disabled={!p.is_active} />
               <CarePlan patientId={patientId} />
               <SubmissionHistory patientId={patientId} />
               <NotesCard

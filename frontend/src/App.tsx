@@ -1,13 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 
 import { RequireAuth, RootRedirect } from './auth/RequireAuth'
+import { AdminPage } from './features/admin/AdminPage'
 import { LoginPage } from './features/auth/LoginPage'
 import { DoctorAlertsPage } from './features/doctor/DoctorAlertsPage'
 import { DoctorPatientsPage } from './features/doctor/DoctorPatientsPage'
 import { PatientDetailPage } from './features/doctor/PatientDetailPage'
 import { QuestionnaireEditorPage } from './features/doctor/QuestionnaireEditorPage'
 import { QuestionnairesPage } from './features/doctor/QuestionnairesPage'
-import { RoleHomePage } from './features/home/RoleHomePage'
 import { PatientHistoryPage } from './features/patient/PatientHistoryPage'
 import { PatientHomePage } from './features/patient/PatientHomePage'
 import { QuestionnairePage } from './features/patient/QuestionnairePage'
@@ -39,7 +39,7 @@ export default function App() {
           />
         </Route>
         <Route element={<RequireAuth role="admin" />}>
-          <Route path="/admin" element={<RoleHomePage role="admin" />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 
 import { currentUserQuery, HOME_BY_ROLE, login, type Role } from '../../api/auth'
-import { ApiError } from '../../api/client'
+import { accountDisabled, ApiError } from '../../api/client'
 import { getToken, setToken } from '../../auth/token'
 import './login.css'
 
@@ -41,12 +41,17 @@ export function LoginPage() {
   const queryClient = useQueryClient()
   const [params] = useSearchParams()
   const expired = params.get('expired') === '1'
+  // A letiltott fiók újrabelépő ablakából érkezett (M3, A1): rögtön a letiltás üzenete.
+  const disabledParam = params.get('disabled') === '1'
   const next = safeNext(params.get('next'))
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // Egy belépési kísérlet után már csak annak eredménye látszik, az érkezéskori
+  // üzenet (lejárt munkamenet, letiltott fiók) nem.
+  const [attempted, setAttempted] = useState(false)
 
   // Aki már be van jelentkezve, annak nem kell újra belépnie.
   if (getToken() !== null && !expired) return <Navigate to="/" replace />
@@ -54,6 +59,7 @@ export function LoginPage() {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
+    setAttempted(true)
     setSubmitting(true)
     try {
       setToken(await login(email, password))
@@ -61,7 +67,9 @@ export function LoginPage() {
       navigate(next ?? HOME_BY_ROLE[me.role], { replace: true })
     } catch (err) {
       const rejected = err instanceof ApiError && (err.status === 401 || err.status === 422)
-      setError(t(rejected ? 'login.invalid' : 'errors.unavailable'))
+      // A letiltott fiók (M3, A1) külön üzenetet kap; a szerver ezt csak helyes jelszóra adja.
+      const disabled = err instanceof ApiError && accountDisabled(err)
+      setError(t(disabled ? 'login.disabled' : rejected ? 'login.invalid' : 'errors.unavailable'))
     } finally {
       setSubmitting(false)
     }
@@ -86,7 +94,10 @@ export function LoginPage() {
             <Title order={2}>{t('login.title')}</Title>
             <p className="lg-meta">{t('login.subtitle')}</p>
           </div>
-          {expired && <Alert color="yellow">{t('login.expired')}</Alert>}
+          {!attempted && disabledParam && <Alert color="red">{t('login.disabled')}</Alert>}
+          {!attempted && !disabledParam && expired && (
+            <Alert color="yellow">{t('login.expired')}</Alert>
+          )}
           {error && <Alert color="red">{error}</Alert>}
           <TextInput
             label={t('login.email')}

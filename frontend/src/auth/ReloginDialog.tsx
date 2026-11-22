@@ -4,7 +4,14 @@ import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { type CurrentUser, login } from '../api/auth'
-import { ApiError, apiGetWithToken, expireSession, setReloginHandler } from '../api/client'
+import {
+  accountDisabled,
+  ApiError,
+  apiGetWithToken,
+  expireSession,
+  setReloginHandler,
+  showAccountDisabled,
+} from '../api/client'
 import './relogin.css'
 import { setToken } from './token'
 
@@ -19,9 +26,13 @@ import { setToken } from './token'
  * Mentést; a közben megakadt lekérdezések maguktól lefutnak. */
 // Az Esc ne zárja be az alatta nyitott ablakot (pl. a riasztás lezárását): a Mantine
 // ablakai az Esc-et az ablakon (window) figyelik, és kihagyják, ha a lenyomás célelemén
-// ez a jelölés van. Az újrabelépő ablak fókuszcsapdája miatt a cél mindig az ablak
-// tartalma vagy egy mezője, gombja, ezért mindegyik megkapja.
-const STOP_ESCAPE = { 'data-mantine-stop-propagation': 'true' } as const
+// ez a jelölés van. A cél általában az ablak tartalma vagy egy mezője, gombja, ezért
+// ezek megkapják; ha a fókusz mégis a <body>-ra kerül (pl. kattintás az elmosott
+// háttérre, vagy a betöltés alatt letiltott gomb után), a jelölés nyitott ablaknál a
+// <body>-n is ott van (lásd a hatást lent), és sikertelen belépés után a fókusz
+// visszakerül a jelszómezőre.
+const STOP_ESCAPE_ATTR = 'data-mantine-stop-propagation'
+const STOP_ESCAPE = { [STOP_ESCAPE_ATTR]: 'true' } as const
 
 export function ReloginDialog({ user }: { user: CurrentUser }) {
   const { t } = useTranslation()
@@ -30,6 +41,7 @@ export function ReloginDialog({ user }: { user: CurrentUser }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const passwordRef = useRef<HTMLInputElement>(null)
   // A várakozó lekérdezések közös ígérete: az újrabelépéskor teljesül.
   const waiting = useRef<{
     promise: Promise<void>
@@ -46,6 +58,9 @@ export function ReloginDialog({ user }: { user: CurrentUser }) {
           resolve = res
           reject = rej
         })
+        // Ha az ablak lebomlik, és épp nincs várakozó lekérdezés, az elutasítás ne
+        // legyen kezeletlen (a várakozók a saját águkon továbbra is megkapják).
+        promise.catch(() => {})
         waiting.current = { promise, resolve, reject }
         setPassword('')
         setError(null)
@@ -61,6 +76,16 @@ export function ReloginDialog({ user }: { user: CurrentUser }) {
       waiting.current = null
     }
   }, [])
+
+  // Nyitott ablaknál a <body> is megkapja az Esc-jelölést (lásd fent); bezáráskor és
+  // lebontáskor lekerül, ha mi tettük fel.
+  useEffect(() => {
+    if (!opened) return
+    const body = document.body
+    if (body.getAttribute(STOP_ESCAPE_ATTR) === 'true') return
+    body.setAttribute(STOP_ESCAPE_ATTR, 'true')
+    return () => body.removeAttribute(STOP_ESCAPE_ATTR)
+  }, [opened])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -84,9 +109,19 @@ export function ReloginDialog({ user }: { user: CurrentUser }) {
       // (a verziószámhoz kötött vázlat elveszne, ha közben más orvos mentett).
       void queryClient.invalidateQueries({ predicate: (q) => q.state.status === 'error' })
     } catch (err) {
+      // A fiókot közben letiltották (M3, A1): a szerver ezt csak helyes jelszóra
+      // árulja el. Itt nincs mit újra próbálni: a belépőoldalra a letiltás üzenetével,
+      // újratöltéssel (a régi adatok nem maradnak a háttérben).
+      if (err instanceof ApiError && accountDisabled(err)) {
+        showAccountDisabled()
+        return
+      }
       // Az e-mail-cím rögzített, ezért a 401 (és a 422) csak a jelszó hibája lehet.
       const rejected = err instanceof ApiError && (err.status === 401 || err.status === 422)
       setError(t(rejected ? 'session.invalidPassword' : 'errors.unavailable'))
+      // A fókusz a jelszómezőre (a betöltés alatt letiltott gomb után a <body>-n
+      // maradna).
+      passwordRef.current?.focus()
     } finally {
       setSubmitting(false)
     }
@@ -131,6 +166,7 @@ export function ReloginDialog({ user }: { user: CurrentUser }) {
           required
           value={password}
           onChange={(e) => setPassword(e.currentTarget.value)}
+          ref={passwordRef}
           visibilityToggleButtonProps={STOP_ESCAPE}
           data-autofocus
           {...STOP_ESCAPE}

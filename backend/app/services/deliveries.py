@@ -47,6 +47,23 @@ RETRY_DELAYS = (timedelta(minutes=1), timedelta(minutes=5))
 # Egy kézbesítő kör legfeljebb ennyi sort dolgoz fel (a maradék a következő körre marad).
 ROUND_LIMIT = 100
 
+# A hónapok magyar neve a levél időpontjához, a rendszer területi beállításától
+# (locale) függetlenül (a hallgató döntése, 2026-11-21).
+HU_MONTHS = (
+    "január",
+    "február",
+    "március",
+    "április",
+    "május",
+    "június",
+    "július",
+    "augusztus",
+    "szeptember",
+    "október",
+    "november",
+    "december",
+)
+
 # A súlyosság a felület szóhasználatával (a szabályszerkesztő „Súlyosság" mezője).
 SEVERITY_LABELS = {Severity.MODERATE: "Közepes", Severity.SEVERE: "Súlyos"}
 
@@ -77,18 +94,25 @@ def queue_alert_email(db: Session, alert: Alert, now: datetime) -> list[Notifica
     return rows
 
 
+def hungarian_datetime(at: datetime) -> str:
+    """Időpont a rendszer időzónájában (Europe/Budapest), magyar írásmóddal, pl.
+    „2026. október 12. 10:00" (a nap kezdő nulla nélkül)."""
+    local = at.astimezone(settings.tz)
+    return f"{local.year}. {HU_MONTHS[local.month - 1]} {local.day}. {local:%H:%M}"
+
+
 def alert_email(alert: Alert) -> tuple[str, str]:
     """A levél tárgya és törzse, betegadat nélkül (D4). Az időpont a rendszer
-    időzónájában (Europe/Budapest), magyar írásmóddal."""
+    időzónájában (Europe/Budapest), magyar írásmóddal (hungarian_datetime)."""
     severity = SEVERITY_LABELS[alert.severity]
-    when = alert.created_at.astimezone(settings.tz).strftime("%Y. %m. %d. %H:%M")
+    when = hungarian_datetime(alert.created_at)
     link = f"{settings.app_base_url.rstrip('/')}/doctor/alerts"
     subject = f"PULSE: új riasztás ({severity})"
     body = (
         "Egy betegénél új riasztás keletkezett.\n"
         "\n"
         f"Súlyosság: {severity}\n"
-        f"Időpont: {when} (magyar idő)\n"
+        f"Időpont: {when} (magyar idő szerint)\n"
         "\n"
         f"A részletek bejelentkezés után: {link}\n"
         "\n"
@@ -186,7 +210,10 @@ def deliver_due(
     a hívóé" szokásától): a zár csak az épp küldött soron van, egy későbbi sor
     hibája nem görgeti vissza a már elküldöttek állapotát, és egy megszakadt
     kör legfeljebb egy levelet ismételhet meg. A sikertelen sor
-    next_attempt_at-je a jövőbe kerül, így ugyanebben a körben nem jön újra."""
+    next_attempt_at-je a jövőbe kerül (RETRY_DELAYS), így rögzített `now`
+    mellett ugyanebben a körben nem jön újra; `now=None` esetén csak akkor,
+    ha a kör tovább tart, mint a várakozás (akkor is legfeljebb a kísérletek
+    számáig, és a kör legfeljebb ROUND_LIMIT sort dolgoz fel)."""
     result = DeliveryRound()
     for _ in range(limit):
         at = now or datetime.now(UTC)

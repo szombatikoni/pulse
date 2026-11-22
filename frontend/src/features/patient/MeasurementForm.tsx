@@ -1,5 +1,6 @@
 import { Button, NumberInput, Stack, Text, TextInput, VisuallyHidden } from '@mantine/core'
 import { Clock, Drop, Gauge, Heart, type Icon, Scales } from '@phosphor-icons/react'
+import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -77,6 +78,7 @@ export function MeasurementForm({
 }) {
   const { t, i18n } = useTranslation()
   const types = useMeasurementTypes()
+  const queryClient = useQueryClient()
   const record = useRecordMeasurement(patientId)
   const correct = useCorrectMeasurement(patientId)
   const [typeCode, setTypeCode] = useState(
@@ -110,6 +112,10 @@ export function MeasurementForm({
     }
     if (error instanceof ApiError && error.status === 422 && error.detail) {
       const detail = error.detail as MeasurementErrorDetail
+      // A tartományt közben az admin módosíthatta (M3, A1): a mezők határa frissüljön.
+      if (detail.code === 'out_of_range') {
+        void queryClient.invalidateQueries({ queryKey: ['measurement-types'] })
+      }
       const component = detail.component ? componentLabel(t, typeCode, detail.component) : ''
       const text = t(`measurements.errors.${detail.code}`, {
         component,

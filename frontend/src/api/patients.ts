@@ -117,6 +117,9 @@ export type PatientSummary = {
   id: string
   name: string
   birth_date: string
+  /** A beteg fiókja aktív-e; letiltva „Letiltva" jel, és az alkalmai nem számítanak
+   * elmulasztottnak (M3, A1). */
+  is_active: boolean
   status: PatientStatus
   reasons: StatusReason[]
   /** A legutóbbi adat (mérés vagy kérdőív-kitöltés) ideje. */

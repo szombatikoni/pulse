@@ -16,7 +16,12 @@ dolgozik:
   időszakába; teljesítve, ha a rögzítés a határidőig történt, különben késve;
 - elmulasztva: mérésnél az időszak vége + 48 óra (a visszadátumozás határa,
   MAX_BACKDATE, abszolút időben, lásd catch_up_deadline) után, kérdőívnél az
-  időszak vége után azonnal.
+  időszak vége után azonnal;
+- a letiltott beteg (M3, A1): az az alkalom, amelynek határideje egy letiltott
+  időszakba esik, nem nyílik meg, és nem lesz elmulasztott (a már nyitott
+  esedékes sora a pótlási ablak végén törlődik); a letiltás előtti határidejű
+  alkalma a szokásos időben elmulasztottra zárul, de letiltott betegnél nincs
+  elmaradt adat riasztás (services/disabled.py).
 
 A véglegesítést (commit) a hívó végzi, mint a mérésnél és a kitöltésnél.
 """
@@ -26,7 +31,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import ColumnElement, or_, select, update
+from sqlalchemy import ColumnElement, delete, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, joinedload
 
@@ -42,6 +47,7 @@ from app.models import (
     QuestionnaireVersion,
     Submission,
 )
+from app.services.disabled import disabled_periods_by_patient, is_excused, overlaps
 from app.services.measurements import MAX_BACKDATE
 from app.services.questionnaires import current_version
 from app.services.rules import MissedTarget, evaluate_missed
@@ -122,6 +128,13 @@ def latest_lapsed_period(assignment: Assignment, now: datetime) -> Period | None
     period = period_containing(assignment, now.astimezone(settings.tz).date())
     if period.due_at < now:
         return period
+    if period.first_day <= assignment.start_date:
+        return None
+    return period_containing(assignment, period.first_day - timedelta(days=1))
+
+
+def previous_period(assignment: Assignment, period: Period) -> Period | None:
+    """Az előírás előző időszaka, vagy None, ha ez az első."""
     if period.first_day <= assignment.start_date:
         return None
     return period_containing(assignment, period.first_day - timedelta(days=1))
@@ -273,6 +286,9 @@ def open_due_occurrences(db: Session, now: datetime) -> int:
             .order_by(Assignment.id)
         )
     )
+    # Kimentett (letiltott időszakba eső) határidejű időszakra nem nyit (A1); a
+    # letiltott beteg letiltás előtti határidejű időszakára igen (az számít).
+    disabled = disabled_periods_by_patient(db, (a.patient_id for a in assignments))
     # A meglévő alkalmak egy lekérdezéssel, nem időszakonként külön: a
     # visszamenőleges nyitásnál egy előírásnak sok múltbeli időszaka lehet.
     existing = {
@@ -286,10 +302,12 @@ def open_due_occurrences(db: Session, now: datetime) -> int:
     opened = 0
     for assignment in assignments:
         last_day = min(today, assignment.end_date) if assignment.end_date else today
+        excused_periods = disabled.get(assignment.patient_id, [])
         missing = [
             period
             for period in periods_until(assignment, last_day)
             if (assignment.id, period.due_at) not in existing
+            and not is_excused(excused_periods, period.due_at)
         ]
         if not missing:
             continue
@@ -316,6 +334,31 @@ def close_missed_occurrences(db: Session, now: datetime) -> int:
     expired = [o for o in candidates if now >= missed_from(o)]
     if not expired:
         return 0
+    # Letiltott beteg (A1, services/disabled.py): a kimentett határidejű
+    # (letiltott időszakba eső) esedékes alkalom nem lesz elmulasztott; a
+    # kötelezettség megszűnt, ezért törlődik (mint visszavonáskor, plans.py),
+    # így nem marad örökre esedékes. A letiltás előtti határidejű alkalom a
+    # szokásos időben (letiltva is) elmulasztottra zárul; riasztás belőle lásd lent.
+    patient_ids = {o.assignment.patient_id for o in expired}
+    disabled = disabled_periods_by_patient(db, patient_ids)
+    excused = [
+        o for o in expired if is_excused(disabled.get(o.assignment.patient_id, []), o.due_at)
+    ]
+    if excused:
+        db.execute(
+            delete(AssignmentOccurrence)
+            .where(
+                AssignmentOccurrence.id.in_([o.id for o in excused]),
+                AssignmentOccurrence.status == OccurrenceStatus.DUE,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        for occurrence in excused:
+            db.expunge(occurrence)
+    excused_ids = {o.id for o in excused}
+    expired = [o for o in expired if o.id not in excused_ids]
+    if not expired:
+        return 0
     # Feltételes zárás (review k1): a kijelölés és a zárás között egy egyidejű
     # mentés teljesítheti az alkalmat. Feltétel nélküli UPDATE-nél ez a
     # fulfilled_at CHECK-en integritáshibát adna, és a teljes futás (a most
@@ -335,6 +378,14 @@ def close_missed_occurrences(db: Session, now: datetime) -> int:
         )
     )
     # Csak a ténylegesen most lezártak célpontjai (a közben teljesítettek nem).
+    # Letiltott betegnél nincs elmaradt adat riasztás (és így e-mail sem, A9): ha a
+    # beteg valamelyik letiltott időszaka átfedi a [pótlási idő vége, most]
+    # szakaszt (most is le van tiltva, a pótlási idő letiltva járt le, vagy a
+    # lejárat és ez a futás között le volt tiltva), a lezárás nem értékel. Így a
+    # háttérfolyamat ütemezésétől független: visszaengedélyezéskor sem keletkezik
+    # utólag riasztás a letiltás alatt lejárt elmulasztásokból. Az elmulasztott sor viszont
+    # megmarad, és egy későbbi (visszaengedélyezés utáni) elmulasztás sorozatában
+    # számít (a hallgató döntése, 2026-11-21).
     targets = {
         MissedTarget(
             patient_id=o.assignment.patient_id,
@@ -343,6 +394,7 @@ def close_missed_occurrences(db: Session, now: datetime) -> int:
         )
         for o in expired
         if o.id in closed
+        and not overlaps(disabled.get(o.assignment.patient_id, []), missed_from(o), now)
     }
     # A betöltött példányok státusza elavult; a következő hozzáférés újraolvassa.
     for occurrence in expired:
