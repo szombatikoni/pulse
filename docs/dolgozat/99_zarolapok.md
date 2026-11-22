@@ -32,4 +32,5 @@ Aláírás
 
 A rendszer forráskódja, a tervezési dokumentumok és az AI-használati napló a
 https://github.com/szombatikoni/pulse nyilvános repó `develop` ágán érhetők
-el.
+el. A követési terv teljes, 38 soros FHIR-leképezési táblázata és a hozzá
+tartozó példa az `integration/FHIR_lekepezes.md` fájlban van.

@@ -139,7 +139,7 @@ végponton szabványos formában is kiadhatók: FHIR R4 Observation (LOINC- és
 UCUM-kóddal), Questionnaire és QuestionnaireResponse. A méréstípusok LOINC- és
 UCUM-kódja az adatbázisban van. Egy klinikai ajánláson alapuló szabályt CQL-ben is
 megírtunk, és egy meglévő motorral külön próbában futtattuk; a próbát a
-Működés fejezet utolsó alfejezete írja le. A harmadik mérföldkőben a motor
+Működés fejezet „Integrációs próba" alfejezete írja le. A harmadik mérföldkőben a motor
 külön konténerbe került, a backend belső HTTP-hívással éri el. Egy végpont a
 beteg utolsó hét lezárt napjának vérnyomásméréseit értékelteti ki vele, és az
 eredményt saját, törtekkel végzett számítással veti össze; ha a motor nem

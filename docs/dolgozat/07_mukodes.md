@@ -10,7 +10,8 @@ szabálytípus, az alkalmak tárolása, a riasztás lezárása és a mérésjav�
 a beteg teendőlistája (mi esedékes, mi kész, mi maradt el, és meddig
 pótolható) a tárolt alkalmakból számolódik. A fejezet végén egy integrációs
 próba szerepel: egy klinikai irányelven alapuló szabály, szabványos adatokon,
-meglévő motorral kiértékelve.
+meglévő motorral kiértékelve. A fejezetet egy leképezési terv zárja: hogyan
+illeszkedne a követési terv egy szabványos protokoll-leíráshoz.
 
 ## A beteg státusza
 
@@ -301,3 +302,134 @@ kiad FHIR-csomagot, és a backend egy végpontja a külön konténerben futó
 motorral értékelteti ki a beteg méréseit (lásd az Architektúra fejezetet). Az
 eredményt az orvos az adatlap Áttekintés fülén, tájékoztató panelen látja; a
 státuszra és a riasztásokra nem hat. A saját adatbázis marad az elsődleges.
+
+## A követési terv illesztése szabványos protokoll-leíráshoz
+
+A próba egyetlen szabályt kötött az irányelvhez. Ez a szakasz azt vizsgálja,
+hogyan illeszkedne a PULSE követési terve és a szabályai egy szabványos
+protokoll-leíráshoz, a FHIR R4 PlanDefinition [@fhir-r4-plandefinition],
+Library [@fhir-r4-library] és CarePlan [@fhir-r4-careplan] erőforrásához. Ez
+terv és leképezési táblázat, nem megvalósítás: a rendszer ezeket az
+erőforrásokat nem adja ki és nem fogadja be, a FHIR-kiadás ma a beteg
+adataiból, a mérésekből és a kérdőívekből áll. A példa ugyanaz a protokoll,
+mint a próbában: a NICE NG136 szerinti otthoni vérnyomás-ellenőrzés.
+
+### Három szint, öt kérdés
+
+A leképezést három szinten végeztem. A protokollszint a betegtől független
+leírás: mit kell mérni, milyen gyakran, és milyen logika értékeli ki
+(PlanDefinition, a logika Library-ként). A betegszint az, amit ebből egy
+betegre előírnak (CarePlan, előírásonként ServiceRequest
+[@fhir-r4-servicerequest]). Az eredményszint a beérkező adat és a belőle
+született jelzés (Observation [@fhir-r4-observation], QuestionnaireResponse
+[@fhir-r4-questionnaireresponse]). Egy megfeleltetés teljes, ha mezőről
+mezőre, azonos jelentéssel átvihető; részleges, ha van megfelelője, de
+információ vész el, vagy saját konvenció kell hozzá; és nincs, ha a másik
+oldalon nincs megfelelője.
+
+A legfontosabb megállapítás, hogy a PULSE-ban nincs protokollszintű követési
+sablon. A szabály és az előírás is egy beteghez tartozik, a kérdőívsablon egy
+kérdőívé, nem egy követési tervé, a CQL-könyvtár pedig fájlként él a
+CQL-szolgáltatás mellett, az adatbázis nem tud róla. Ezért a protokollszint
+jórészt hiányzik, a beteg- és az eredményszinten viszont szinte mindennek
+van megfelelője, többnyire részleges: az előírás, az alkalom, a mérés és a
+kitöltés mind megvan, csak más szerkezetben.
+
+A beilleszthetőséghez öt kérdésre kerestem választ: honnan származik a
+protokoll, melyik változata érvényes, milyen adatot igényel, mit lehet benne
+betegenként beállítani, és mit ad vissza. Hogy ezeknek hol a helyük a
+FHIR-ben, és hol tart ma a PULSE, azt az alábbi táblázat mutatja.
+
+| Kérdés | Helye a FHIR-ben | A PULSE-ban ma |
+|------------|------------------------------|------------------------------|
+| eredet | PlanDefinition.relatedArtifact (hivatkozás) | csak szövegben: a CQL-fájl fejléce és a dolgozat |
+| változat | PlanDefinition.version, Library.version | a CQL-könyvtár verziója, amelyet a CQL-szolgáltatás minden eredménnyel visszaad, és a szabályverzió sorszáma; a kettő nincs összekötve |
+| bemenő adat | Library.dataRequirement | a méréstípus LOINC-kódja és a CQL lekérése |
+| betegenkénti beállítás | a definíciója Library.parameter; az értéke az `$apply` hívásban a specifikáció szövege szerint név szerint átadható, bár a művelet R4-es paraméterlistája ilyet külön nem nevesít [@fhir-r4-using-expressions]; a célérték a beteg Goal erőforrásában is [@fhir-r4-goal] | saját szabálynál a szabályverzió paraméterei; a CQL-paramétereket a backend minden betegnél azonos alapértékkel adja át, csak az időszak változik |
+| kimenet | az `$apply` kimenete egy CarePlan, benne a feltételek szerint alkalmazandó tevékenységekkel [@fhir-r4-plandefinition-apply] | saját szabálynál a riasztás, a szabályverzióval és a kiváltó adatokkal; a CQL-eredmény a panelen látszik, nem tárolódik |
+
+A legfontosabb megfeleltetéseket a következő táblázat foglalja össze; a
+teljes, 38 soros táblázat és egy példa az elektronikus mellékletben, a repó
+`integration/FHIR_lekepezes.md` fájljában van.
+
+| Szint | FHIR R4 elem | PULSE-megfelelő | Illeszkedés |
+|------------|----------------------------|----------------------------|--------------|
+| protokoll | PlanDefinition azonosítása, forrása és logikája (url, version, relatedArtifact, library) | nincs tárolva; a szabályverziók és a CQL-könyvtár között nincs hivatkozás | nincs |
+| protokoll | Library.parameter | a CQL-könyvtár 11 paramétere | részleges: az alapérték elvész |
+| protokoll | Library.dataRequirement | a CQL lekérése és a méréstípus LOINC-kódja | teljes |
+| beteg | CarePlan.instantiatesCanonical (melyik protokollból jön a terv) | nincs | nincs |
+| beteg | CarePlan tevékenységének időzítése (Timing) | az előírás gyakorisága, kezdete, vége és javasolt időpontja | részleges: a határidő és a pótlási idő nem írható le |
+| beteg | ServiceRequest előírásonként | előírás | részleges |
+| beteg | Task alkalmanként | alkalom | részleges, saját konvenció |
+| eredmény | Observation, QuestionnaireResponse | mérés, kitöltés (a kiadás ma is megvan) | teljes |
+| eredmény | Observation.basedOn, QuestionnaireResponse.basedOn | az alkalmat teljesítő mérés vagy kitöltés | részleges |
+| eredmény | DetectedIssue, Task, Provenance, Flag | riasztás és a beteg státusza | részleges, nincs egyetlen megfelelő |
+
+### Ahol a két modell eltér
+
+A PULSE több olyat tud, aminek a FHIR-ben nincs természetes helye. A
+riasztás a keletkezéskori szabályverzióra hivatkozik. Verzióra hivatkozni a
+FHIR-ben is lehet (canonical url és verzió), de betegre szabott szabálynak
+nincs saját erőforrása, és a verzió módosíthatatlanságát a szabvány nem
+biztosítja, az a rendszer dolga. A riasztásnak életútja, deduplikációja és eseménytörténete van.
+Az alkalom késve is teljesíthető, pótlási idővel. A javított mérés új sor, az
+eredeti megmarad, míg a FHIR a javítást a mérés amended vagy corrected
+státuszával jelöli [@fhir-r4-observation-status]. Az adathiány önálló, sosem
+kedvező állapot. Fordítva, a FHIR tud olyat, amit a PULSE nem: feltételes és
+egymásra épülő tevékenységeket (condition, trigger, relatedAction, egymásba
+ágyazott action), gazdagabb időzítést (napi több alkalom, napszak, a hét
+napjai, ismétlésszám) [@fhir-r4-datatypes], protokollból példányosított
+tervet, és tágabb tervkörnyezetet (cél, kezelt betegség, ellátócsoport).
+
+**Az alkalom.** Az alkalomnak a FHIR-ben nincs saját eleme. Saját
+konvencióként alkalmanként egy Task erőforrást rendelnék hozzá
+[@fhir-r4-task]: ennek tárgya (focus) az előírásnak megfelelő ServiceRequest,
+az időszaka (restriction.period) az alkalom időszaka, a kimenete (output) a
+teljesítő mérés vagy kitöltés. Ezt a szabvány nem írja elő, ez az én
+választásom. A Task állapotai [@fhir-r4-task-status] az esedékes, a
+teljesítve és az elmulasztva állapotot nagyjából lefedik (ready, completed,
+cancelled), a késve teljesítve viszont elvész: completed lesz belőle, a
+késés legfeljebb egy szabadon kódolt üzleti állapotban (businessStatus)
+maradhatna meg. A pótlási határ (mérésnél az időszak vége után 48 óra) sem
+fér el, mert a restriction.period egyetlen időszak. A kapcsolat is csak egy
+irányban írható le: a mérés nem hivatkozhat a Task erőforrásra, mert az
+Observation basedOn és partOf eleme ezt nem engedi.
+
+**A riasztás.** A riasztásnak nincs egyetlen pontos FHIR-megfelelője, ezért
+három részre bontottam. A tartalma (beteg, súlyosság, kiváltó adatok) a
+DetectedIssue erőforráshoz áll a legközelebb [@fhir-r4-detectedissue], de a
+szabvány ezt szűkebb célra szánja: egy tervezett vagy folyamatban lévő
+klinikai tevékenység problémájára, például gyógyszer-kölcsönhatásra. Egy
+mérési eltérés ennek tág olvasata. Az elmaradt adatküldés sem illik bele
+egyértelműen: a szabvány a technikai jellegű problémákat (például a hiányos
+adatot) az OperationOutcome erőforráshoz utalja, és értelmezés kérdése, hogy
+egy elmaradt otthoni mérés ide vagy a klinikai tevékenység problémái közé
+tartozik. Az életút (felelős, állapot,
+események) Task erőforrással és eseményenként egy Provenance erőforrással
+[@fhir-r4-provenance] írható le; a DetectedIssue saját státusza
+eredményállapot, nem munkafolyamat. A beteg összesített státuszához a Flag
+erőforrás illik [@fhir-r4-flag], amely a beteg rekordjának tömör, figyelmeztető
+kiemelése; egy-egy riasztásra viszont nem, mert a Flag nem egy adott
+személynek szóló jelzés. Mivel a riasztás jelentését csak több erőforrás
+együtt, saját kiegészítésekkel adná vissza, a riasztás belső entitás maradt.
+
+**Napi több alkalom.** A NICE napi kétszeri mérése FHIR-ben egy Timing-értékkel
+leírható (naponta kétszer, hét napig), a PULSE-ban viszont ma nem írható elő:
+egy időszakhoz egy alkalom tartozik, és ugyanarra a célra egyszerre egy
+érvényes előírás lehet. Ez a rendszer korlátja, a továbbfejlesztési
+lehetőségek között szerepel.
+
+### Mit jelentene a megvalósítás
+
+A tervből három irányban lehetne továbblépni; egyik sem vállalás, csak
+lehetséges továbbfejlesztés. A legkisebb a csak kiadás: a
+meglévő FHIR-csomag mellé CarePlan, előírásonként ServiceRequest,
+alkalmanként Task, a riasztásokból DetectedIssue, az orvosi visszajelzésből
+Communication kerülne, az adatmodell változtatása nélkül. A második egy
+statikus protokoll: a PlanDefinition és a Library leírása a repóban, egy új
+protokolltábla (url, verzió, forrás), amelyre az előírás és a szabályverzió
+hivatkozik, és egy szolgáltatás, amely a protokollból betegre előírást és
+szabályt hoz létre; ehhez már adatbázis-migráció kell. A harmadik a
+szabványos `$apply` művelet, amely a PlanDefinition-ből CarePlan-t állít elő.
+Ehhez egy FHIR-szerver és a művelet megvalósítása kellene, ezért a dolgozat
+keretén kívül esik.

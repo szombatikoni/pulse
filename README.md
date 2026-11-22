@@ -22,8 +22,8 @@ PULSE — Patient Understanding through Limits, Signals and Evaluation. Chronic 
 
 ## Indítás Dockerrel
 
-A teljes rendszer (adatbázis, backend, háttérfolyamat, CQL-szolgáltatás, webes
-felület) két paranccsal indul. Pythont, Node.js-t vagy PostgreSQL-t nem kell telepíteni, ezek a
+A teljes rendszer (adatbázis, backend, háttérfolyamat, CQL-szolgáltatás,
+fejlesztői postafiók, webes felület) két paranccsal indul. Pythont, Node.js-t vagy PostgreSQL-t nem kell telepíteni, ezek a
 konténerekben futnak.
 
 ### Előfeltételek
@@ -57,6 +57,12 @@ Ezután:
 |---|---|
 | Webes felület | http://localhost:8080 |
 | API-dokumentáció (Swagger) | http://localhost:8000/api/docs |
+| Fejlesztői postafiók (Mailpit) | http://localhost:8025 |
+
+Új riasztásnál a beteghez rendelt orvosok e-mailt kapnak. A leveleket a
+Mailpit fogja el, valódi címre semmi nem megy ki; a levél a riasztás után
+nagyjából fél percen belül érkezik meg. Közvetlenül a seed után a postafiók
+üres.
 
 ### Demófiókok
 
@@ -71,7 +77,7 @@ Mind mesterséges; a közös jelszó: **`pulse-demo-2026`**.
 | Beteg | `kiss.ilona@pulse.example` | Adathiány: a múlt heti kérdőívkitöltése elmaradt |
 | Beteg | `molnar.katalin@pulse.example` | Rendben |
 | Beteg | `toth.maria@pulse.example` | Adathiány: az előírt esti pulzusmérést és a heti kérdőívet még nem teljesítette (Nagy doktor betege) |
-| Admin | `admin@pulse.example` | betegadatot nem lát |
+| Admin | `admin@pulse.example` | felhasználók, orvos–beteg összerendelések, a méréstípusok rögzíthető tartománya; betegadatot nem lát |
 
 A mérések időpontjai a seed futtatásához képest relatívak (az utolsó mérés
 a legutóbbi reggel 7:30-as, magyar idő szerint). **A demó a seed napján
@@ -93,9 +99,10 @@ docker compose down -v     # leállítás ÉS az adatbázis törlése (tiszta ú
 Az alapértékek helyi kipróbálásra valók. Eltérő jelszóhoz vagy aláírókulcshoz
 másold a `.env.example` fájlt `.env` néven, és írd át. A compose
 automatikusan beolvassa. Nyilvános környezetben a `JWT_SECRET_KEY`-t
-kötelező lecserélni.
+kötelező lecserélni. Az e-mail-küldés üres `SMTP_HOST=` értékkel kapcsolható
+ki; a riasztás ilyenkor is létrejön, a levél küldés nélkül vár.
 
-A portok (8080, 8000, 5432) csak a saját gépről érhetők el. Ha valamelyik
+A portok (8080, 8000, 8025, 5432) csak a saját gépről érhetők el. Ha valamelyik
 foglalt (például fut már egy PostgreSQL az 5432-esen), a `docker-compose.yml`
 `ports:` sorában írható át.
 
@@ -118,8 +125,10 @@ ugyanezeket futtatja, a CQL-szolgáltatás tesztjeivel együtt: `.github/workflo
 Az `e2e/` tesztek a fő folyamatokat a felületen viszik végig: a beteg mér és
 kérdőívet tölt ki, az orvos a listán és az adatlapon látja a jelzést, idegen
 beteg adatlapját pedig nem nyithatja meg; emellett a szabályverziókat, a
-riasztás életútját, a mérésjavítást, a követési tervet, a kérdőívszerkesztőt
-és a NICE-kiértékelés paneljét is ellenőrzik. Futó rendszert és **frissen seedelt**
+riasztás életútját, a mérésjavítást, a követési tervet, a kérdőívszerkesztőt,
+a NICE-kiértékelés paneljét, az admin felületet (létrehozás, összerendelés,
+letiltás), az orvosi megjegyzést és a lejárt munkamenet utáni helyben
+újrabelépést is ellenőrzik. Futó rendszert és **frissen seedelt**
 adatbázist vár, és **módosítja az adatokat**. Hogy a saját demóadataid
 megmaradjanak, külön példányon érdemes futtatni (a fő példány leállítása után,
 mert ugyanazokat a portokat használja):
@@ -139,6 +148,11 @@ készült, ELM-re lefordított CQL-szabályt a `cql-execution` motorral, és az
 eredményt egy a motortól független kézi számítással veti össze (a fordítás
 külön lépésként megismételhető). Csak Docker kell hozzá;
 a leírás és a parancsok: [integration/README.md](integration/README.md).
+
+A követési terv, a szabályok és a riasztás FHIR R4 erőforrásokra
+(PlanDefinition, Library, CarePlan) való leképezésének terve, táblázattal és
+példával: [integration/FHIR_lekepezes.md](integration/FHIR_lekepezes.md).
+Ez terv, nem megvalósítás.
 
 ## Kódrendszerek
 

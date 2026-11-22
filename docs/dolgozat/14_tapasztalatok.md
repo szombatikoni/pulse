@@ -64,7 +64,11 @@ A rendszer több irányban bővíthető a leadás után:
   (hivatalos validátorral még nem ellenőrizve), de
   más egészségügyi rendszerrel nem cserél adatot. A következő lépés egy
   külső FHIR-szerverrel való kétirányú kapcsolat, és az irányelvek
-  protokoll-leírásainak (PlanDefinition, CarePlan) közvetlen átvétele lenne.
+  protokoll-leírásainak (PlanDefinition, CarePlan) közvetlen átvétele lenne;
+  ennek leképezési tervét a Működés fejezet írja le.
+- **Napi több alkalom előírása.** Most egy előírás időszakonként egy alkalmat
+  ad, és ugyanarra a célra egyszerre egy érvényes előírás lehet, ezért például
+  a NICE-ajánlás napi kétszeri mérése nem írható elő.
 - **Eszközintegráció.** A mérések most kézi rögzítéssel kerülnek be. A
   vérnyomásmérők és vércukormérők adatainak automatikus átvétele csökkentené
   a beteg terhét és az elgépelés esélyét.
