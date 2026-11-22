@@ -77,10 +77,32 @@ jobs:
       - name: Típusellenőrzés és build
         run: npm run build
 
+  cql:
+    name: CQL-szolgáltatás (node --test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integration
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          # Ugyanaz a főverzió, mint a szolgáltatás image-ében (node:24.21.0-alpine3.24).
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: integration/package-lock.json
+      - run: npm ci
+      - name: A szolgáltatás tesztjei (HTTP-felület, kiértékelés a kézi csomagon)
+        run: npm run teszt
+
   docker:
     name: Docker-image-ek és böngészős teszt
     runs-on: ubuntu-latest
     needs: [backend, frontend]
+    env:
+      # A worker kézbesítő köre itt 5 másodpercenként fut (alapból 30), hogy az
+      # e-mail-lépés ne várjon sokat; a compose ebből a változóból olvassa.
+      DELIVERY_INTERVAL_SECONDS: "5"
     steps:
       - uses: actions/checkout@v7
       # Ugyanaz az indítás, mint a README-ben: tiszta adatbázis, majd a demóadat.
@@ -88,6 +110,11 @@ jobs:
         run: docker compose up --build -d --wait
       - name: Mesterséges demóadat (seed)
         run: docker compose exec -T api python -m seed
+      # A pytest a CQL-szolgáltatást hamis klienssel helyettesíti; itt a teljes
+      # lánc fut a valódi konténerekkel (DB → FHIR-csomag → CQL-motor →
+      # összevetés), egy seedelt betegen, kézzel számolt elvárással.
+      - name: NICE-kiértékelés a valódi CQL-motorral (teljes lánc)
+        run: docker compose exec -T api python -m scripts.nice_lanc_proba
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
@@ -98,9 +125,41 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
-      - name: Böngészős folyamatteszt (a két M2-folyamat a felületen)
+      - name: Böngészős folyamattesztek (M2-folyamatok, NICE, admin-felület, kérdőívszerkesztő, megjegyzés)
         working-directory: e2e
         run: npx playwright test
+      # Az e-mail-értesítés (M3, A9) a valódi konténerekkel: a böngészős teszt
+      # kérdőív-folyamatában Tóth Mária kritikus (13 pontos) kitöltése új, súlyos
+      # riasztást nyit (ugyanez a kitöltés egy közepeset is; a lépés a súlyosra
+      # szóló levelet keresi). A seedben nincs kitöltése, így ez nem ismételt
+      # aktiválódás, és nem a seedből jön. A worker a levelet a Mailpitnek küldi
+      # Nagy doktornak (Tóth Mária orvosa); a lépés a Mailpit API-ján legfeljebb
+      # 90 másodpercig várja, majd ellenőrzi, hogy a levélben nincs betegnév, és
+      # a Riasztások oldalra mutat.
+      - name: E-mail-értesítés a Mailpitben (új riasztás után)
+        run: |
+          for i in $(seq 1 30); do
+            id=$(curl -fsS http://127.0.0.1:8025/api/v1/messages | jq -r '[.messages[]
+              | select(.Subject == "PULSE: új riasztás (Súlyos)")
+              | select(any(.To[]; .Address == "dr.nagy@pulse.example"))][0].ID // empty' || true)
+            if [ -n "$id" ]; then
+              text=$(curl -fsS "http://127.0.0.1:8025/api/v1/message/$id" | jq -r .Text)
+              echo "$text"
+              if ! echo "$text" | grep -q "/doctor/alerts"; then
+                echo "A levélből hiányzik a Riasztások oldal címe."
+                exit 1
+              fi
+              if echo "$text" | grep -q "Tóth"; then
+                echo "A levél betegnevet tartalmaz."
+                exit 1
+              fi
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Nem érkezett meg a levél a Mailpitbe."
+          curl -fsS http://127.0.0.1:8025/api/v1/messages | jq .
+          exit 1
       - name: Hiba esetén a képernyőképek és a nyomkövetés feltöltése
         if: failure()
         uses: actions/upload-artifact@v7

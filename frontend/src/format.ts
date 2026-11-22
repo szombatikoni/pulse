@@ -38,6 +38,25 @@ export function formatDateTime(iso: string): string {
   }).format(new Date(iso))
 }
 
+/** Naptári nap („YYYY-MM-DD") röviden: „okt. 30.", „30 Oct". Helyi dátumként
+ * olvassuk, nem UTC-éjfélként, így nem csúszik el egy nappal. */
+export function formatDate(isoDate: string): string {
+  const [y, m, d] = isoDate.slice(0, 10).split('-').map(Number)
+  return new Intl.DateTimeFormat(locale(), { month: 'short', day: 'numeric' }).format(
+    new Date(y, m - 1, d),
+  )
+}
+
+/** A mai nap „YYYY-MM-DD" alakban, helyi idő szerint (dátummezőhöz). */
+export function todayInput(now = new Date()): string {
+  return toLocalInput(now).slice(0, 10)
+}
+
+/** Napszak a szerver „HH:MM:SS" alakjából: „10:00". */
+export function formatClock(time: string): string {
+  return time.slice(0, 5)
+}
+
 export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' }).format(date)
 }

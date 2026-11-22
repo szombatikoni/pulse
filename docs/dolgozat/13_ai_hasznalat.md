@@ -99,7 +99,4 @@ A bejegyzések fordított időrendben követik egymást.
 
 ## Tanulságok
 
-> **Jóváhagyandó:** ezt a részt neked kell megírnod, a saját tapasztalataid
-> alapján. Pár kérdés, ami segíthet: Mi működött jól a munkamódszerben? Hol
-> kellett a legtöbbet ellenőrizni? Mit csinálnál másképp? Mit tanultál meg
-> közben, amit AI nélkül nem, vagy lassabban tanultál volna meg?
+[KÉSŐBB: a tanulságok a munka lezárása után]

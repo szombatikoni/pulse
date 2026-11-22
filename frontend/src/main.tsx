@@ -1,4 +1,5 @@
-import '@fontsource-variable/inter'
+import '@fontsource-variable/instrument-sans'
+import '@fontsource-variable/source-serif-4/opsz.css'
 import '@mantine/core/styles.css'
 import './index.css'
 import './i18n'

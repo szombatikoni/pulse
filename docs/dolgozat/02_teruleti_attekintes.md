@@ -48,9 +48,6 @@ megadhat, amely a naplóban a testsúlyértékek színezését adja. A PDF-ripor
 fizetős (PRO) változat része. Az eszközcsatlakozásoknál az alkalmazás maga
 jelzi, hogy a lista országonként eltérhet, és a helyi engedélyezéstől függ.
 
-> **Jóváhagyandó:** 1–2 képernyőkép ide is kerülhet (például a céltartomány
-> beállítása és a riport-képernyő a PRO jelöléssel).
-
 A termék változik: a pumpavezérlő funkció 2026 júniusában megszűnt, a napló
 és a bóluskalkulátor megmaradt [@mysugr-pumpcontrol]. A Roche CGM-szenzorához
 tartozó alkalmazások pedig a mySugr-be olvadnak [@accuchek-mysugr-switch].

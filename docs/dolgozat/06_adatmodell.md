@@ -1,15 +1,16 @@
 # Adatmodell
 
-A @abra:adatmodell a teljes tervezett adatmodellt mutatja, 22 entitással. A
-mezők a második mérföldkő migrációi szerintiek; a még el nem készült entitások
-szaggatott kerettel szerepelnek. Az alábbiakban a fontosabb tervezési döntéseket
-írom le. A második mérföldkőig a
-felhasználók, profilok és összerendelések, a mérések, a szabályok és
-riasztások, valamint a kérdőívek és kirendeléseik táblái készültek el. Az
-alkalmak, a megjegyzések és az értesítések a következő mérföldkőben kerülnek
-be.
+Az adatmodellt két ábra mutatja, a jelenlegi 20 táblával. A @abra:adatmodell1
+a felhasználókat, az összerendelést, a méréseket, a szabályokat, a
+riasztásokat és az értesítéseket tartalmazza, a @abra:adatmodell2 a
+kérdőíveket, a követési tervet, az alkalmakat és a kitöltéseket. A két részt
+összekötő táblák mindkét ábrán szerepelnek. A tervezett 22 entitásból kettő
+még nincs meg: a megjegyzések és az e-mail-kézbesítés táblája. Az alábbiakban
+a fontosabb tervezési döntéseket írom le.
 
-![A PULSE adatmodellje](images/dolgozat_adatmodell.png){#abra:adatmodell}
+![Az adatmodell első része: felhasználók, mérések, szabályok, riasztások](images/dolgozat_adatmodell_1.png){#abra:adatmodell1}
+
+![Az adatmodell második része: kérdőívek, követési terv, kitöltések](images/dolgozat_adatmodell_2.png){#abra:adatmodell2}
 
 ## Felhasználók, profilok és összerendelés
 
@@ -38,15 +39,17 @@ nyilvánvaló elírást szűri ki (például 1400 Hgmm); az orvosi határokat a
 szabályok adják. Ezt a mezőt az első tervben még referenciatartománynak
 neveztem, de az orvosi nyelvben ez az egészséges értékek szokásos sávját
 jelenti, ezért a megvalósításban „rögzíthető tartomány" lett a neve. A
-méréstípus és a komponensek LOINC-kódot is kapnak, így egy
-későbbi FHIR-exportnál a mérés jelentése egyértelmű.
+méréstípus és a komponensek LOINC-kódot is kapnak, így a
+FHIR-kiadásban a mérés jelentése egyértelmű.
 
 A mérés két időpontot tárol: mikor mérte a beteg (`measured_at`), és mikor
 rögzítette (`recorded_at`). Mérést legfeljebb két napra visszamenőleg lehet
 rögzíteni. A mérés ideje dönti el, melyik alkalomhoz tartozik, a rögzítés
 ideje pedig azt, hogy a határidőn belül vagy késve érkezett (lásd a Működés
 fejezetet). A javítás nem írja felül az eredeti mérést: az
-új mérés a `corrected_from` mezővel hivatkozik rá.
+új mérés a `corrected_from` mezővel hivatkozik rá. A kétnapos határ csak az
+új mérés rögzítésére vonatkozik, a már rögzített mérés értéke időkorlát
+nélkül javítható.
 
 ### Relációs tárolás vagy dokumentum-adatbázis
 
@@ -114,9 +117,10 @@ A követési terv eleme az előírás (`Assignment`): mit (mérés vagy kérdő�
 milyen gyakran, milyen határidővel, mettől meddig. Az előírás egyes alkalmai
 külön sorok (`AssignmentOccurrence`), saját határidővel, státusszal
 (esedékes, teljesítve, késve teljesítve, elmulasztva) és a teljesítő méréssel
-vagy kitöltéssel. Az alkalmakat a háttérfolyamat menet közben hozza létre, nem
-előre, a teljes időszakra. Így az előírás módosítása vagy visszavonása nem
-igényli előre legyártott sorok törlését. Egy egyedi megszorítás (előírás +
+vagy kitöltéssel. Az alkalmak menet közben jönnek létre (a háttérfolyamat
+futásakor, vagy ha előbb érkezik adat, a mentéskor), nem előre, a teljes
+időszakra. Így az előírás módosításakor vagy visszavonásakor nincs előre
+legyártott sorozat, csak a még nyitott (esedékes) alkalom törlődik. Egy egyedi megszorítás (előírás +
 határidő) garantálja, hogy a háttérfolyamat ismételt futása sem hoz létre
 dupla alkalmat.
 

@@ -1,4 +1,5 @@
-# A PULSE teljes rendszere: adatbázis, backend (API) és frontend.
+# A PULSE teljes rendszere: adatbázis, backend (API), háttérfolyamat (worker),
+# CQL-szolgáltatás, fejlesztői postafiók (Mailpit) és frontend.
 # Indítás a repó gyökeréből: docker compose up --build
 # A jelszavak csak helyi fejlesztésre valók; felülírhatók egy .env fájlban
 # (minta: .env.example).
@@ -32,12 +33,79 @@ services:
       # A tokenek aláírókulcsa; az alapérték csak helyi fejlesztésre való.
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-insecure-secret-change-me-0123456789}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      # A CQL-szolgáltatás címe a belső hálózaton (M3, K2). Szándékosan nincs
+      # depends_on rá: az API és a riasztás nélküle is működik.
+      CQL_SERVICE_URL: ${CQL_SERVICE_URL:-http://cql:8080}
+      # A hívás időtúllépése másodpercben; utána a végpont 503-at ad.
+      CQL_TIMEOUT_SECONDS: ${CQL_TIMEOUT_SECONDS:-5}
     depends_on:
       db:
         # Csak akkor indul, ha az adatbázis már fogad kapcsolatot.
         condition: service_healthy
     ports:
       - "127.0.0.1:8000:8000"
+    healthcheck:
+      # Az API az indításkor előbb lefuttatja a migrációkat, utána válaszol: ha az
+      # /api/health elérhető, a séma is naprakész (erre vár a worker). A slim
+      # image-ben nincs curl, ezért Pythonnal kérdezzük le.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    # Háttérfolyamat (M3): az előírások alkalmainak nyitása és az elmulasztottak
+    # lezárása. Ugyanaz az image, mint az API-é, csak más indítóparanccsal.
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pulse}:${POSTGRES_PASSWORD:-pulse}@db:5432/${POSTGRES_DB:-pulse}
+      # Két ellenőrzés közti idő másodpercben (alapból óránként).
+      OCCURRENCE_CHECK_INTERVAL_SECONDS: ${OCCURRENCE_CHECK_INTERVAL_SECONDS:-3600}
+      # E-mail az orvosnak új riasztásnál (M3, A9): a worker kézbesítő köre
+      # ennyi másodpercenként küldi a várakozó leveleket a Mailpitnek.
+      DELIVERY_INTERVAL_SECONDS: ${DELIVERY_INTERVAL_SECONDS:-30}
+      # Ha nincs megadva, a Mailpit; ha üresen van megadva (SMTP_HOST=), a
+      # küldés ki van kapcsolva, a sorok várnak. Ezért itt „-" és nem „:-".
+      SMTP_HOST: ${SMTP_HOST-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      MAIL_FROM: ${MAIL_FROM:-pulse@pulse.example}
+      # A levélbeli hivatkozás (…/doctor/alerts) címe: a frontend a saját gépen.
+      APP_BASE_URL: ${APP_BASE_URL:-http://127.0.0.1:8080}
+    depends_on:
+      api:
+        # A migrációkat az API futtatja; a worker csak utána indul.
+        condition: service_healthy
+
+  cql:
+    # A CQL-motor hosszan futó HTTP-szolgáltatásként (M3, K2): az NICE NG136
+    # szerinti vérnyomásátlag (integration/cql/PulseHbpmAverage.cql) lefordított
+    # ELM-je az image-ben van, és induláskor egyszer töltődik be.
+    # Portot nem nyit a gép felé, csak a compose belső hálózatán érhető el
+    # (http://cql:8080).
+    build:
+      context: ./integration
+      target: szolgaltatas
+    # Ha a folyamat mégis kilép (pl. egy kezeletlen hiba miatt), a Docker
+    # újraindítja; kézi leállítás (docker compose stop) után nem.
+    restart: unless-stopped
+    healthcheck:
+      # Az alpine image-ben nincs curl/wget; a Node beépített fetch-ével kérdezünk.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    # Fejlesztői és demó-postafiók (M3, A9): minden levelet elkap, valódi címre
+    # nem továbbít. A webes felülete csak a saját gépről érhető el
+    # (http://127.0.0.1:8025); az SMTP-port (1025) csak a compose belső
+    # hálózatán (mailpit:1025), a gép felé nem nyílik. Az image saját
+    # állapot-ellenőrzése (/mailpit readyz) miatt a --wait erre is vár.
+    # Nyilvános demóban a 8025-ös felület nem lehet nyilvános.
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "127.0.0.1:8025:8025"
 
   frontend:
     build: ./frontend

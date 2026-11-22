@@ -4,13 +4,14 @@ Ez a fejezet dátumozott példákon mutatja be a működési szabályokat: hogya
 áll elő a beteg státusza, hogyan kezeli a rendszer az ismétlődő teendőket és
 az elmaradást, mi történik szabálymódosításkor és adatjavításkor, és hogyan
 pontoz a kérdőív. A példák mesterséges adatokkal készültek. A státusz, a
-küszöbszabály, a deduplikáció és a kérdőív-pontozás a második mérföldkőben
-már működik, és tesztek ellenőrzik. A beteg teendőlistája (mi esedékes, mi
-kész, mi maradt el, és meddig pótolható) is már az alább leírt szabályokkal
-számolódik, az előírásokból. Az alkalmak tárolása, a riasztáslezárás és a
-javítás a harmadik mérföldkőben készül el. A fejezet végén egy integrációs
+küszöbszabály, a deduplikáció és a kérdőív-pontozás a második mérföldkő óta
+működik, és tesztek ellenőrzik. A harmadik mérföldkőben elkészült a többi
+szabálytípus, az alkalmak tárolása, a riasztás lezárása és a mérésjavítás is;
+a beteg teendőlistája (mi esedékes, mi kész, mi maradt el, és meddig
+pótolható) a tárolt alkalmakból számolódik. A fejezet végén egy integrációs
 próba szerepel: egy klinikai irányelven alapuló szabály, szabványos adatokon,
-meglévő motorral kiértékelve.
+meglévő motorral kiértékelve. A fejezetet egy leképezési terv zárja: hogyan
+illeszkedne a követési terv egy szabványos protokoll-leíráshoz.
 
 ## A beteg státusza
 
@@ -35,7 +36,8 @@ feljebb álló érvényes, a felület a többi okot is kiírja.
 A legfontosabb elv, hogy sem a lezárás, sem az adat hiánya nem ad kedvező
 státuszt. Egy frissen felvett beteg, akinek még nincs mérése, Adathiány
 státuszú, nem Rendben. Előírás nélkül akkor friss az adat, ha a legutóbbi
-mérés vagy kitöltés legfeljebb 7 napos.
+mérés vagy kitöltés legfeljebb 7 napos. Ugyanez érvényes addig, amíg az
+előírás első alkalma le nem zárult.
 
 **Példa: lezárás, majd megerősítő mérés**
 
@@ -69,9 +71,11 @@ utolsó napján, a beállított időpontban van.
 - **Meddig pótolható?** Mérést legfeljebb két napra visszamenőleg lehet
   rögzíteni, a mérés időpontjától számítva. Egy elmulasztott alkalom így
   addig pótolható, amíg az időszakába eső mérés még rögzíthető; utána
-  végleges.
+  végleges. A kétnapos határ csak az új mérés visszadátumozására vonatkozik:
+  a már rögzített mérés értéke időkorlát nélkül javítható, a javítás a mérés
+  időpontját nem változtatja meg.
 
-![Egy alkalom életciklusa](images/folyamat_kirendeles.png){#abra:alkalom}
+![Egy alkalom életciklusa](images/dolgozat_folyamat_kirendeles.png){#abra:alkalom}
 
 | Időpont | Esemény | Alkalom |
 |---------|-----------------------------------|---------------|
@@ -83,20 +87,26 @@ utolsó napján, a beállított időpontban van.
 
 Az első elmulasztás a státuszt azonnal Adathiányra állítja. Riasztás csak
 az „elmaradt adatküldés" szabályban beállított számú (alapértelmezés szerint
-két egymást követő) elmulasztás után keletkezik.
+két egymást követő) elmulasztás után keletkezik. Mérésnél az alkalom a
+pótlási idő végéig, az időszak vége után 48 óráig még teljesíthető, ezért a
+szabály csak ezután számolja elmulasztottnak. A riasztás így később
+keletkezik, mint ahogy a határidő lejár, a státusz viszont ettől függetlenül
+már a határidőnél Adathiány.
 
 **Kérdőívnél nincs pótlás.** A kérdőív a kitöltés pillanatának állapotáról
 szól, ezért nem dátumozható vissza: a kitöltés mindig az aktuális alkalomhoz
 számít, az elmaradt korábbi alkalom pedig elmulasztva marad. Ugyanezért a
 kérdések időszaka igazodik a kirendelés gyakoriságához: heti kérdőív az elmúlt
-hétre kérdez, napi az aznapra. A mostani demókérdőív ennek még nem felel meg
-(heti kirendelés mellett az előző éjszakára és az aznapra is kérdez); a
-harmadik mérföldkőben új verziót kap, ami egyben a verzióváltást is bemutatja.
+hétre kérdez, napi az aznapra. A demókérdőív első verziója ennek még nem
+felelt meg (heti kirendelés mellett az előző éjszakára és az aznapra is
+kérdezett). A második verzióban a kérdések az elmúlt hétre szólnak, a
+pontozás és a sávok nem változtak; ez egyben a verzióváltást is bemutatja.
 
 ## Riasztás, deduplikáció és szabálymódosítás
 
 A riasztás életútja egy egyszerű állapotgép: keletkezett → megtekintett →
-felelőshöz rendelt → lezárt. Lezárni csak indoklással lehet, és minden váltás
+felelőshöz rendelt → lezárt. Lépés kihagyható, visszaút nincs. Lezárni
+bármelyik nyitott állapotból, de csak indoklással lehet, és minden váltás
 eseményként rögzül (ki, mikor, mit).
 
 ![A riasztás életútja](images/folyamat_riasztas.png){#abra:riasztas}
@@ -104,9 +114,10 @@ eseményként rögzül (ki, mikor, mit).
 A riasztásokat a rendszer beteg és szabály szerint vonja össze. Nyitott
 riasztás mellett ugyanarra a szabályra érkező újabb kiváltó adat nem nyit új
 riasztást, hanem „ismételt aktiválódás" eseményt ad; a súlyosság ilyenkor
-emelkedhet, de nem csökkenhet. A demóadatokban Szabó Jánosnál ez látszik: két
-140 Hgmm feletti mérés után a vérnyomás-küszöbszabályhoz egy riasztás tartozik,
-két eseménnyel.
+emelkedhet, de nem csökkenhet. A demóadatokban Szabó Jánosnál ez látszik: a
+harmadik 140/90 Hgmm feletti mérés megnyitja az időablakos szabály riasztását,
+a negyedik ugyanahhoz kapcsolódik, így egy riasztás tartozik hozzá, két
+eseménnyel.
 
 Szabálymódosításkor ugyanaz a nyitott riasztás folytatódik, az új adatot
 viszont már az új verzió értékeli. Minden esemény tárolja az alkalmazott
@@ -155,8 +166,9 @@ esik. Ezt a rendszer a verzió létrehozásakor ellenőrzi.
 A demókérdőív sávjai: 0–5 rendben, 6–10 figyelmeztető, 11–13 kritikus. A
 fenti számpélda a tesztek között is szerepel. A kérdőívszabály a sávra
 riaszt: a demóadatokban a figyelmeztető vagy kritikus sáv közepes, a
-kritikus sáv súlyos riasztást ad. A vérnyomásnál a demó 140/90 Hgmm felett
-közepes, 180 Hgmm szisztolés felett súlyos riasztást ad. Ezek bemutató
+kritikus sáv súlyos riasztást ad. A vérnyomásnál a demó 7 napon belül három
+140/90 Hgmm feletti mérés után közepes, 180 Hgmm szisztolés felett azonnal
+súlyos riasztást ad. Ezek bemutató
 értékek, nem klinikai ajánlások: a valódi határokat az orvos betegenként
 állítja be.
 
@@ -165,8 +177,8 @@ a riasztást nem. Ennek három oka van: egy orvosi értelmezés nélküli „Sú
 vagy „kritikus" felirat megijesztheti a beteget, vagy épp hamis megnyugvást
 adhat; a riasztás az orvosnak szól, aki eldönti, mit jelent és mi a teendő; és
 ha a beteg látná, melyik válasz mennyi pontot ér, a válaszait is
-befolyásolhatná. Az értelmezést az orvos közli: a tervben a riasztás lezárásakor
-rövid visszajelzést küldhet a betegnek.
+befolyásolhatná. Az értelmezést az orvos közli: a riasztás lezárásakor
+rövid visszajelzést küldhet a betegnek, amelyet a beteg a teendői között lát.
 
 ## Integrációs próba: ajánláson alapuló szabály szabványos adatokon
 
@@ -262,29 +274,162 @@ eltérés a számábrázolásé: a motor lebegőpontosan számol (84,41666…), 
 A próbában a kétértelmű pontok alapértékei a háttérkutatás javaslatai, nem
 végleges döntések.
 
-> **Jóváhagyandó (a te döntéseid, a beépítés előtt):**
-> 1. Kiessen-e az első nap a kezelés követésénél is (az 1.2.7 a diagnózisról
->    szól)? A próbában: igen.
-> 2. Mi az „első nap": az első mérés napja, vagy a kirendelés kezdőnapja? A
->    próbában: az első mérés napja.
-> 3. Mindkét átlagnak a cél alatt kell lennie, vagy elég az egyiknek? A
->    próbában: mindkettőnek.
-> 4. Hány értékelhető nap kell legalább? A próbában: 3 (az első nappal 4).
-> 5. Kerekítsen-e a rendszer az összevetés előtt? A próbában: nem.
-> 6. Melyik napon számít az életkor? A próbában: a sorozat utolsó napján.
-> 7. A leolvasások egyszerű átlaga, vagy előbb alkalmanként a két leolvasás
->    átlaga? A próbában: minden leolvasás egyszerű átlaga (teljes pároknál a
->    kettő ugyanaz, hiányos párnál eltér).
-> 8. Mi legyen a hiányos (például csak szisztolés) és a javított méréssel? A
->    próbában: a hiányos kimarad, és külön listán látszik; a javított mérés
->    kezelése a harmadik mérföldkő része.
+A kétértelmű pontok és a próbában használt alapértékek:
 
-Ha nincs elég adat, az eredmény „nincs elég adat", ami a PULSE-ban Adathiány,
-nem kedvező státusz; ez a meglévő elvből következik.
+1. Az első mérési nap a kezelés követésénél is kiesik, bár az ajánlás 1.2.7
+   pontja a diagnózisról szól.
+2. Az „első nap" az első mérés napja, nem a kirendelés kezdőnapja.
+3. Mindkét átlagnak a cél alatt kell lennie, nem elég az egyiknek.
+4. Legalább 3 értékelhető nap kell (az első nappal együtt 4).
+5. Az összevetés előtt nincs kerekítés.
+6. Az életkor a sorozat utolsó napján számít.
+7. Az átlag minden leolvasás egyszerű átlaga, nem az alkalmankénti két
+   leolvasás átlagainak átlaga (teljes pároknál a kettő ugyanaz, hiányos
+   párnál eltér).
+8. A hiányos (például csak szisztolés) mérés kimarad, és külön listán
+   látszik. Javított mérésből a PULSE csak az utolsó változatot adja ki, a
+   felülírt mérés nem kerül a motorhoz.
+
+Ha nincs elég adat, az eredmény „nincs elég adat", a PULSE paneljén „Nem
+értékelhető". A kiértékelés eredménye nem tárolódik, és nem hat a státuszra,
+így kedvező státuszt sem adhat.
 
 ### Korlátok
 
 A FHIR-csomagot hivatalos validátorral még nem ellenőriztem. A próba egyetlen
-fordító- és motorverzióval futott. A PULSE-ba még nincs beépítve: a saját
-adatbázis marad az elsődleges, a FHIR-kiadás és a CQL-kiértékelés bekötése a
-harmadik mérföldkő feladata.
+fordító- és motorverzióval futott. A próba óta a PULSE a saját adataiból is
+kiad FHIR-csomagot, és a backend egy végpontja a külön konténerben futó
+motorral értékelteti ki a beteg méréseit (lásd az Architektúra fejezetet). Az
+eredményt az orvos az adatlap Áttekintés fülén, tájékoztató panelen látja; a
+státuszra és a riasztásokra nem hat. A saját adatbázis marad az elsődleges.
+
+## A követési terv illesztése szabványos protokoll-leíráshoz
+
+A próba egyetlen szabályt kötött az irányelvhez. Ez a szakasz azt vizsgálja,
+hogyan illeszkedne a PULSE követési terve és a szabályai egy szabványos
+protokoll-leíráshoz, a FHIR R4 PlanDefinition [@fhir-r4-plandefinition],
+Library [@fhir-r4-library] és CarePlan [@fhir-r4-careplan] erőforrásához. Ez
+terv és leképezési táblázat, nem megvalósítás: a rendszer ezeket az
+erőforrásokat nem adja ki és nem fogadja be, a FHIR-kiadás ma a beteg
+adataiból, a mérésekből és a kérdőívekből áll. A példa ugyanaz a protokoll,
+mint a próbában: a NICE NG136 szerinti otthoni vérnyomás-ellenőrzés.
+
+### Három szint, öt kérdés
+
+A leképezést három szinten végeztem. A protokollszint a betegtől független
+leírás: mit kell mérni, milyen gyakran, és milyen logika értékeli ki
+(PlanDefinition, a logika Library-ként). A betegszint az, amit ebből egy
+betegre előírnak (CarePlan, előírásonként ServiceRequest
+[@fhir-r4-servicerequest]). Az eredményszint a beérkező adat és a belőle
+született jelzés (Observation [@fhir-r4-observation], QuestionnaireResponse
+[@fhir-r4-questionnaireresponse]). Egy megfeleltetés teljes, ha mezőről
+mezőre, azonos jelentéssel átvihető; részleges, ha van megfelelője, de
+információ vész el, vagy saját konvenció kell hozzá; és nincs, ha a másik
+oldalon nincs megfelelője.
+
+A legfontosabb megállapítás, hogy a PULSE-ban nincs protokollszintű követési
+sablon. A szabály és az előírás is egy beteghez tartozik, a kérdőívsablon egy
+kérdőívé, nem egy követési tervé, a CQL-könyvtár pedig fájlként él a
+CQL-szolgáltatás mellett, az adatbázis nem tud róla. Ezért a protokollszint
+jórészt hiányzik, a beteg- és az eredményszinten viszont szinte mindennek
+van megfelelője, többnyire részleges: az előírás, az alkalom, a mérés és a
+kitöltés mind megvan, csak más szerkezetben.
+
+A beilleszthetőséghez öt kérdésre kerestem választ: honnan származik a
+protokoll, melyik változata érvényes, milyen adatot igényel, mit lehet benne
+betegenként beállítani, és mit ad vissza. Hogy ezeknek hol a helyük a
+FHIR-ben, és hol tart ma a PULSE, azt az alábbi táblázat mutatja.
+
+| Kérdés | Helye a FHIR-ben | A PULSE-ban ma |
+|------------|------------------------------|------------------------------|
+| eredet | PlanDefinition.relatedArtifact (hivatkozás) | csak szövegben: a CQL-fájl fejléce és a dolgozat |
+| változat | PlanDefinition.version, Library.version | a CQL-könyvtár verziója, amelyet a CQL-szolgáltatás minden eredménnyel visszaad, és a szabályverzió sorszáma; a kettő nincs összekötve |
+| bemenő adat | Library.dataRequirement | a méréstípus LOINC-kódja és a CQL lekérése |
+| betegenkénti beállítás | a definíciója Library.parameter; az értéke az `$apply` hívásban a specifikáció szövege szerint név szerint átadható, bár a művelet R4-es paraméterlistája ilyet külön nem nevesít [@fhir-r4-using-expressions]; a célérték a beteg Goal erőforrásában is [@fhir-r4-goal] | saját szabálynál a szabályverzió paraméterei; a CQL-paramétereket a backend minden betegnél azonos alapértékkel adja át, csak az időszak változik |
+| kimenet | az `$apply` kimenete egy CarePlan, benne a feltételek szerint alkalmazandó tevékenységekkel [@fhir-r4-plandefinition-apply] | saját szabálynál a riasztás, a szabályverzióval és a kiváltó adatokkal; a CQL-eredmény a panelen látszik, nem tárolódik |
+
+A legfontosabb megfeleltetéseket a következő táblázat foglalja össze; a
+teljes, 38 soros táblázat és egy példa az elektronikus mellékletben, a repó
+`integration/FHIR_lekepezes.md` fájljában van.
+
+| Szint | FHIR R4 elem | PULSE-megfelelő | Illeszkedés |
+|------------|----------------------------|----------------------------|--------------|
+| protokoll | PlanDefinition azonosítása, forrása és logikája (url, version, relatedArtifact, library) | nincs tárolva; a szabályverziók és a CQL-könyvtár között nincs hivatkozás | nincs |
+| protokoll | Library.parameter | a CQL-könyvtár 11 paramétere | részleges: az alapérték elvész |
+| protokoll | Library.dataRequirement | a CQL lekérése és a méréstípus LOINC-kódja | teljes |
+| beteg | CarePlan.instantiatesCanonical (melyik protokollból jön a terv) | nincs | nincs |
+| beteg | CarePlan tevékenységének időzítése (Timing) | az előírás gyakorisága, kezdete, vége és javasolt időpontja | részleges: a határidő és a pótlási idő nem írható le |
+| beteg | ServiceRequest előírásonként | előírás | részleges |
+| beteg | Task alkalmanként | alkalom | részleges, saját konvenció |
+| eredmény | Observation, QuestionnaireResponse | mérés, kitöltés (a kiadás ma is megvan) | teljes |
+| eredmény | Observation.basedOn, QuestionnaireResponse.basedOn | az alkalmat teljesítő mérés vagy kitöltés | részleges |
+| eredmény | DetectedIssue, Task, Provenance, Flag | riasztás és a beteg státusza | részleges, nincs egyetlen megfelelő |
+
+### Ahol a két modell eltér
+
+A PULSE több olyat tud, aminek a FHIR-ben nincs természetes helye. A
+riasztás a keletkezéskori szabályverzióra hivatkozik. Verzióra hivatkozni a
+FHIR-ben is lehet (canonical url és verzió), de betegre szabott szabálynak
+nincs saját erőforrása, és a verzió módosíthatatlanságát a szabvány nem
+biztosítja, az a rendszer dolga. A riasztásnak életútja, deduplikációja és eseménytörténete van.
+Az alkalom késve is teljesíthető, pótlási idővel. A javított mérés új sor, az
+eredeti megmarad, míg a FHIR a javítást a mérés amended vagy corrected
+státuszával jelöli [@fhir-r4-observation-status]. Az adathiány önálló, sosem
+kedvező állapot. Fordítva, a FHIR tud olyat, amit a PULSE nem: feltételes és
+egymásra épülő tevékenységeket (condition, trigger, relatedAction, egymásba
+ágyazott action), gazdagabb időzítést (napi több alkalom, napszak, a hét
+napjai, ismétlésszám) [@fhir-r4-datatypes], protokollból példányosított
+tervet, és tágabb tervkörnyezetet (cél, kezelt betegség, ellátócsoport).
+
+**Az alkalom.** Az alkalomnak a FHIR-ben nincs saját eleme. Saját
+konvencióként alkalmanként egy Task erőforrást rendelnék hozzá
+[@fhir-r4-task]: ennek tárgya (focus) az előírásnak megfelelő ServiceRequest,
+az időszaka (restriction.period) az alkalom időszaka, a kimenete (output) a
+teljesítő mérés vagy kitöltés. Ezt a szabvány nem írja elő, ez az én
+választásom. A Task állapotai [@fhir-r4-task-status] az esedékes, a
+teljesítve és az elmulasztva állapotot nagyjából lefedik (ready, completed,
+cancelled), a késve teljesítve viszont elvész: completed lesz belőle, a
+késés legfeljebb egy szabadon kódolt üzleti állapotban (businessStatus)
+maradhatna meg. A pótlási határ (mérésnél az időszak vége után 48 óra) sem
+fér el, mert a restriction.period egyetlen időszak. A kapcsolat is csak egy
+irányban írható le: a mérés nem hivatkozhat a Task erőforrásra, mert az
+Observation basedOn és partOf eleme ezt nem engedi.
+
+**A riasztás.** A riasztásnak nincs egyetlen pontos FHIR-megfelelője, ezért
+három részre bontottam. A tartalma (beteg, súlyosság, kiváltó adatok) a
+DetectedIssue erőforráshoz áll a legközelebb [@fhir-r4-detectedissue], de a
+szabvány ezt szűkebb célra szánja: egy tervezett vagy folyamatban lévő
+klinikai tevékenység problémájára, például gyógyszer-kölcsönhatásra. Egy
+mérési eltérés ennek tág olvasata. Az elmaradt adatküldés sem illik bele
+egyértelműen: a szabvány a technikai jellegű problémákat (például a hiányos
+adatot) az OperationOutcome erőforráshoz utalja, és értelmezés kérdése, hogy
+egy elmaradt otthoni mérés ide vagy a klinikai tevékenység problémái közé
+tartozik. Az életút (felelős, állapot,
+események) Task erőforrással és eseményenként egy Provenance erőforrással
+[@fhir-r4-provenance] írható le; a DetectedIssue saját státusza
+eredményállapot, nem munkafolyamat. A beteg összesített státuszához a Flag
+erőforrás illik [@fhir-r4-flag], amely a beteg rekordjának tömör, figyelmeztető
+kiemelése; egy-egy riasztásra viszont nem, mert a Flag nem egy adott
+személynek szóló jelzés. Mivel a riasztás jelentését csak több erőforrás
+együtt, saját kiegészítésekkel adná vissza, a riasztás belső entitás maradt.
+
+**Napi több alkalom.** A NICE napi kétszeri mérése FHIR-ben egy Timing-értékkel
+leírható (naponta kétszer, hét napig), a PULSE-ban viszont ma nem írható elő:
+egy időszakhoz egy alkalom tartozik, és ugyanarra a célra egyszerre egy
+érvényes előírás lehet. Ez a rendszer korlátja, a továbbfejlesztési
+lehetőségek között szerepel.
+
+### Mit jelentene a megvalósítás
+
+A tervből három irányban lehetne továbblépni; egyik sem vállalás, csak
+lehetséges továbbfejlesztés. A legkisebb a csak kiadás: a
+meglévő FHIR-csomag mellé CarePlan, előírásonként ServiceRequest,
+alkalmanként Task, a riasztásokból DetectedIssue, az orvosi visszajelzésből
+Communication kerülne, az adatmodell változtatása nélkül. A második egy
+statikus protokoll: a PlanDefinition és a Library leírása a repóban, egy új
+protokolltábla (url, verzió, forrás), amelyre az előírás és a szabályverzió
+hivatkozik, és egy szolgáltatás, amely a protokollból betegre előírást és
+szabályt hoz létre; ehhez már adatbázis-migráció kell. A harmadik a
+szabványos `$apply` művelet, amely a PlanDefinition-ből CarePlan-t állít elő.
+Ehhez egy FHIR-szerver és a művelet megvalósítása kellene, ezért a dolgozat
+keretén kívül esik.

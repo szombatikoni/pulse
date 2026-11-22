@@ -8,11 +8,13 @@ A kész válasz → pont tábla a verzióban tárolódik; kitöltéskor a pont o
 olvasódik ki.
 """
 
+import re
+import unicodedata
 import uuid
 from datetime import UTC, date, datetime, time
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -93,6 +95,123 @@ class VersionSpec(BaseModel):
         return self
 
 
+# --- A kérdőívszerkesztő bemenete (M3, A5) -------------------------------------
+# A VersionSpec az alap (a seed és a régebbi tesztek is ezt használják); az orvosi
+# szerkesztőből érkező verzió ennél szigorúbb: felső korlátok a méretre, csak az
+# 1–5-ös és az 1–10-es skála, és mindig a három rögzített nevű sáv (a hallgató
+# döntése, D2). A sávszabályok név szerint hivatkoznak a sávokra, így egy
+# átnevezett vagy elhagyott sáv mellett a szabály csendben soha nem riasztana.
+
+FIXED_BANDS = ("normal", "warning", "critical")
+EDITOR_SCALES = ((1, 5), (1, 10))
+TEXT_MAX = 300
+QUESTIONS_MAX = 20
+OPTIONS_MAX = 10
+OPTION_SCORE_MAX = 10
+END_LABEL_MAX = 100
+NAME_MAX = 200
+
+
+def check_editor_text(value: str | None) -> str | None:
+    """A szerkesztő szövegmezői (név, kérdés, felirat, végfelirat): vezérlőkarakter
+    (NUL, sortörés, tabulátor…) nem lehet benne (a NUL-t a PostgreSQL el sem
+    tárolná), és nem állhat csak láthatatlan karakterből (szóköz, nulla szélességű
+    szóköz és más formázókarakter), mert a beteg üresnek látná. (A magányos
+    surrogate-ot már a Pydantic szövegellenőrzése elutasítja.)"""
+    if value is None:
+        return None
+    if any(unicodedata.category(c) == "Cc" for c in value):
+        raise ValueError("a szövegben nem lehet vezérlőkarakter")
+    if all(c.isspace() or unicodedata.category(c) == "Cf" for c in value):
+        raise ValueError("a szöveg nem állhat csak láthatatlan karakterből")
+    return value
+
+
+EditorText = Annotated[str, AfterValidator(check_editor_text)]
+# Szigorú egész: a true, az "5" és az 5.5 is 422 (alapból a Pydantic átalakítaná).
+StrictInt = Annotated[int, Field(strict=True)]
+
+
+class EditorOptionSpec(OptionSpec):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    label: EditorText = Field(min_length=1, max_length=200)
+    score: StrictInt = Field(ge=0, le=OPTION_SCORE_MAX)
+
+
+class EditorQuestionSpec(QuestionSpec):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    text: EditorText = Field(min_length=1, max_length=TEXT_MAX)
+    scale_min: StrictInt | None = None
+    scale_max: StrictInt | None = None
+    min_label: EditorText | None = Field(default=None, max_length=END_LABEL_MAX)
+    max_label: EditorText | None = Field(default=None, max_length=END_LABEL_MAX)
+    options: list[EditorOptionSpec] = Field(default_factory=list, max_length=OPTIONS_MAX)
+
+    @model_validator(mode="after")
+    def check_editor_limits(self) -> "EditorQuestionSpec":
+        if self.question_type is QuestionType.SCALE:
+            if (self.scale_min, self.scale_max) not in EDITOR_SCALES:
+                raise ValueError("a skála 1–5 vagy 1–10 lehet")
+            if self.options:
+                raise ValueError("skálánál a pontokat a jobb vég adja, lehetőség nem adható meg")
+        # A beteg a feliratot látja: két azonos (kis- és nagybetűtől függetlenül)
+        # felirat között nem tudna választani, az orvos a kitöltésben nem tudná
+        # megkülönböztetni. (A belső value egyediségét a QuestionSpec nézi.)
+        labels = [o.label.casefold() for o in self.options]
+        if len(labels) != len(set(labels)):
+            raise ValueError("a válaszlehetőségek felirata egyedi")
+        return self
+
+
+class EditorBandSpec(BandSpec):
+    min: StrictInt = Field(ge=0)
+    max: StrictInt = Field(ge=0)
+
+
+class EditorVersionSpec(VersionSpec):
+    questions: list[EditorQuestionSpec] = Field(min_length=1, max_length=QUESTIONS_MAX)
+    scoring_thresholds: list[EditorBandSpec] = Field(min_length=3, max_length=3)
+
+    @model_validator(mode="after")
+    def fixed_bands(self) -> "EditorVersionSpec":
+        names = tuple(b.band for b in sorted(self.scoring_thresholds, key=lambda b: b.min))
+        if names != FIXED_BANDS:
+            raise ValueError("a sávok: normal, warning, critical, ebben a sorrendben")
+        return self
+
+
+class QuestionnaireError(ValueError):
+    """A szerkesztő hibája; a `code` alapján a felület a saját nyelvén írja ki.
+    A conflict jelzi az ütközést (HTTP 409), a többi érvénytelen adat (422)."""
+
+    def __init__(self, code: str, *, conflict: bool = False, **extra: Any) -> None:
+        super().__init__(code)
+        self.code = code
+        self.conflict = conflict
+        self.extra = extra
+
+
+# Az útvonalban foglalt szó (/doctor/questionnaires/new), ezért nem lehet kód.
+RESERVED_CODES = {"new"}
+
+
+def code_from_name(name: str) -> str:
+    """A sablon kódja a névből: ékezet nélkül, kisbetű, szám és aláhúzás (a kód
+    URL-elem, pl. a FHIR-kiadásban), legfeljebb 50 karakter. Ha a névből nem
+    képezhető (vagy foglalt szó), üres szöveg."""
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    code = re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")[:50].rstrip("_")
+    return "" if code in RESERVED_CODES else code
+
+
+# A skála végfeliratának elválasztója a válaszcímkében („1 – nagyon rosszul").
+# A felirat nincs külön tárolva; a szerkesztőhöz a scale_end_labels bontja vissza,
+# ezért a két irány ugyanezt az állandót használja.
+SCALE_LABEL_SEP = " – "
+
+
 def scale_options(spec: QuestionSpec) -> list[dict[str, Any]]:
     """A skála válasz → pont táblája a jobb vég szerint (a jobb vég 0 pont)."""
     assert spec.scale_min is not None and spec.scale_max is not None
@@ -104,11 +223,26 @@ def scale_options(spec: QuestionSpec) -> list[dict[str, Any]]:
             score = spec.scale_max - value
         label = str(value)
         if value == spec.scale_min and spec.min_label:
-            label = f"{value} – {spec.min_label}"
+            label = f"{value}{SCALE_LABEL_SEP}{spec.min_label}"
         if value == spec.scale_max and spec.max_label:
-            label = f"{value} – {spec.max_label}"
+            label = f"{value}{SCALE_LABEL_SEP}{spec.max_label}"
         options.append({"value": str(value), "label": label, "score": score})
     return options
+
+
+def scale_end_labels(question: Question) -> tuple[str | None, str | None]:
+    """A skála két végének felirata a tárolt válaszcímkékből (a scale_options
+    fordítottja): a szerkesztő ebből tölti vissza a mezőket."""
+
+    def end_label(value: int | None) -> str | None:
+        option = next((o for o in question.options_scores if o["value"] == str(value)), None)
+        if option is None or option["label"] == str(value):
+            return None
+        prefix = f"{value}{SCALE_LABEL_SEP}"
+        label = option["label"]
+        return label[len(prefix) :] if label.startswith(prefix) else None
+
+    return end_label(question.scale_min), end_label(question.scale_max)
 
 
 def _options_for(spec: QuestionSpec) -> list[dict[str, Any]]:
@@ -137,13 +271,32 @@ def create_template(
 
 
 def add_version(
-    db: Session, template: QuestionnaireTemplate, spec: VersionSpec
+    db: Session,
+    template: QuestionnaireTemplate,
+    spec: VersionSpec,
+    *,
+    base_version_no: int | None = None,
 ) -> QuestionnaireVersion:
-    """Sablonmódosítás = új verzió (F13); a régi változatlan marad."""
+    """Sablonmódosítás = új verzió (F13); a régi változatlan marad.
+
+    Egyidejű mentés: a sablon sora a verziószám olvasása előtt zárolódik
+    (SELECT … FOR UPDATE, mint a szabályoknál), így két párhuzamos mentés egymás
+    után fut, és a (template_id, version_no) egyediség nem sérülhet. A
+    base_version_no az a verzió, amelyből a szerkesztés indult (A5): ha közben
+    más mentett, a mentés ütközés (stale_version, HTTP 409), hogy az orvos ne
+    írja felül tudtán kívül a másik változtatását."""
+    db.execute(
+        select(QuestionnaireTemplate.id)
+        .where(QuestionnaireTemplate.id == template.id)
+        .with_for_update()
+    )
     last = current_version(db, template.id, required=False)
+    last_no = last.version_no if last else 0
+    if base_version_no is not None and base_version_no != last_no:
+        raise QuestionnaireError("stale_version", conflict=True, current_version_no=last_no)
     version = QuestionnaireVersion(
         template_id=template.id,
-        version_no=(last.version_no if last else 0) + 1,
+        version_no=last_no + 1,
         scoring_thresholds=[b.model_dump() for b in spec.scoring_thresholds],
         questions=[
             Question(
@@ -269,7 +422,9 @@ def submit_questionnaire(
 ) -> tuple[Submission, list[Alert]]:
     """Kitöltés ellenőrzése, pontozása és mentése, majd kiértékelés a beteg
     szabályaival (egy tranzakcióban; a commitot a hívó végzi)."""
-    from app.services.rules import evaluate_submission  # körkörös import elkerülése
+    # körkörös import elkerülése
+    from app.services.occurrences import fill_version, fulfil_with_submission
+    from app.services.rules import evaluate_submission
 
     now = now or datetime.now(UTC)
     local_today = now.astimezone(settings.tz).date()
@@ -277,7 +432,8 @@ def submit_questionnaire(
     template = templates.get(template_code)
     if template is None:
         raise SubmissionError("not_assigned")
-    version = current_version(db, template.id)
+    # Az aktuális időszak alkalmának verziója, nem a sablon legújabb verziója (M3).
+    version = fill_version(db, patient_id, template.id, local_today)
 
     by_id = {str(q.id): q for q in version.questions}
     for qid in answers:
@@ -301,6 +457,7 @@ def submit_questionnaire(
     )
     db.add(submission)
     db.flush()
+    fulfil_with_submission(db, submission)  # az aktuális időszak alkalma (M3)
     return submission, evaluate_submission(db, submission, now=now)
 
 

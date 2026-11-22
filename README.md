@@ -22,8 +22,8 @@ PULSE — Patient Understanding through Limits, Signals and Evaluation. Chronic 
 
 ## Indítás Dockerrel
 
-A teljes rendszer (adatbázis, backend, webes felület) egyetlen paranccsal
-indul. Pythont, Node.js-t vagy PostgreSQL-t nem kell telepíteni, ezek a
+A teljes rendszer (adatbázis, backend, háttérfolyamat, CQL-szolgáltatás,
+fejlesztői postafiók, webes felület) két paranccsal indul. Pythont, Node.js-t vagy PostgreSQL-t nem kell telepíteni, ezek a
 konténerekben futnak.
 
 ### Előfeltételek
@@ -38,7 +38,8 @@ konténerekben futnak.
 ### Indítás
 
 ```bash
-git clone https://github.com/szombatikoni/pulse.git
+# A fejlesztés a develop ágon halad; a main az utolsó lezárt mérföldkő állapota
+git clone --branch develop https://github.com/szombatikoni/pulse.git
 cd pulse
 
 # Az image-ek felépítése és a konténerek indítása a háttérben
@@ -56,6 +57,12 @@ Ezután:
 |---|---|
 | Webes felület | http://localhost:8080 |
 | API-dokumentáció (Swagger) | http://localhost:8000/api/docs |
+| Fejlesztői postafiók (Mailpit) | http://localhost:8025 |
+
+Új riasztásnál a beteghez rendelt orvosok e-mailt kapnak. A leveleket a
+Mailpit fogja el, valódi címre semmi nem megy ki; a levél a riasztás után
+nagyjából fél percen belül érkezik meg. Közvetlenül a seed után a postafiók
+üres.
 
 ### Demófiókok
 
@@ -66,17 +73,19 @@ Mind mesterséges; a közös jelszó: **`pulse-demo-2026`**.
 | Orvos | `dr.kovacs@pulse.example` | négy beteg, mindegyik más státuszban |
 | Orvos | `dr.nagy@pulse.example` | Tóth Mária kezelőorvosa |
 | Beteg | `varga.bela@pulse.example` | Súlyos: egy mérése 180 Hgmm felett |
-| Beteg | `szabo.janos@pulse.example` | Figyelem: két 140 feletti mérés, és a kérdőíve a figyelmeztető sávban |
-| Beteg | `kiss.ilona@pulse.example` | Adathiány: 12 napja nem mért |
+| Beteg | `szabo.janos@pulse.example` | Figyelem: három 140/90 feletti mérés egy héten belül, és a kérdőíve a figyelmeztető sávban |
+| Beteg | `kiss.ilona@pulse.example` | Adathiány: a múlt heti kérdőívkitöltése elmaradt |
 | Beteg | `molnar.katalin@pulse.example` | Rendben |
-| Beteg | `toth.maria@pulse.example` | Rendben (Nagy doktor betege) |
-| Admin | `admin@pulse.example` | betegadatot nem lát |
+| Beteg | `toth.maria@pulse.example` | Adathiány: az előírt esti pulzusmérést és a heti kérdőívet még nem teljesítette (Nagy doktor betege) |
+| Admin | `admin@pulse.example` | felhasználók, orvos–beteg összerendelések, a méréstípusok rögzíthető tartománya; betegadatot nem lát |
 
 A mérések időpontjai a seed futtatásához képest relatívak (az utolsó mérés
-a legutóbbi reggel 7:30-as, magyar idő szerint). Mivel 7 napnál régebbi adat
-már nem számít frissnek, **a demó a seed után kb. egy hétig mutatja a fenti
-státuszokat**; utána (vagy bemutató előtt) érdemes tisztán újrakezdeni:
-`docker compose down -v`, majd újra az indítás és a seed.
+a legutóbbi reggel 7:30-as, magyar idő szerint). **A demó a seed napján
+mutatja a fenti státuszokat.** Másnap 10 órától, a napi vérnyomásmérés
+határidejétől a Rendben lévő beteg is Adathiányba kerül, mert az aznapi mérése
+hiányzik. A seed ismételt futtatása a meglévő adatokat nem frissíti, ezért
+bemutató előtt érdemes tisztán újrakezdeni: `docker compose down -v`, majd
+újra az indítás és a seed.
 
 ### Leállítás
 
@@ -90,9 +99,12 @@ docker compose down -v     # leállítás ÉS az adatbázis törlése (tiszta ú
 Az alapértékek helyi kipróbálásra valók. Eltérő jelszóhoz vagy aláírókulcshoz
 másold a `.env.example` fájlt `.env` néven, és írd át. A compose
 automatikusan beolvassa. Nyilvános környezetben a `JWT_SECRET_KEY`-t
-kötelező lecserélni.
+kötelező lecserélni. Az e-mail-küldés üres `SMTP_HOST=` értékkel kapcsolható
+ki; a riasztás ilyenkor is létrejön, a levél küldés nélkül vár.
 
-A portok (8080, 8000, 5432) csak a saját gépről érhetők el.
+A portok (8080, 8000, 8025, 5432) csak a saját gépről érhetők el. Ha valamelyik
+foglalt (például fut már egy PostgreSQL az 5432-esen), a `docker-compose.yml`
+`ports:` sorában írható át.
 
 ## Fejlesztés
 
@@ -105,13 +117,18 @@ A portok (8080, 8000, 5432) csak a saját gépről érhetők el.
 | Kódellenőrzés | `uv run ruff check .` (`backend/`), `npm run lint` (`frontend/`) |
 | Böngészős folyamatteszt ([Playwright](https://playwright.dev/)) | `npm ci`, `npx playwright install chromium`, majd `npx playwright test` (`e2e/`; lásd lent) |
 
-A CI (GitHub Actions) minden pushkor ugyanezeket futtatja: `.github/workflows/ci.yml`.
+A CI (GitHub Actions) a `develop` és a `main` ágra kerülő minden változtatásnál
+ugyanezeket futtatja, a CQL-szolgáltatás tesztjeivel együtt: `.github/workflows/ci.yml`.
 
 ### Böngészős folyamatteszt
 
-Az `e2e/` teszt a két M2-folyamatot a felületen viszi végig: a beteg mér és
+Az `e2e/` tesztek a fő folyamatokat a felületen viszik végig: a beteg mér és
 kérdőívet tölt ki, az orvos a listán és az adatlapon látja a jelzést, idegen
-beteg adatlapját pedig nem nyithatja meg. Futó rendszert és **frissen seedelt**
+beteg adatlapját pedig nem nyithatja meg; emellett a szabályverziókat, a
+riasztás életútját, a mérésjavítást, a követési tervet, a kérdőívszerkesztőt,
+a NICE-kiértékelés paneljét, az admin felületet (létrehozás, összerendelés,
+letiltás), az orvosi megjegyzést és a lejárt munkamenet utáni helyben
+újrabelépést is ellenőrzik. Futó rendszert és **frissen seedelt**
 adatbázist vár, és **módosítja az adatokat**. Hogy a saját demóadataid
 megmaradjanak, külön példányon érdemes futtatni (a fő példány leállítása után,
 mert ugyanazokat a portokat használja):
@@ -131,6 +148,11 @@ készült, ELM-re lefordított CQL-szabályt a `cql-execution` motorral, és az
 eredményt egy a motortól független kézi számítással veti össze (a fordítás
 külön lépésként megismételhető). Csak Docker kell hozzá;
 a leírás és a parancsok: [integration/README.md](integration/README.md).
+
+A követési terv, a szabályok és a riasztás FHIR R4 erőforrásokra
+(PlanDefinition, Library, CarePlan) való leképezésének terve, táblázattal és
+példával: [integration/FHIR_lekepezes.md](integration/FHIR_lekepezes.md).
+Ez terv, nem megvalósítás.
 
 ## Kódrendszerek
 

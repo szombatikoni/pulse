@@ -5,6 +5,7 @@
 #   docker compose run --rm forditas   # CQL -> ELM (a fordítószolgáltatással)
 #   docker compose run --rm motor      # a motor futtatása a betegcsomagon
 #   docker compose run --rm ellenorzes # független kézi számítás és összevetés
+#   docker compose run --rm kiadas-feldolgozas  # M3: a PULSE FHIR-kiadásának feldolgozása
 #   docker compose down                # a fordítószolgáltatás leállítása
 
 name: pulse-cql
@@ -33,6 +34,16 @@ services:
     build: .
     image: pulse-cql-futtato:0.1.0
     command: ["node", "futtatas.mjs"]
+    volumes:
+      - ./:/app/work
+
+  # M3, K1: a PULSE-ból kiadott csomag (adat/pulse_kiadas_bundle.json) beolvasása
+  # a motor FHIR-adapterével és az M2-es szabály futtatása rajta. A letöltés és
+  # az adatbázis-oldali ellenőrzés a gépen fut (lásd README, „FHIR-kiadás").
+  kiadas-feldolgozas:
+    build: .
+    image: pulse-cql-futtato:0.1.0
+    command: ["node", "kiadas_feldolgozas.mjs"]
     volumes:
       - ./:/app/work
 

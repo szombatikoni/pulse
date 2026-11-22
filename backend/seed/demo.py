@@ -6,10 +6,14 @@ bemutató célra való.
 A mérések ugyanazon az úton kerülnek be, mint a felületről (rögzítés +
 kiértékelés), így a riasztásokat a valódi szabálykiértékelés hozza létre. Az
 időpontok a futtatás idejéhez képest relatívak, hogy a bemutatón mindig friss
-adat legyen. Kovács doktor listáján így minden M2-beli státusz megjelenik:
-Varga Béla Súlyos, Szabó János Figyelem, Kiss Ilona Adathiány, Molnár Katalin
-Rendben. A „Közérzet" kérdőívet minden demóbeteg megkapja; Szabó János
-legutóbbi kitöltése a figyelmeztető sávba esik.
+adat legyen. Kovács doktor listáján így minden státusz megjelenik (a Kezelve
+kivételével, amihez riasztáslezárás kell): Varga Béla Súlyos (180 feletti
+érték), Szabó János Figyelem (három 140/90 feletti érték egy héten belül, és
+figyelmeztető sávú kitöltés), Kiss Ilona Adathiány (a múlt heti Közérzet-
+kitöltése elmaradt), Molnár Katalin Rendben. A „Közérzet" kérdőívet minden
+demóbeteg hetente megkapja; a régi kitöltések után a kérdőív 2. verziót kap
+(verzióváltás-bemutató, M3, A5). A végén egy alkalom-ellenőrzés megnyitja és lezárja
+az előírások múltbeli alkalmait, mint a háttérfolyamat.
 """
 
 from datetime import UTC, date, datetime, time, timedelta
@@ -33,7 +37,9 @@ from app.models import (
     UserRole,
 )
 from app.services.measurements import get_type_by_code, record_measurement
+from app.services.occurrences import run_occurrence_check
 from app.services.questionnaires import (
+    add_version,
     assign_questionnaire,
     create_template,
     current_version,
@@ -42,7 +48,7 @@ from app.services.questionnaires import (
 from app.services.rules import create_rule
 from app.services.tasks import assign_measurement
 from app.services.users import create_user, get_user_by_email
-from seed.questionnaires import WELLBEING_CODE, WELLBEING_NAME, WELLBEING_V1
+from seed.questionnaires import WELLBEING_CODE, WELLBEING_NAME, WELLBEING_V1, WELLBEING_V2
 from seed.reference import seed_measurement_types
 
 DEMO_PASSWORD = "pulse-demo-2026"
@@ -93,21 +99,25 @@ ASSIGNMENTS = [
     ("dr.nagy@pulse.example", "toth.maria@pulse.example"),
 ]
 
-# Minden demóbeteg két vérnyomás-küszöbszabályt és két kérdőívszabályt kap a
-# kezelőorvosától (bemutató-beállítás; a szabályszerkesztő az M3-ban jön).
+# Minden demóbeteg ugyanazt a szabálykészletet kapja a kezelőorvosától, a
+# kiértékelés összehasonlításának beállítása szerint (07_mukodesi_szabalyok.md,
+# 5. rész): küszöbszabály csak a kritikus határon, a tartós eltérésre
+# időablakos szabály, a kérdőívre sáv- és trendszabály, és elmaradt adat.
 DEMO_RULES = [
-    (
-        RuleType.THRESHOLD,
-        Severity.MODERATE,
-        {
-            "measurement_type": "blood_pressure",
-            "limits": {"systolic": {"max": 140}, "diastolic": {"max": 90}},
-        },
-    ),
     (
         RuleType.THRESHOLD,
         Severity.SEVERE,
         {"measurement_type": "blood_pressure", "limits": {"systolic": {"max": 180}}},
+    ),
+    (
+        RuleType.WINDOW,
+        Severity.MODERATE,
+        {
+            "measurement_type": "blood_pressure",
+            "limits": {"systolic": {"max": 140}, "diastolic": {"max": 90}},
+            "count": 3,
+            "window_days": 7,
+        },
     ),
     (
         RuleType.QUESTIONNAIRE,
@@ -118,6 +128,16 @@ DEMO_RULES = [
         RuleType.QUESTIONNAIRE,
         Severity.SEVERE,
         {"questionnaire": WELLBEING_CODE, "bands": ["critical"]},
+    ),
+    (
+        RuleType.QUESTIONNAIRE,
+        Severity.MODERATE,
+        {"questionnaire": WELLBEING_CODE, "trend_count": 3},
+    ),
+    (
+        RuleType.MISSING_DATA,
+        Severity.MODERATE,
+        {"measurement_type": "blood_pressure", "consecutive_missed": 2},
     ),
 ]
 
@@ -136,26 +156,33 @@ DEMO_SUBMISSIONS = {
     # 1 + 1 + 0 = 2 (rendben), majd 2 + 2 + 2 = 6 (figyelmeztető sáv → riasztás)
     "szabo.janos@pulse.example": [(10, 4, 2, "never"), (3, 3, 3, "rarely")],
     "molnar.katalin@pulse.example": [(5, 5, 1, "never")],
-    # A legutóbbi adata így is 12 napos marad (Adathiány).
+    # A múlt heti alkalmát elmulasztotta (Adathiány: elmulasztott alkalom).
     "kiss.ilona@pulse.example": [(13, 4, 2, "never")],
 }
 
 # Vérnyomás-méréssorok: (hány napja, szisztolés, diasztolés).
 # fmt: off
 DEMO_BLOOD_PRESSURE = {
-    # Két 140 feletti érték: az első riasztást nyit, a második ugyanahhoz
-    # kapcsolódik, ismételt aktiválódásként (deduplikáció).
+    # 140/90 feletti értékek a 3. naptól: a harmadik (1 napja) az időablakos
+    # szabály szerint riasztást nyit, a negyedik ugyanahhoz kapcsolódik,
+    # ismételt aktiválódásként (deduplikáció).
     "szabo.janos@pulse.example": [
         (9, 132, 84), (8, 128, 82), (7, 135, 86), (6, 130, 83), (5, 134, 85),
-        (4, 129, 81), (3, 146, 92), (2, 138, 88), (1, 136, 86), (0, 152, 95),
+        (4, 129, 81), (3, 146, 92), (2, 143, 89), (1, 144, 91), (0, 152, 95),
     ],
     # Tartósan magas, egyszer 180 felett: közepes és súlyos riasztás is.
     "varga.bela@pulse.example": [
         (6, 148, 92), (5, 151, 94), (4, 149, 91), (3, 155, 96),
         (2, 158, 97), (1, 186, 104), (0, 162, 98),
     ],
-    # Rendben lévő értékek, de a legutóbbi 12 napos: nincs friss adat.
-    "kiss.ilona@pulse.example": [(15, 128, 80), (14, 131, 82), (13, 126, 79), (12, 129, 81)],
+    # Rendben lévő értékek, egy hosszabb szünettel. A legutóbbi lezárt
+    # vérnyomás-alkalma (3 napja; a pótlási ablak 2 nap) teljesített, így a
+    # napszaktól függetlenül nincs két egymást követő elmulasztás és elmaradt-
+    # adat riasztás: az Adathiányt a kérdőív elmulasztott alkalma adja.
+    "kiss.ilona@pulse.example": [
+        (15, 128, 80), (14, 131, 82), (13, 126, 79), (12, 129, 81),
+        (4, 127, 80), (3, 130, 82), (2, 128, 79),
+    ],
     "molnar.katalin@pulse.example": [
         (6, 122, 78), (5, 125, 80), (4, 119, 76), (3, 124, 79),
         (2, 121, 77), (1, 123, 78), (0, 120, 76),
@@ -213,11 +240,22 @@ def seed_demo_data(db: Session, now: datetime | None = None) -> list[str]:
     now = now or datetime.now(UTC)
     log += _seed_questionnaire(db, now)
     log += _seed_measurement_plans(db, now)
-    log += _seed_rules(db)
+    log += _seed_rules(db, now)
     log += _seed_measurements(db, now)
     log += _seed_submissions(db, now)
+    log += _seed_questionnaire_v2(db)
+    log += _check_occurrences(db, now)
     db.commit()
     return log
+
+
+def _check_occurrences(db: Session, now: datetime) -> list[str]:
+    """Egy alkalom-ellenőrzés, ugyanaz, amit a háttérfolyamat futtat: a frissen
+    betöltött adatbázis így azonnal a helyes alkalmakat és elmulasztásokat
+    mutatja, nem kell az első worker-futásra várni. Ismételt futásnál nem nyit
+    és nem zár újat (az ellenőrzés idempotens)."""
+    check = run_occurrence_check(db, now)
+    return [f"alkalom-ellenőrzés: {check.opened} megnyitva, {check.missed} elmulasztva"]
 
 
 def _seed_questionnaire(db: Session, now: datetime) -> list[str]:
@@ -256,6 +294,21 @@ def _seed_questionnaire(db: Session, now: datetime) -> list[str]:
             )
             log.append(f"kirendelés: {WELLBEING_NAME} – {patient.name}")
     return log
+
+
+def _seed_questionnaire_v2(db: Session) -> list[str]:
+    """A „Közérzet" 2. verziója (M3, A5): a régi kitöltések után, de az
+    alkalom-ellenőrzés előtt jön létre. A heti kirendelés 14 napja kezdődött,
+    így a frissen betöltött adatbázisban a mai nap egy új hét első napja: a
+    régi kitöltések az 1. verzióra hivatkoznak, a mai alkalom már a 2.-at kapja.
+    Ismételt futásnál nem jön létre újabb verzió."""
+    template = db.scalar(
+        select(QuestionnaireTemplate).where(QuestionnaireTemplate.code == WELLBEING_CODE)
+    )
+    if current_version(db, template.id).version_no != 1:
+        return []
+    add_version(db, template, WELLBEING_V2)
+    return [f"kérdőív: {WELLBEING_NAME}, 2. verzió"]
 
 
 def _seed_measurement_plans(db: Session, now: datetime) -> list[str]:
@@ -324,14 +377,23 @@ def _seed_submissions(db: Session, now: datetime) -> list[str]:
     return log
 
 
-def _seed_rules(db: Session) -> list[str]:
+# A szabályok létrehozási ideje: a legkorábbi demóadat (a legfeljebb 16 napja
+# kezdődő mérések, a 14 napja induló előírások) előtt, hogy a verzió „… óta"
+# dátuma ne legyen későbbi a rá hivatkozó, visszadátumozott riasztásoknál.
+# Szabályonként egy perccel később: így a lista a DEMO_RULES sorrendjét mutatja.
+# A kiértékelés a létrehozási időt nem olvassa, csak a sorrend és a felület.
+RULES_DAYS_BEFORE = 17
+
+
+def _seed_rules(db: Session, now: datetime) -> list[str]:
     log: list[str] = []
+    since = now - timedelta(days=RULES_DAYS_BEFORE)
     for doctor_email, patient_email in ASSIGNMENTS:
         doctor = _get(db, doctor_email)
         patient = _get(db, patient_email).patient_profile
         if db.scalar(select(exists().where(Rule.patient_id == patient.id))):
             continue
-        for rule_type, severity, params in DEMO_RULES:
+        for i, (rule_type, severity, params) in enumerate(DEMO_RULES):
             create_rule(
                 db,
                 patient_id=patient.id,
@@ -339,6 +401,7 @@ def _seed_rules(db: Session) -> list[str]:
                 rule_type=rule_type,
                 params=params,
                 severity=severity,
+                created_at=since + timedelta(minutes=i),
             )
         log.append(f"szabályok: {patient.name} ({len(DEMO_RULES)} db)")
     return log

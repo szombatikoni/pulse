@@ -1,13 +1,19 @@
 import type { PatientStatus } from '../api/patients'
 
-// A státuszterv színei (docs/design/statusz_javaslat.html; a hallgató
-// jóváhagyta 2026-09-28; 2026-10-17-én a szürke háttérhez telítettebbre
-// állítva, a hallgató kérésére). A színt mindig ikon és szó kíséri, így
-// színtévesztővel és szürkeárnyalatban is megkülönböztethető.
+// Felületterv, 2026-10-30: a státusz teli kör / teli címke a saját színében, fehér
+// jellel és szóval. A színek fehér jelhez mérve (kontraszt, színtévesztő-szimuláció);
+// a piros és a zöld színtévesztővel összemosódhat, ezért mindig ikon és szó együtt.
 export const STATUS_COLOR: Record<PatientStatus, string> = {
-  severe: '#FF4545',
-  attention: '#FFB020',
-  no_data: '#B3B3B3',
-  handled: '#4DA3FF',
-  ok: '#2FCB4A',
+  severe: 'var(--pulse-severe)',
+  attention: 'var(--pulse-warn)',
+  no_data: 'var(--pulse-nodata)',
+  handled: 'var(--pulse-handled)',
+  ok: 'var(--pulse-ok)',
+}
+
+// A teli címke háttere: a Figyelem borostyánja itt sötétebb, hogy a fehér felirat
+// olvasható legyen (4,6:1; az ikon borostyánján csak 3,3:1).
+export const STATUS_PILL: Record<PatientStatus, string> = {
+  ...STATUS_COLOR,
+  attention: 'var(--pulse-warn-pill)',
 }

@@ -1,21 +1,37 @@
 """A seed (mesterséges demóadat, M2-leadandó) gépi ellenőrzése."""
 
+from datetime import UTC, datetime, time, timedelta
+
+import pytest
 from sqlalchemy import func, select
 
+from app.core.config import settings
 from app.models import (
     Alert,
+    AlertEventType,
     Assignment,
+    AssignmentOccurrence,
+    AssignmentTarget,
     DoctorPatient,
     Measurement,
+    MeasurementType,
+    NotificationDelivery,
+    OccurrenceStatus,
     QuestionnaireTemplate,
+    QuestionnaireVersion,
     Rule,
+    RuleType,
+    Severity,
     Submission,
     User,
 )
 from app.services.access import can_access_patient
+from app.services.occurrences import OccurrenceCheck, run_occurrence_check
+from app.services.plans import list_plan
+from app.services.rules import current_version, list_rules
 from app.services.status import PatientStatus, doctor_patient_list
 from app.services.users import get_user_by_email
-from seed.demo import ASSIGNMENTS, DEMO_PASSWORD, USERS, seed_demo_data
+from seed.demo import ASSIGNMENTS, DEMO_PASSWORD, DEMO_RULES, USERS, seed_demo_data
 
 
 def count(db, model):
@@ -39,6 +55,7 @@ def test_seed_is_idempotent(db):
         Alert,
         QuestionnaireTemplate,
         Assignment,
+        AssignmentOccurrence,
         Submission,
     )
     before = [count(db, m) for m in models]
@@ -57,18 +74,168 @@ def test_seed_is_idempotent(db):
     assert not any(line.startswith(created) for line in second_run)
 
 
-def test_seeded_doctor_list_shows_every_m2_status(db):
-    # A bemutatóhoz: Kovács doktor listáján minden M2-beli státusz megjelenik,
-    # a valódi szabálykiértékelés eredményeként, priorizálva.
+def test_fresh_seed_queues_no_email(db):
+    # A mostani viselkedés rögzítése (A9): a frissen betöltött demóadat egyetlen
+    # e-mailt sem állít sorba. Ennek oka, hogy a címzett az új riasztás
+    # pillanatában érvényes összerendelésből jön, a seed összerendelései a
+    # valódi seedelési időtől érvényesek, a seedelt riasztások viszont
+    # visszadátumozottak (akkor még nem volt hozzárendelt orvos). Ha egy
+    # későbbi seed-módosítás után a seed leveleket kezdene küldeni, ez a teszt
+    # jelez (a döntés a hallgatóé: a seed küldjön-e levelet).
     seed_demo_data(db)
+    assert count(db, Alert) > 0
+    assert count(db, NotificationDelivery) == 0
+
+
+def test_seed_opens_and_closes_occurrences_at_once(db):
+    # A seed végén lefut az alkalom-ellenőrzés: a háttérfolyamat első futására
+    # nem marad munka. Tóth Mária esti pulzusmérése két hete indult, és még
+    # egyszer sem rögzítette: a pótlási ablakon (2 nap) túli 12 nap elmulasztott,
+    # a tegnapelőtti, a tegnapi és a mai alkalom még esedékes.
+    now = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
+    log = seed_demo_data(db, now=now)
+    assert any(line.startswith("alkalom-ellenőrzés") for line in log)
+    assert run_occurrence_check(db, now) == OccurrenceCheck(0, 0)
+
+    toth = get_user_by_email(db, "toth.maria@pulse.example").patient_profile
+    statuses = db.scalars(
+        select(AssignmentOccurrence.status)
+        .join(Assignment)
+        .join(MeasurementType)
+        .where(Assignment.patient_id == toth.id, MeasurementType.code == "heart_rate")
+    ).all()
+    assert statuses.count(OccurrenceStatus.MISSED) == 12
+    assert statuses.count(OccurrenceStatus.DUE) == 3
+    assert len(statuses) == 15
+
+
+@pytest.mark.parametrize("hour", [3, 9, 20])
+def test_seeded_doctor_list_shows_every_status(db, hour):
+    # A bemutatóhoz: Kovács doktor listáján minden státusz megjelenik (a Kezelve
+    # kivételével), a valódi szabálykiértékelés eredményeként, priorizálva, a
+    # futtatás napszakától függetlenül (a mérések reggel, a kitöltések este
+    # vannak, a pótlási ablak 48 óra). A seed holnapi időpontja azért kell,
+    # mert az összerendelés a valódi „most"-tól érvényes.
+    now = datetime.combine(
+        datetime.now(settings.tz).date() + timedelta(days=1), time(hour), tzinfo=settings.tz
+    )
+    seed_demo_data(db, now=now)
     kovacs = get_user_by_email(db, "dr.kovacs@pulse.example")
-    rows = doctor_patient_list(db, kovacs.doctor_profile.id)
-    assert [(p.name, r.status) for p, r in rows] == [
-        ("Varga Béla", PatientStatus.SEVERE),
-        ("Szabó János", PatientStatus.ATTENTION),
-        ("Kiss Ilona", PatientStatus.NO_DATA),
-        ("Molnár Katalin", PatientStatus.OK),
+    rows = doctor_patient_list(db, kovacs.doctor_profile.id, now)
+    assert [(p.name, r.status, [x.code for x in r.reasons]) for p, r in rows] == [
+        # 186 Hgmm (küszöb, súlyos) és tartósan 140/90 felett (időablak); a
+        # Közérzetet nem tölti ki.
+        ("Varga Béla", PatientStatus.SEVERE, ["open_alert", "open_alert", "missed_occurrence"]),
+        # Három 140/90 feletti érték egy héten belül, és figyelmeztető sávú kitöltés.
+        ("Szabó János", PatientStatus.ATTENTION, ["open_alert", "open_alert"]),
+        # A múlt heti Közérzet-alkalma elmaradt; a vérnyomását 2 napja mérte
+        # utoljára, így a tegnapi vérnyomás-alkalom határideje is lejárt (még
+        # pótolható, de a státusz a határidő után már Adathiány; K4, 2026-11-16).
+        ("Kiss Ilona", PatientStatus.NO_DATA, ["missed_occurrence", "missed_occurrence"]),
+        ("Molnár Katalin", PatientStatus.OK, ["fresh_data"]),
     ]
+    varga, szabo, kiss, _ = (r for _, r in rows)
+    assert [r.alert.rule_version.rule_type for r in varga.reasons[:2]] == [
+        RuleType.THRESHOLD,
+        RuleType.WINDOW,
+    ]
+    assert [r.alert.rule_version.rule_type for r in szabo.reasons] == [
+        RuleType.WINDOW,
+        RuleType.QUESTIONNAIRE,
+    ]
+    window_events = [e.event_type for e in szabo.reasons[0].alert.events]
+    assert window_events == [AlertEventType.CREATED, AlertEventType.RE_TRIGGERED]
+    # A két ok sorrendje (határidő szerint) a napszaktól függ.
+    by_kind = {r.occurrence.assignment.target_kind: r.occurrence for r in kiss.reasons}
+    assert by_kind[AssignmentTarget.QUESTIONNAIRE].status is OccurrenceStatus.MISSED
+    bp = by_kind[AssignmentTarget.MEASUREMENT]
+    assert bp.status is OccurrenceStatus.DUE
+    assert bp.due_at < now
+
+
+# A seed státuszai egy későbbi időpontban (review K3, 2026-11-16): a mérések
+# horgonya 7:30, a vérnyomás határideje 10:00. A „következő 10:01" a 3 és 9 órás
+# seednél aznap, a 20 órásnál másnap van. A tényleges viselkedést rögzíti: ha a
+# seed után a 10:00-s határidőig nem jön új mérés (hajnali seednél aznap, este
+# seedeltnél másnap), a Rendben beteg (Molnár Katalin) Adathiány lesz, és
+# Vargánál és Szabónál is megjelenik a lejárt vérnyomás-alkalom. Csak a reggel
+# (7:30 és 10:00 között) seedelt adatbázis mutat aznap 10:01-kor is minden
+# státuszt. A bemutató előtt ezért újra kell seedelni (a seed napi frissítése
+# az M4-listán van). A háttérfolyamat futása az eredményen nem változtat (a
+# státusz a sor nélküli lejárt határidőt is látja, review K2).
+NEXT_10_01 = {
+    3: [
+        (
+            "Varga Béla",
+            PatientStatus.SEVERE,
+            ["open_alert", "open_alert"] + ["missed_occurrence"] * 2,
+        ),
+        ("Szabó János", PatientStatus.ATTENTION, ["open_alert", "open_alert", "missed_occurrence"]),
+        ("Kiss Ilona", PatientStatus.NO_DATA, ["missed_occurrence", "missed_occurrence"]),
+        ("Molnár Katalin", PatientStatus.NO_DATA, ["missed_occurrence"]),
+    ],
+    9: [
+        ("Varga Béla", PatientStatus.SEVERE, ["open_alert", "open_alert", "missed_occurrence"]),
+        ("Szabó János", PatientStatus.ATTENTION, ["open_alert", "open_alert"]),
+        ("Kiss Ilona", PatientStatus.NO_DATA, ["missed_occurrence", "missed_occurrence"]),
+        ("Molnár Katalin", PatientStatus.OK, ["fresh_data"]),
+    ],
+}
+NEXT_10_01[20] = NEXT_10_01[3]
+
+
+@pytest.mark.parametrize("worker", [False, True])
+@pytest.mark.parametrize("hour", [3, 9, 20])
+def test_seeded_statuses_at_the_next_10_01(db, hour, worker):
+    day = datetime.now(settings.tz).date() + timedelta(days=1)
+    seed_demo_data(db, now=datetime.combine(day, time(hour), tzinfo=settings.tz))
+    later_day = day if hour < 10 else day + timedelta(days=1)
+    later = datetime.combine(later_day, time(10, 1), tzinfo=settings.tz)
+    if worker:
+        run_occurrence_check(db, later)
+    kovacs = get_user_by_email(db, "dr.kovacs@pulse.example")
+    rows = doctor_patient_list(db, kovacs.doctor_profile.id, later)
+    assert [(p.name, r.status, [x.code for x in r.reasons]) for p, r in rows] == NEXT_10_01[hour]
+    # A vérnyomás-okok a „later" napjának 10:00-s határidejéből jönnek (a többi
+    # elmulasztott ok a Közérzeté): hajnali és esti seednél mind a négy betegnél,
+    # reggelinél csak Kissnél (ő 2 napja mérte utoljára).
+    deadline = datetime.combine(later_day, time(10), tzinfo=settings.tz)
+    lapsed = [p.name for p, r in rows for x in r.reasons if x.at == deadline]
+    assert len(lapsed) == (1 if hour == 9 else 4)
+
+
+def test_seed_rules_follow_the_comparison_setup(db):
+    # 07_mukodesi_szabalyok.md, 5. rész: küszöb csak a kritikus határon, időablak,
+    # kérdőív sáv és trend, elmaradt adat.
+    seed_demo_data(db)
+    molnar = get_user_by_email(db, "molnar.katalin@pulse.example").patient_profile
+    versions = [
+        current_version(db, rule.id)
+        for rule in db.scalars(select(Rule).where(Rule.patient_id == molnar.id))
+    ]
+    by_type = [(v.rule_type, v.severity, v.params) for v in versions]
+    assert (
+        RuleType.THRESHOLD,
+        Severity.SEVERE,
+        {"measurement_type": "blood_pressure", "limits": {"systolic": {"max": 180}}},
+    ) in by_type
+    assert (
+        RuleType.MISSING_DATA,
+        Severity.MODERATE,
+        {"measurement_type": "blood_pressure", "consecutive_missed": 2},
+    ) in by_type
+    assert sorted(v.rule_type for v in versions) == sorted(
+        [
+            RuleType.THRESHOLD,
+            RuleType.WINDOW,
+            RuleType.QUESTIONNAIRE,
+            RuleType.QUESTIONNAIRE,
+            RuleType.QUESTIONNAIRE,
+            RuleType.MISSING_DATA,
+        ]
+    )
+    trend = [v.params for v in versions if v.params.get("trend_count")]
+    assert trend == [{"questionnaire": "wellbeing", "trend_count": 3}]
 
 
 def test_seeded_doctor_sees_only_own_patient(db):
@@ -87,3 +254,120 @@ def test_seeded_accounts_can_log_in(client, db):
             "/api/auth/login", json={"email": spec["email"], "password": DEMO_PASSWORD}
         )
         assert response.status_code == 200, spec["email"]
+
+
+def test_seed_wellbeing_second_version(db):
+    # M3, A5 (D5): a „Közérzet" 2. verziója a régi kitöltések után, az alkalom-
+    # ellenőrzés előtt jön létre; csak a kérdések időszaka változik, a pontozás nem.
+    now = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
+    log = seed_demo_data(db, now=now)
+    assert "kérdőív: Közérzet, 2. verzió" in log
+    template = db.scalar(
+        select(QuestionnaireTemplate).where(QuestionnaireTemplate.code == "wellbeing")
+    )
+    versions = db.scalars(
+        select(QuestionnaireVersion)
+        .where(QuestionnaireVersion.template_id == template.id)
+        .order_by(QuestionnaireVersion.version_no)
+    ).all()
+    assert [v.version_no for v in versions] == [1, 2]
+    v1, v2 = versions
+    assert [q.text for q in v2.questions] == [
+        "Hogyan aludt az elmúlt héten?",
+        "Mennyire érezte magát fáradtnak az elmúlt héten?",
+        "Tapasztalt-e szédülést az elmúlt héten?",
+    ]
+    assert v2.scoring_thresholds == v1.scoring_thresholds
+    assert [q.options_scores for q in v2.questions] == [q.options_scores for q in v1.questions]
+
+    # A régi kitöltések az 1. verzióra hivatkoznak.
+    assert set(db.scalars(select(Submission.version_id))) == {v1.id}
+
+    # A mai alkalmak (a heti időszak első napja) már a 2. verziót kapják.
+    local_today = now.astimezone(settings.tz).date()
+    occurrences = db.execute(
+        select(AssignmentOccurrence.period_start, AssignmentOccurrence.questionnaire_version_id)
+        .join(Assignment)
+        .where(Assignment.questionnaire_template_id == template.id)
+    ).all()
+    today = [
+        vid for start, vid in occurrences if start.astimezone(settings.tz).date() == local_today
+    ]
+    assert today and set(today) == {v2.id}
+    # A kitöltéssel teljesített múltbeli alkalmak (a kitöltéskor nyíltak) az 1.-et;
+    # a kitöltés nélküli múltbeli alkalmak (pl. Kiss Ilona elmulasztott múlt heti
+    # alkalma) viszont csak a záró ellenőrzésben nyílnak meg, ezért a 2.-at. Ezt a
+    # felület sehol nem mutatja (a verzió csak a kitöltéskor számít); a viselkedést
+    # rögzíti a teszt, a döntés a hallgatóé (A5, a terv 4. pontjának nyitott kérdése).
+    submitted_on = {
+        s.occurrence_id for s in db.scalars(select(Submission)) if s.occurrence_id is not None
+    }
+    by_id = dict(
+        db.execute(
+            select(AssignmentOccurrence.id, AssignmentOccurrence.questionnaire_version_id)
+            .join(Assignment)
+            .where(Assignment.questionnaire_template_id == template.id)
+        ).all()
+    )
+    assert {by_id[i] for i in submitted_on} == {v1.id}
+    kiss = get_user_by_email(db, "kiss.ilona@pulse.example").patient_profile
+    missed = db.scalars(
+        select(AssignmentOccurrence.questionnaire_version_id)
+        .join(Assignment)
+        .where(
+            Assignment.patient_id == kiss.id,
+            Assignment.questionnaire_template_id == template.id,
+            AssignmentOccurrence.status == OccurrenceStatus.MISSED,
+        )
+    ).all()
+    assert missed == [v2.id]
+
+    # Ismételt futásnál nem jön újabb verzió.
+    seed_demo_data(db, now=now)
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(QuestionnaireVersion)
+            .where(QuestionnaireVersion.template_id == template.id)
+        )
+        == 2
+    )
+
+
+def test_seeded_rules_keep_their_order_and_predate_the_data(db):
+    # A szabálylista egy típuson belül is a seed sorrendjét adja (nem a véletlen
+    # UUID-ét), és a szabályverziók a legkorábbi visszadátumozott adat előtt
+    # jönnek létre: a „… óta" dátum nem későbbi a rájuk hivatkozó riasztásnál.
+    # 07:00 helyi idő: a mérések napi 7:30-as horgonya még a tegnapi, így a
+    # legkorábbi mérés a lehető legkorábbi (16 nap és fél óra).
+    now = datetime(2026, 11, 20, 6, 0, tzinfo=UTC)
+    seed_demo_data(db, now=now)
+    for _doctor, email in ASSIGNMENTS:
+        patient = get_user_by_email(db, email).patient_profile
+        entries = list_rules(db, patient.id)
+        assert [(e.current.rule_type, e.current.severity, e.current.params) for e in entries] == [
+            (rule_type, severity, params) for rule_type, severity, params in DEMO_RULES
+        ]
+        latest_version = max(e.current.created_at for e in entries)
+        earliest_data = min(
+            db.scalar(
+                select(func.min(Measurement.measured_at)).where(
+                    Measurement.patient_id == patient.id
+                )
+            ),
+            db.scalar(
+                select(func.min(Submission.submitted_at)).where(Submission.patient_id == patient.id)
+            )
+            or now,
+            db.scalar(select(func.min(Alert.created_at)).where(Alert.patient_id == patient.id))
+            or now,
+        )
+        assert latest_version < earliest_data, email
+        assert latest_version < now - timedelta(days=16)
+
+
+def test_seeded_plan_order_is_stable(db):
+    # Azonos kezdetű előírások: előbb a mérések név szerint, aztán a kérdőív.
+    seed_demo_data(db, now=datetime(2026, 11, 20, 12, 0, tzinfo=UTC))
+    toth = get_user_by_email(db, "toth.maria@pulse.example").patient_profile
+    assert [e.name for e in list_plan(db, toth.id)] == ["Pulzus", "Vérnyomás", "Közérzet"]

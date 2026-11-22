@@ -4,6 +4,7 @@ import { Navigate, Outlet, useLocation } from 'react-router'
 
 import { HOME_BY_ROLE, type Role, useCurrentUser } from '../api/auth'
 import { AppLayout } from '../components/AppLayout'
+import { ReloginDialog } from './ReloginDialog'
 import { getToken } from './token'
 
 /** Védett útvonalcsoport: csak bejelentkezve, és csak a megadott szerepkörrel.
@@ -26,7 +27,8 @@ export function RequireAuth({ role }: { role: Role }) {
     )
   }
   if (me.isError) {
-    // A lejárt munkamenetet (401) az API-kliens már kezeli; ide csak más hiba jut.
+    // A lejárt munkamenetet (401) az API-kliens már kezeli (első betöltésnél a
+    // belépőoldalra visz, a keretben az újrabelépő ablakot nyitja); ide csak más hiba jut.
     return (
       <Center h="100vh">
         <Alert color="red">{t('errors.unavailable')}</Alert>
@@ -39,6 +41,8 @@ export function RequireAuth({ role }: { role: Role }) {
   return (
     <AppLayout user={me.data}>
       <Outlet />
+      {/* Lejárt munkamenetnél újrabelépés helyben, az oldal megtartásával (M3, A8 D3). */}
+      <ReloginDialog user={me.data} />
     </AppLayout>
   )
 }

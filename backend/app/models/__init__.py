@@ -17,13 +17,19 @@ from app.models.measurement import (
     MeasurementComponent,
     MeasurementType,
     MeasurementValue,
+    not_superseded,
 )
+from app.models.note import Note
+from app.models.notification import Notification, NotificationType
+from app.models.notification_delivery import DeliveryKind, DeliveryStatus, NotificationDelivery
 from app.models.questionnaire import (
     Answer,
     Assignment,
+    AssignmentOccurrence,
     AssignmentTarget,
     Frequency,
     GoodEnd,
+    OccurrenceStatus,
     Question,
     QuestionnaireTemplate,
     QuestionnaireVersion,
@@ -39,8 +45,11 @@ __all__ = [
     "AlertStatus",
     "Answer",
     "Assignment",
+    "AssignmentOccurrence",
     "AssignmentTarget",
     "Base",
+    "DeliveryKind",
+    "DeliveryStatus",
     "DoctorPatient",
     "DoctorProfile",
     "Frequency",
@@ -49,6 +58,11 @@ __all__ = [
     "MeasurementComponent",
     "MeasurementType",
     "MeasurementValue",
+    "Note",
+    "Notification",
+    "NotificationDelivery",
+    "NotificationType",
+    "OccurrenceStatus",
     "PatientProfile",
     "Question",
     "QuestionType",
@@ -61,4 +75,5 @@ __all__ = [
     "Submission",
     "User",
     "UserRole",
+    "not_superseded",
 ]

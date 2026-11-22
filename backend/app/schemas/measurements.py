@@ -41,12 +41,25 @@ class ValueOut(BaseModel):
     unit: str
 
 
+class MeasurementCorrection(BaseModel):
+    """A mérés javítása (A7): csak az értékek, a mérés ideje az eredetié marad."""
+
+    values: dict[str, float] = Field(
+        min_length=1, max_length=10, examples=[{"systolic": 131, "diastolic": 82}]
+    )
+
+
 class MeasurementOut(BaseModel):
     id: uuid.UUID
     type_code: str
     measured_at: datetime
     recorded_at: datetime
     values: list[ValueOut]
+    # Javításnál a javított (eredeti) mérés azonosítója (A7).
+    corrected_from: uuid.UUID | None = None
+    # Ha a mérést felülírták: a javítás azonosítója. Az ilyen mérés az
+    # előzményben jelölve marad, a grafikon és a kiértékelés kihagyja.
+    corrected_by: uuid.UUID | None = None
 
 
 def measurement_out(measurement: Measurement) -> MeasurementOut:
@@ -60,6 +73,8 @@ def measurement_out(measurement: Measurement) -> MeasurementOut:
             ValueOut(component=v.component.code, value=v.value, unit=v.component.unit)
             for v in values
         ],
+        corrected_from=measurement.corrected_from,
+        corrected_by=measurement.correction.id if measurement.correction else None,
     )
 
 

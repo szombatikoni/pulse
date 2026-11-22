@@ -1,19 +1,20 @@
-"""A beteg teendői: az előírások aktuális és előző időszaka (F6, F14).
+"""A beteg teendői: az előírások aktuális és előző időszaka (F6, F14; M3, A3).
 
-Számított előnézet: az alkalmakat nem tárolja, hanem minden lekérdezéskor az
-előírásból és a beérkezett adatokból számolja ki. A szabályok az M1
+A teendőlista a tárolt alkalmakból (AssignmentOccurrence, occurrences.py)
+dolgozik, nem számol külön: ami az alkalomnál teljesített, az kész; ami
+esedékes, az a határidőig esedékes, utána lejárt. Az aktuális és az előző
+időszak alkalmát a lekérés megnyitja, ha még nincs (ugyanaz az idempotens út,
+mint a mentésnél), így a háttérfolyamat ütemétől nem függ. A szabályok az M1
 adatmodelljéből jönnek (docs/M1/03_adatmodell.md, „Előírás és alkalom"):
 
-- az időszak napi előírásnál a helyi naptári nap; heti vagy N napos előírásnál a
-  kezdőnaptól (start_date) számított teljes időköz (7, illetve interval_days nap);
-- a határidő (due_at) az időszak utolsó napján, a due_time időpontban van;
-- a mérés a mérés ideje (measured_at), a kitöltés a beküldés ideje szerint
-  kerül az időszakába;
-- az elmaradt mérés az időszak vége után két napig pótolható (MAX_BACKDATE);
-  kérdőívnél nincs pótlás (a hallgató döntése, 2026-10-15).
-
-Az M3-ban az alkalmak (AssignmentOccurrence) ugyanezzel a szabállyal
-tárolódnak, és azokra épül a késés rögzítése és az elmaradt adat jelzése.
+- az időszak és a határidő az occurrences.py szerint;
+- az elmaradt mérés az időszak vége után 48 óráig pótolható (MAX_BACKDATE,
+  ugyanaz a határ, mint a háttérfolyamat zárásánál: occurrences.catch_up_deadline);
+  kérdőívnél nincs pótlás (a hallgató döntése, 2026-10-15);
+- letiltott betegnek nincs teendője (a lekérés alkalmat sem nyit nála), és
+  visszaengedélyezés után a letiltott időszakba eső határidejű időszak nem
+  jelenik meg teendőként, késésben vagy pótolhatóként sem (M3, A1;
+  services/disabled.py).
 """
 
 import uuid
@@ -21,21 +22,35 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from enum import StrEnum
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import (
     Assignment,
+    AssignmentOccurrence,
     AssignmentTarget,
     Frequency,
     Measurement,
     MeasurementType,
+    OccurrenceStatus,
     QuestionnaireTemplate,
-    QuestionnaireVersion,
-    Submission,
+)
+from app.services.disabled import (
+    DisabledPeriod,
+    disabled_periods,
+    inactive_patients,
+    is_excused,
 )
 from app.services.measurements import MAX_BACKDATE
+from app.services.occurrences import (
+    Period,
+    catch_up_deadline,
+    occurrence_for,
+    period_containing,
+    period_end,
+    valid_on,
+)
 
 # A „Pótlás" javasolt időpontja ennyivel a legkorábbi rögzíthető idő után van,
 # hogy a mentésig eltelt idő miatt se essen ki a két napos ablakból.
@@ -43,9 +58,9 @@ CATCH_UP_MARGIN = timedelta(minutes=5)
 
 
 class TaskState(StrEnum):
-    DONE = "done"  # az aktuális időszakban már érkezett adat
-    DUE = "due"  # még nem érkezett, a határidő még nem járt le
-    LATE = "late"  # a határidő lejárt, de az időszak még tart (késve teljesíthető)
+    DONE = "done"  # az aktuális alkalom teljesítve (időben vagy késve)
+    DUE = "due"  # esedékes, a határidő még nem járt le
+    LATE = "late"  # esedékes, a határidő lejárt, de az időszak még tart (késve teljesíthető)
 
 
 @dataclass
@@ -76,7 +91,8 @@ def assign_measurement(
     suggested_time: time | None = None,
     interval_days: int | None = None,
 ) -> Assignment:
-    """Mérés előírása a betegnek (F14). Az alkalmak tárolása az M3-ban jön."""
+    """Mérés előírása a betegnek (F14), ellenőrzések nélkül: a demóadathoz és a
+    tesztekhez. Az orvosi felület útja a plans.create()."""
     assignment = Assignment(
         patient_id=patient_id,
         assigned_by=assigned_by,
@@ -93,70 +109,85 @@ def assign_measurement(
     return assignment
 
 
-def _period_days(assignment: Assignment) -> int:
-    if assignment.frequency is Frequency.DAILY:
-        return 1
-    if assignment.frequency is Frequency.WEEKLY:
-        return 7
-    return assignment.interval_days or 1
-
-
-def _local_midnight(day: date) -> datetime:
-    return datetime.combine(day, time(0), tzinfo=settings.tz)
-
-
-def _last_data_at(
-    db: Session, assignment: Assignment, start: datetime, end: datetime
-) -> datetime | None:
-    """A legutóbbi adat ideje az előírás [start, end) időszakában."""
-    if assignment.target_kind is AssignmentTarget.MEASUREMENT:
-        return db.scalar(
-            select(func.max(Measurement.measured_at)).where(
-                Measurement.patient_id == assignment.patient_id,
-                Measurement.type_id == assignment.measurement_type_id,
-                Measurement.measured_at >= start,
-                Measurement.measured_at < end,
-            )
-        )
-    return db.scalar(
-        select(func.max(Submission.submitted_at))
-        .join(QuestionnaireVersion)
-        .where(
-            Submission.patient_id == assignment.patient_id,
-            QuestionnaireVersion.template_id == assignment.questionnaire_template_id,
-            Submission.submitted_at >= start,
-            Submission.submitted_at < end,
-        )
-    )
-
-
 def _active_assignments(db: Session, patient_id: uuid.UUID, today: date) -> list[Assignment]:
     """Az éppen érvényes előírások (ugyanaz a szűrés, mint a kirendelt kérdőíveknél)."""
     return list(
         db.scalars(
             select(Assignment)
-            .where(
-                Assignment.patient_id == patient_id,
-                Assignment.revoked_at.is_(None),
-                Assignment.start_date <= today,
-                or_(Assignment.end_date.is_(None), Assignment.end_date >= today),
-            )
+            .where(Assignment.patient_id == patient_id, *valid_on(today))
             .order_by(Assignment.start_date, Assignment.id)
         )
     )
 
 
-def _task(db: Session, assignment: Assignment, now: datetime) -> PatientTask | None:
-    today = now.astimezone(settings.tz).date()
-    days = _period_days(assignment)
-    k = (today - assignment.start_date).days // days
-    first_day = assignment.start_date + timedelta(days=k * days)
-    start = _local_midnight(first_day)
-    end = _local_midnight(first_day + timedelta(days=days))
-    due_at = datetime.combine(
-        first_day + timedelta(days=days - 1), assignment.due_time, tzinfo=settings.tz
+_DONE = {OccurrenceStatus.FULFILLED, OccurrenceStatus.FULFILLED_LATE}
+
+
+def _done_at(db: Session, occurrence: AssignmentOccurrence) -> datetime | None:
+    """Mikor készült a teljesítő adat: mérésnél a mérés ideje (measured_at), mert
+    a beteg ezt adta meg; kitöltésnél a beküldés ideje (= fulfilled_at).
+
+    Az alkalom az eredeti mérésre mutat akkor is, ha azt később javították (A7):
+    szűrés itt nem kell, mert a javítás a mérési időt nem változtatja (D1)."""
+    if occurrence.status not in _DONE:
+        return None
+    if occurrence.measurement_id is not None:
+        measurement = db.get(Measurement, occurrence.measurement_id)
+        if measurement is not None:
+            return measurement.measured_at
+    return occurrence.fulfilled_at
+
+
+def _catch_up_only(
+    db: Session,
+    assignment: Assignment,
+    code: str,
+    name: str,
+    period: Period,
+    now: datetime,
+    excused: list[DisabledPeriod],
+) -> PatientTask | None:
+    """Visszaengedélyezés napja, ha a mai határidő a letiltás alatt telt le és a
+    mai alkalom nem teljesült (A1): a mai alkalom nem teendő. Ha viszont az előző
+    időszak határideje a letiltás előtt volt (számít), még nem teljesült és még
+    pótolható, akkor az előző időszak a pótlás ajánlatával; így a letiltás előtti
+    pótlás lehetősége nem vész el. Ezt a teendőt a pótlási ajánlat és a hiányzó
+    „előző elmaradt" jelzés (previous_missed=False) különbözteti meg; a beteg
+    felülete ilyenkor csak a pótlást mutatja (TaskList.tsx), állapotsor és a mai
+    időszakra mentő fő gomb nélkül. Egyébként nincs teendő (a következő időszak a
+    kezdetétől látszik)."""
+    if assignment.target_kind is not AssignmentTarget.MEASUREMENT:
+        return None
+    if period.first_day <= assignment.start_date:
+        return None
+    previous_period = period_containing(assignment, period.first_day - timedelta(days=1))
+    if is_excused(excused, previous_period.due_at):
+        return None
+    deadline = catch_up_deadline(previous_period.end)
+    suggested = max(previous_period.due_at, now - MAX_BACKDATE + CATCH_UP_MARGIN)
+    if now >= deadline or suggested >= previous_period.end:
+        return None
+    previous = occurrence_for(db, assignment, previous_period)
+    if previous.status is not OccurrenceStatus.DUE:
+        return None
+    return PatientTask(
+        assignment=assignment,
+        code=code,
+        name=name,
+        period_start=previous.period_start,
+        period_end=previous_period.end,
+        due_at=previous.due_at,
+        state=TaskState.LATE,
+        done_at=None,
+        previous_missed=False,
+        catch_up_until=deadline,
+        catch_up_suggested_at=suggested,
     )
 
+
+def _task(
+    db: Session, assignment: Assignment, now: datetime, excused: list[DisabledPeriod]
+) -> PatientTask | None:
     if assignment.target_kind is AssignmentTarget.MEASUREMENT:
         mtype = db.get(MeasurementType, assignment.measurement_type_id)
         if mtype is None:
@@ -168,41 +199,60 @@ def _task(db: Session, assignment: Assignment, now: datetime) -> PatientTask | N
             return None
         code, name = template.code, template.name
 
-    done_at = _last_data_at(db, assignment, start, end)
-    if done_at is not None:
+    period = period_containing(assignment, now.astimezone(settings.tz).date())
+    if is_excused(excused, period.due_at):
+        # A határidő a letiltás alatt telt le (A1): ez az alkalom nem esedékes és nem
+        # késésben, sort sem nyitunk rá. Ha már teljesült, kész teendőként látszik;
+        # ha nem, de az előző (számító) időszak még pótolható, az látszik.
+        existing = db.scalar(
+            select(AssignmentOccurrence).where(
+                AssignmentOccurrence.assignment_id == assignment.id,
+                AssignmentOccurrence.due_at == period.due_at,
+            )
+        )
+        if existing is None or existing.status not in _DONE:
+            return _catch_up_only(db, assignment, code, name, period, now, excused)
+        current = existing
+    else:
+        current = occurrence_for(db, assignment, period)
+    if current.status in _DONE:
         state = TaskState.DONE
     else:
-        state = TaskState.LATE if now > due_at else TaskState.DUE
+        state = TaskState.LATE if now > current.due_at else TaskState.DUE
 
-    # Az előző időszak: csak ha az előírás már akkor is érvényes volt.
+    # Az előző időszak: csak ha az előírás már akkor is érvényes volt. Elmaradt,
+    # ha az alkalma nem teljesült (még esedékes, vagy a háttérfolyamat már
+    # elmulasztottra zárta).
     previous_missed = False
     catch_up_until = catch_up_suggested_at = None
-    if k > 0:
-        prev_first_day = first_day - timedelta(days=days)
-        prev_start = _local_midnight(prev_first_day)
-        if _last_data_at(db, assignment, prev_start, start) is None:
+    previous_period = (
+        period_containing(assignment, period.first_day - timedelta(days=1))
+        if period.first_day > assignment.start_date
+        else None
+    )
+    # A letiltott időszakba eső határidejű előző időszak nem elmaradt (A1).
+    if previous_period is not None and not is_excused(excused, previous_period.due_at):
+        previous = occurrence_for(db, assignment, previous_period)
+        if previous.status not in _DONE:
             previous_missed = True
-            if (
-                assignment.target_kind is AssignmentTarget.MEASUREMENT
-                and now < start + MAX_BACKDATE
-            ):
-                prev_due = datetime.combine(
-                    first_day - timedelta(days=1), assignment.due_time, tzinfo=settings.tz
-                )
-                suggested = max(prev_due, now - MAX_BACKDATE + CATCH_UP_MARGIN)
-                if suggested < start:
-                    catch_up_until = start + MAX_BACKDATE
+            # Az előző időszak vége az aktuális kezdete; a pótlás határa ugyanabból
+            # a képletből jön, mint a worker zárásáé (abszolút 48 óra).
+            deadline = catch_up_deadline(period.start)
+            if assignment.target_kind is AssignmentTarget.MEASUREMENT and now < deadline:
+                suggested = max(previous.due_at, now - MAX_BACKDATE + CATCH_UP_MARGIN)
+                if suggested < period.start:
+                    catch_up_until = deadline
                     catch_up_suggested_at = suggested
 
     return PatientTask(
         assignment=assignment,
         code=code,
         name=name,
-        period_start=start,
-        period_end=end,
-        due_at=due_at,
+        period_start=current.period_start,
+        period_end=period_end(current),
+        due_at=current.due_at,
         state=state,
-        done_at=done_at,
+        done_at=_done_at(db, current),
         previous_missed=previous_missed,
         catch_up_until=catch_up_until,
         catch_up_suggested_at=catch_up_suggested_at,
@@ -213,10 +263,16 @@ def patient_tasks(
     db: Session, patient_id: uuid.UUID, now: datetime | None = None
 ) -> list[PatientTask]:
     """A beteg teendői az érvényes előírásai szerint. Sorrend: előbb ami még
-    hiányzik (lejárt, esedékes), aztán a pótolható, végül a kész."""
+    hiányzik (lejárt, esedékes), aztán a pótolható, végül a kész. A hiányzó
+    alkalmakat megnyitja; a véglegesítést (commit) a hívó végzi."""
     now = now or datetime.now(UTC)
+    if inactive_patients(db, [patient_id]):
+        return []  # letiltott beteg: nincs teendő, alkalmat sem nyit (A1)
     today = now.astimezone(settings.tz).date()
-    tasks = [t for a in _active_assignments(db, patient_id, today) if (t := _task(db, a, now))]
+    excused = disabled_periods(db, patient_id)
+    tasks = [
+        t for a in _active_assignments(db, patient_id, today) if (t := _task(db, a, now, excused))
+    ]
 
     def rank(task: PatientTask) -> int:
         if task.state is TaskState.LATE:
@@ -226,4 +282,5 @@ def patient_tasks(
         return 2 if task.catch_up_until else 3
 
     tasks.sort(key=lambda t: (rank(t), t.due_at))
+    db.flush()
     return tasks

@@ -1,249 +1,182 @@
-import { Anchor, Group, Loader, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core'
-import type { TFunction } from 'i18next'
+import { Button, Loader, Text } from '@mantine/core'
+import { ArrowLeft, Note } from '@phosphor-icons/react'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 
-import { ApiError } from '../../api/client'
-import { type MeasurementType, useMeasurementTypes } from '../../api/measurements'
-import {
-  type Alert,
-  type RuleVersion,
-  type Trigger,
-  usePatient,
-  usePatientAlerts,
-} from '../../api/patients'
+import { useAlertMutations } from '../../api/alerts'
+import { ApiError, apiGet } from '../../api/client'
+import { useMeasurementTypes } from '../../api/measurements'
+import { type Alert, usePatient } from '../../api/patients'
+import { useQuestionnaireTemplates } from '../../api/plans'
+import { usePatientSubmissions } from '../../api/questionnaires'
+import { usePatientRules } from '../../api/rules'
 import type { Task } from '../../api/tasks'
+import { DisabledMark } from '../../components/DisabledMark'
 import { StatusIcon, StatusLabel } from '../../components/StatusLabel'
-import { STATUS_COLOR } from '../../components/statusColors'
-import {
-  ageInYears,
-  componentLabel,
-  formatDateTime,
-  formatMeasurementNumber,
-  formatNumber,
-  formatRelative,
-  formatSoon,
-  formatUntil,
-  unitLabel,
-} from '../../format'
-import { MeasurementHistory } from '../patient/MeasurementHistory'
+import { ageInYears, formatRelative, formatSoon, formatUntil } from '../../format'
+import i18n from '../../i18n'
 import { TaskIcon } from '../patient/TaskList'
-import { reasonText, triggerText } from './reasons'
+import { AlertCard, ClosedAlert } from './AlertCards'
+import { CarePlan } from './CarePlan'
+import { MeasurementCharts } from './charts/MeasurementCharts'
+import { NicePanel } from './NicePanel'
+import { NOTE_FIELD_ID, NotesCard } from './NotesCard'
+import './patientDetail.css'
+import { reasonText } from './reasons'
+import type { RuleTextContext } from './ruleText'
+import { RulesTab } from './RulesTab'
 import { SubmissionHistory } from './SubmissionHistory'
 
-/** A szabályverzió feltétele olvashatóan: mérésnél „Szisztolés > 140 Hgmm vagy
- * Diasztolés > 90 Hgmm", kérdőívnél „„Közérzet” pontszáma a(z) figyelmeztető vagy
- * kritikus sávban". */
-function conditionText(
-  t: TFunction,
-  version: RuleVersion,
-  types: MeasurementType[],
-  questionnaireName: string | undefined,
-): string {
-  if (version.rule_type === 'questionnaire') {
-    const bands = (version.params.bands ?? [])
-      .map((b) => t(`questionnaires.bands.${b}`, { defaultValue: b }))
-      .join(t('doctor.alert.or'))
-    return t('doctor.alert.questionnaireCondition', {
-      name: questionnaireName ?? version.params.questionnaire,
-      bands,
-    })
-  }
-  const typeCode = version.params.measurement_type ?? ''
-  const type = types.find((x) => x.code === typeCode)
-  return Object.entries(version.params.limits ?? {})
-    .flatMap(([component, limit]) => {
-      const label = componentLabel(t, typeCode, component)
-      const unitCode = type?.components.find((c) => c.code === component)?.unit ?? ''
-      const unit = unitLabel(t, unitCode)
-      const parts: string[] = []
-      if (limit.max !== undefined) parts.push(`${label} > ${formatNumber(limit.max)} ${unit}`)
-      if (limit.min !== undefined) parts.push(`${label} < ${formatNumber(limit.min)} ${unit}`)
-      return parts
-    })
-    .join(t('doctor.alert.or'))
-}
-
-/** A riasztás legutóbbi kiváltó adata (a legújabb eseményből). */
-function latestTrigger(alert: Alert): Trigger | undefined {
-  for (let i = alert.events.length - 1; i >= 0; i -= 1) {
-    const triggers = alert.events[i].triggers
-    if (triggers.length) return triggers[triggers.length - 1]
-  }
-  return undefined
-}
-
-/** A riasztás címe: mi történt, hétköznapi szavakkal. */
-function alertTitle(t: TFunction, alert: Alert, trigger: Trigger | undefined): string {
-  const version = alert.rule_version
-  if (version.rule_type === 'questionnaire' && trigger?.submission) {
-    const s = trigger.submission
-    return t('doctor.alert.titleQuestionnaire', {
-      name: s.questionnaire_name,
-      band: t(`questionnaires.bands.${s.band}`, { defaultValue: s.band }),
-    })
-  }
-  const type = t(`measurementTypes.${version.params.measurement_type ?? ''}`, {
-    defaultValue: version.params.measurement_type ?? '',
+/** A beteg összes riasztása, a lezártakkal együtt: a lezárt kártyához és a
+ * grafikonon a riasztást kiváltó mérések jelöléséhez. (A határvonalak a szabálylistából
+ * jönnek, M3, A8.) */
+function useAllAlerts(patientId: string) {
+  return useQuery({
+    queryKey: ['patients', patientId, 'alerts', 'all'],
+    queryFn: () => apiGet<Alert[]>(`/patients/${patientId}/alerts?include_closed=true`),
   })
-  const below = trigger?.violations.some((v) => v.bound === 'min')
-  return t(below ? 'doctor.alert.titleBelow' : 'doctor.alert.titleAbove', { type })
 }
 
-/** Egy riasztás magyarázattal (F17): mi történt, melyik szabályverzió, mely adatok,
- * melyik határ; az események idővonalon, a legújabb elöl. */
-function AlertCard({ alert, types }: { alert: Alert; types: MeasurementType[] }) {
+/** Megtekintett (A6 D1): amikor az orvos az adatlapot megnyitja, az új (new)
+ * riasztásokat külön POST-tal megtekintettnek jelöli, riasztásonként egyszer. A
+ * lekérdezés maga csak olvas; a szerver oldalon a megtekintés idempotens. */
+function useMarkSeen(patientId: string, alerts: Alert[] | undefined) {
+  const { seen } = useAlertMutations(patientId)
+  const sent = useRef(new Set<string>())
+  const { mutate } = seen
+  useEffect(() => {
+    for (const alert of alerts ?? []) {
+      if (alert.status !== 'new' || sent.current.has(alert.id)) continue
+      sent.current.add(alert.id)
+      mutate(alert.id)
+    }
+  }, [alerts, mutate])
+}
+
+/** A teendők teljesítése az orvos szemszögéből: mi kész, mi esedékes, mi maradt el.
+ * A terv 30 napos sávja napi előzményt kívánna; a végpont csak az aktuális
+ * időszakot adja, ezért itt az előírásonkénti állapot látszik. */
+function TaskProgress({ tasks, disabled }: { tasks: Task[]; disabled: boolean }) {
   const { t } = useTranslation()
-  const status = alert.severity === 'severe' ? 'severe' : 'attention'
-  const version = alert.rule_version
-  const trigger = latestTrigger(alert)
-  const questionnaireName = alert.events.flatMap((e) => e.triggers).find((x) => x.submission)
-    ?.submission?.questionnaire_name
-
-  let bigValue: { value: string; unit: string; at: string } | null = null
-  if (trigger?.measurement) {
-    const m = trigger.measurement
-    bigValue = {
-      value: formatMeasurementNumber(m),
-      unit: unitLabel(t, m.values[0]?.unit ?? ''),
-      at: formatRelative(t, m.measured_at),
-    }
-  } else if (trigger?.submission) {
-    const s = trigger.submission
-    bigValue = {
-      value: String(s.total_score),
-      unit: t('doctor.alert.points', { max: s.max_score }),
-      at: formatDateTime(s.submitted_at),
-    }
-  }
-
   return (
-    <div className="pulse-alert" style={{ boxShadow: `inset 3px 0 0 ${STATUS_COLOR[status]}` }}>
-      <Group justify="space-between" align="flex-start" wrap="wrap" gap="xs">
-        <Stack gap={2} style={{ minWidth: 0 }}>
-          <Group gap="xs" wrap="nowrap">
-            <StatusIcon status={status} />
-            <Text fw={700}>{alertTitle(t, alert, trigger)}</Text>
-          </Group>
-          <Text size="xs" c="dimmed">
-            {t('doctor.alert.rule', {
-              type: t(`doctor.ruleTypes.${version.rule_type}`),
-              version: version.version_no,
-              severity: t(`severity.${alert.severity}`),
-            })}
-          </Text>
-        </Stack>
-        {bigValue && (
-          <Stack gap={0} align="flex-end">
-            <Text fw={700} fz={24} lh={1.1}>
-              {bigValue.value}{' '}
-              <Text span size="sm" fw={500} c="dimmed">
-                {bigValue.unit}
-              </Text>
-            </Text>
-            <Text size="xs" c="dimmed">
-              {bigValue.at}
-            </Text>
-          </Stack>
-        )}
-      </Group>
-      <Text size="sm" c="dimmed">
-        {t('doctor.alert.condition', {
-          condition: conditionText(t, version, types, questionnaireName),
-        })}
-      </Text>
-      <ol className="pulse-timeline">
-        {[...alert.events].reverse().map((event, i) => (
-          <li key={i}>
-            <span className="dot" aria-hidden="true" />
-            <Text span size="sm" c="dimmed" className="when">
-              {formatDateTime(event.created_at)}
-            </Text>
-            <span>
-              <Text span size="sm" fw={600}>
-                {t(`doctor.alert.events.${event.event_type}`)}
-              </Text>
-              {event.triggers.map((tr) => (
-                <Text span size="sm" key={tr.measurement?.id ?? tr.submission?.id}>
-                  {' · '}
-                  {tr.measurement
-                    ? `${formatMeasurementNumber(tr.measurement)} ${unitLabel(t, tr.measurement.values[0]?.unit ?? '')}`
-                    : null}
-                  <Text span size="sm" c="dimmed">
-                    {tr.measurement ? ` (${triggerText(t, tr)})` : triggerText(t, tr)}
-                  </Text>
-                </Text>
-              ))}
-              {event.rule_version && event.rule_version.version_no !== version.version_no && (
-                <Text span size="xs" c="dimmed">
-                  {' · '}
-                  {t('doctor.alert.eventVersion', { version: event.rule_version.version_no })}
-                </Text>
-              )}
-            </span>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <section className="pd-card" aria-labelledby="pd-h-tasks">
+      <div className="pd-card-head">
+        <div className="left">
+          <h2 className="pd-h-card" id="pd-h-tasks">
+            {t('doctor.tasksTitle')}
+          </h2>
+          <span className="pd-meta">{t('doctor.detail.tasksMeta')}</span>
+        </div>
+      </div>
+      {tasks.length === 0 ? (
+        // Letiltott betegnél a szerver nem ad teendőt (M3, A1): az előírásai a
+        // követési tervben látszanak, de amíg le van tiltva, nem számítanak.
+        <p className="pd-muted">{t(disabled ? 'account.noTasks' : 'doctor.noTasks')}</p>
+      ) : (
+        <div className="pd-adh">
+          {tasks.map((task) => {
+            const measurement = task.kind === 'measurement'
+            const name = measurement ? t(`measurementTypes.${task.code}`) : task.name
+            const frequency = t(`tasks.frequency.${task.frequency}`, {
+              count: task.interval_days ?? 0,
+            })
+            let state: string
+            if (task.state === 'done' && task.done_at) {
+              state = t(
+                measurement ? 'doctor.task.doneMeasurement' : 'doctor.task.doneQuestionnaire',
+                { when: formatSoon(t, task.done_at) },
+              )
+            } else if (task.state === 'late') {
+              state = t('doctor.task.late', { when: formatSoon(t, task.due_at) })
+            } else {
+              state = t('doctor.task.due', { when: formatSoon(t, task.due_at) })
+            }
+            const missed = task.catch_up_until
+              ? t('doctor.task.missed', { until: formatUntil(t, task.catch_up_until) })
+              : task.previous_missed
+                ? t('doctor.task.missedFinal')
+                : null
+            return (
+              <div key={`${task.kind}-${task.code}`} className="pd-adh-row">
+                <TaskIcon mark={task.state} />
+                <div>
+                  <div className="pd-adh-top">
+                    <span className="nm">{name}</span> <span className="fr">{frequency}</span>
+                  </div>
+                  <div className="pd-adh-state">{state}</div>
+                  {missed && <div className="pd-adh-missed">{missed}</div>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 
-/** A teendők teljesítése az orvos szemszögéből: mi kész, mi esedékes, mi maradt el. */
-function TaskProgress({ tasks }: { tasks: Task[] }) {
-  const { t } = useTranslation()
-  if (tasks.length === 0) return <Text c="dimmed">{t('doctor.noTasks')}</Text>
-  return (
-    <Stack gap="sm">
-      {tasks.map((task) => {
-        const measurement = task.kind === 'measurement'
-        const name = measurement ? t(`measurementTypes.${task.code}`) : task.name
-        const frequency = t(`tasks.frequency.${task.frequency}`, { count: task.interval_days ?? 0 })
-        let state: string
-        if (task.state === 'done' && task.done_at) {
-          state = t(measurement ? 'doctor.task.doneMeasurement' : 'doctor.task.doneQuestionnaire', {
-            when: formatSoon(t, task.done_at),
-          })
-        } else if (task.state === 'late') {
-          state = t('doctor.task.late', { when: formatSoon(t, task.due_at) })
-        } else {
-          state = t('doctor.task.due', { when: formatSoon(t, task.due_at) })
-        }
-        const missed = task.catch_up_until
-          ? t('doctor.task.missed', { until: formatUntil(t, task.catch_up_until) })
-          : task.previous_missed
-            ? t('doctor.task.missedFinal')
-            : null
-        return (
-          <Group key={`${task.kind}-${task.code}`} gap="sm" align="flex-start" wrap="nowrap">
-            <TaskIcon mark={task.state} />
-            <Stack gap={0} style={{ minWidth: 0 }}>
-              <Text size="sm">
-                <b>{name}</b> · {frequency}
-              </Text>
-              <Text size="xs" c="dimmed">
-                {state}
-              </Text>
-              {missed && (
-                <Text size="xs" style={{ color: 'var(--pulse-warn)' }}>
-                  {missed}
-                </Text>
-              )}
-            </Stack>
-          </Group>
-        )
-      })}
-    </Stack>
-  )
-}
+const formatBirth = (iso: string) =>
+  new Intl.DateTimeFormat(i18n.language === 'en' ? 'en-GB' : 'hu-HU', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(new Date(iso))
 
-/** A beteg adatlapja az orvosnak (F10): összefoglaló sáv, nyitott riasztások,
- * kitöltések; a másik hasábban a teendők teljesítése és a mérések. */
+// Az adatlap fülei (felületterv: Áttekintés, Szabályok, Követési terv). A követési
+// terv az A2 óta az Áttekintés jobb hasábjában van, ezért külön fület (még) nem kap.
+const TABS = ['overview', 'rules'] as const
+type Tab = (typeof TABS)[number]
+
+/** A beteg adatlapja az orvosnak (F10), a felületterv szerint: fejléc a státusszal,
+ * alatta fülek. Az Áttekintés bal hasábjában a nyitott riasztások, a NICE szerinti
+ * otthoni vérnyomásátlag (M3, K2) és a mérések grafikonja, a jobb hasábban a teendők teljesítése, a követési terv (M3), a
+ * kérdőív-kitöltések és az orvosi megjegyzések (M3, A8); a Szabályok fülön a beteg szabályai és a szerkesztő (M3, A4). */
 export function PatientDetailPage() {
   const { t } = useTranslation()
   const { patientId = '' } = useParams()
+  const [search, setSearch] = useSearchParams()
   const patient = usePatient(patientId)
-  const alerts = usePatientAlerts(patientId)
+  const alerts = useAllAlerts(patientId)
+  useMarkSeen(patientId, alerts.data)
+  const submissions = usePatientSubmissions(patientId)
   const types = useMeasurementTypes()
+  const templates = useQuestionnaireTemplates()
+  // A grafikon határvonalai a beteg aktív szabályaiból (ugyanaz a lekérdezés, mint a
+  // Szabályok fülé, így a szabály mentése ezt is frissíti).
+  const rules = usePatientRules(patientId)
+  // A megjegyzés-űrlap betegenként nyílik (a fejléc gombja és a kártya „Új” gombja
+  // is ezt nyitja); másik beteg adatlapjára lépve zárva indul. A piszkozat is itt
+  // van, a beteghez kötve: a Szabályok fülre váltva (a kártya ekkor lebomlik) nem
+  // vész el, másik betegnél viszont nem jelenik meg.
+  const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null)
+  const [noteDraft, setNoteDraft] = useState({ patientId: '', text: '' })
+  const noteText = noteDraft.patientId === patientId ? noteDraft.text : ''
+  const [noteFocus, setNoteFocus] = useState(0)
+  const focusedNote = useRef(0)
+  // A fül az URL-ben (?tab=rules): frissítés és visszalépés után is megmarad.
+  const tab: Tab = search.get('tab') === 'rules' ? 'rules' : 'overview'
+  const ctx: RuleTextContext = {
+    types: types.data ?? [],
+    questionnaires: Object.fromEntries((templates.data ?? []).map((x) => [x.code, x.name])),
+  }
+
+  const openNote = () => {
+    if (tab !== 'overview') setSearch({})
+    setNoteOpenFor(patientId)
+    setNoteFocus((n) => n + 1)
+  }
+  // Megnyitáskor a kártyához görget, és a szövegmezőre fókuszál (a Szabályok fülről
+  // előbb az Áttekintés jelenik meg). Kérésenként egyszer: a fülváltás nem görget újra.
+  useEffect(() => {
+    if (tab !== 'overview' || noteFocus === focusedNote.current) return
+    const field = document.getElementById(NOTE_FIELD_ID)
+    if (!field) return
+    focusedNote.current = noteFocus
+    field.closest('section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    field.focus({ preventScroll: true })
+  }, [noteFocus, tab])
 
   if (patient.isPending) return <Loader />
   if (patient.isError) {
@@ -251,75 +184,154 @@ export function PatientDetailPage() {
     return <Text c="red">{t(forbidden ? 'errors.forbidden' : 'errors.unavailable')}</Text>
   }
   const p = patient.data
-  const openAlerts = p.reasons.filter((r) => r.code === 'open_alert').length
-  // A riasztást kiváltó mérések az előzményekben jelölést kapnak.
-  const flagged = new Set(
-    (alerts.data ?? []).flatMap((a) =>
-      a.events.flatMap((e) =>
-        e.triggers.flatMap((tr) => (tr.measurement ? [tr.measurement.id] : [])),
-      ),
-    ),
-  )
+  const all = alerts.data ?? []
+  const open = all
+    .filter((a) => a.status !== 'closed')
+    .sort((a, b) =>
+      a.severity === b.severity
+        ? b.created_at.localeCompare(a.created_at)
+        : a.severity === 'severe'
+          ? -1
+          : 1,
+    )
+  const closed = all.filter((a) => a.status === 'closed')
+  const assigned = open.filter((a) => a.status === 'assigned').length
+  const sentence = open.length
+    ? t('doctor.openAlerts', { count: open.length }) +
+      (assigned ? t('doctor.detail.assignedPart', { count: assigned }) : '')
+    : reasonText(t, p.reasons[0])
 
   return (
-    <Stack gap="lg">
-      <Anchor component={Link} to="/doctor" size="sm" c="dimmed">
-        ← {t('doctor.back')}
-      </Anchor>
-      <Paper p="md" style={{ boxShadow: `inset 3px 0 0 ${STATUS_COLOR[p.status]}` }}>
-        <Title order={2}>{p.name}</Title>
-        <Group gap="lg" mt={6} wrap="wrap">
-          <Text c="dimmed">{t('doctor.age', { age: ageInYears(p.birth_date) })}</Text>
+    <div className="pd-page">
+      <header className="pd-head">
+        <nav className="pd-crumbs" aria-label={t('doctor.detail.backLabel')}>
+          <Link to="/doctor">
+            <ArrowLeft size={15} />
+            {t('doctor.back')}
+          </Link>
+        </nav>
+        <div className="pd-ph">
+          <div className="pd-ph-text">
+            <h1 className="pd-display">{p.name}</h1>
+            <div className="pd-ph-meta">
+              <span>{t('doctor.age', { age: ageInYears(p.birth_date) })}</span>
+              <span>{t('doctor.detail.born', { date: formatBirth(p.birth_date) })}</span>
+              <span>
+                {t('doctor.lastData', {
+                  when: p.last_data_at ? formatRelative(t, p.last_data_at) : t('doctor.noData'),
+                })}
+              </span>
+            </div>
+          </div>
+          <div className="pd-ph-actions">
+            <Button variant="default" leftSection={<Note size={16} />} onClick={openNote}>
+              {t('doctor.notes.headerButton')}
+            </Button>
+          </div>
+        </div>
+        <div className="pd-status">
           <StatusLabel status={p.status} />
-          {openAlerts > 0 && <Text fw={600}>{t('doctor.openAlerts', { count: openAlerts })}</Text>}
-          <Text c="dimmed">
-            {t('doctor.lastData', {
-              when: p.last_data_at ? formatRelative(t, p.last_data_at) : t('doctor.noData'),
-            })}
-          </Text>
-        </Group>
-        {openAlerts === 0 && (
-          <Text size="sm" c="dimmed" mt={4}>
-            {reasonText(t, p.reasons[0])}
-          </Text>
+          <span className="why">{sentence}</span>
+        </div>
+        {!p.is_active && (
+          // Letiltott beteg (M3, A1): a korábbi adatai látszanak, az elmaradt adatai
+          // nem számítanak elmulasztottnak.
+          <div className="pulse-disabled-row">
+            <DisabledMark />
+            <span className="pd-meta">{t('account.disabledHint')}</span>
+          </div>
         )}
-      </Paper>
+      </header>
 
-      <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg" verticalSpacing="lg">
-        <Stack gap="lg" style={{ minWidth: 0 }}>
-          <Paper p="md">
-            <Stack gap="sm">
-              <Title order={3}>{t('doctor.alertsTitle')}</Title>
-              {alerts.isPending && <Loader size="sm" />}
-              {alerts.isError && <Text c="red">{t('errors.unavailable')}</Text>}
-              {alerts.data?.length === 0 && <Text c="dimmed">{t('doctor.noAlerts')}</Text>}
-              {alerts.data?.map((alert) => (
-                <AlertCard key={alert.id} alert={alert} types={types.data ?? []} />
-              ))}
-            </Stack>
-          </Paper>
-          <Paper p="md">
-            <Stack gap="sm">
-              <Title order={3}>{t('doctor.submissionsTitle')}</Title>
+      <div className="pd-tabs" role="tablist" aria-label={t('doctor.detail.tabsLabel')}>
+        {TABS.map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`pd-tab-${id}`}
+            aria-selected={tab === id}
+            aria-controls="pd-tabpanel"
+            onClick={() => setSearch(id === 'overview' ? {} : { tab: id })}
+          >
+            {t(`doctor.detail.tabs.${id}`)}
+          </button>
+        ))}
+      </div>
+
+      <div id="pd-tabpanel" role="tabpanel" aria-labelledby={`pd-tab-${tab}`}>
+        {tab === 'rules' ? (
+          <RulesTab patientId={patientId} patientName={p.name} ctx={ctx} />
+        ) : (
+          <div className="pd-grid-2">
+            <div className="pd-stack-lg">
+              <section className="pd-sec" aria-labelledby="pd-h-alerts">
+                <div className="pd-sec-head">
+                  <div className="left">
+                    <h2 className="pd-h-sec" id="pd-h-alerts">
+                      {t('doctor.alertsTitle')}
+                    </h2>
+                    {open.length > 0 && (
+                      <span
+                        className={
+                          open.some((a) => a.severity === 'severe')
+                            ? 'pd-badge-n hot'
+                            : 'pd-badge-n'
+                        }
+                      >
+                        {open.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {alerts.isPending && <Loader size="sm" />}
+                {alerts.isError && <Text c="red">{t('errors.unavailable')}</Text>}
+                {alerts.isSuccess && open.length === 0 && (
+                  <div className="pd-card pd-empty">
+                    <StatusIcon status="ok" size={22} />
+                    <span>{t('doctor.noAlerts')}</span>
+                  </div>
+                )}
+                {open.map((alert) => (
+                  <AlertCard
+                    key={alert.id}
+                    alert={alert}
+                    ctx={ctx}
+                    patientId={patientId}
+                    patientName={p.name}
+                  />
+                ))}
+                {closed.map((alert) => (
+                  <ClosedAlert key={alert.id} alert={alert} ctx={ctx} />
+                ))}
+              </section>
+              <NicePanel key={patientId} patientId={patientId} />
+              <MeasurementCharts
+                patientId={patientId}
+                doctor
+                alerts={all}
+                rules={rules.data ?? []}
+                rulesError={rules.isError}
+                submissions={submissions.data ?? []}
+              />
+            </div>
+            <div className="pd-stack-lg">
+              <TaskProgress tasks={p.tasks ?? []} disabled={!p.is_active} />
+              <CarePlan patientId={patientId} />
               <SubmissionHistory patientId={patientId} />
-            </Stack>
-          </Paper>
-        </Stack>
-        <Stack gap="lg" style={{ minWidth: 0 }}>
-          <Paper p="md">
-            <Stack gap="sm">
-              <Title order={3}>{t('doctor.tasksTitle')}</Title>
-              <TaskProgress tasks={p.tasks ?? []} />
-            </Stack>
-          </Paper>
-          <Paper p="md">
-            <Stack gap="sm">
-              <Title order={3}>{t('doctor.measurementsTitle')}</Title>
-              <MeasurementHistory patientId={patientId} flaggedIds={flagged} />
-            </Stack>
-          </Paper>
-        </Stack>
-      </SimpleGrid>
-    </Stack>
+              <NotesCard
+                key={patientId}
+                patientId={patientId}
+                open={noteOpenFor === patientId}
+                text={noteText}
+                onTextChange={(text) => setNoteDraft({ patientId, text })}
+                onOpen={openNote}
+                onClose={() => setNoteOpenFor(null)}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

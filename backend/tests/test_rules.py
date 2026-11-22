@@ -10,7 +10,13 @@ from sqlalchemy.exc import DBAPIError
 
 from app.models import AlertEvent, AlertEventType, AlertStatus, RuleType, Severity
 from app.services.measurements import record_measurement
-from app.services.rules import add_rule_version, current_version, open_alert
+from app.services.rules import (
+    RuleError,
+    add_rule_version,
+    create_rule,
+    current_version,
+    open_alert,
+)
 from tests.factories import make_doctor, make_patient, make_threshold_rule, record_bp
 
 NOW = datetime(2026, 10, 12, 8, 0, tzinfo=UTC)
@@ -166,6 +172,7 @@ def test_new_version_evaluates_new_data_and_old_alert_keeps_its_version(db, doct
         rule_type=RuleType.THRESHOLD,
         params={"measurement_type": "blood_pressure", "limits": {"systolic": {"max": 135}}},
         severity=Severity.SEVERE,
+        now=NOW + timedelta(hours=12),
     )
     assert (v1.version_no, v2.version_no) == (1, 2)
 
@@ -174,9 +181,9 @@ def test_new_version_evaluates_new_data_and_old_alert_keeps_its_version(db, doct
     assert same.id == alert.id
     assert alert.rule_version_id == v1.id  # a megnyitáskori verzió nem változik
     assert alert.severity is Severity.SEVERE  # a súlyosság emelkedhet (F18)
-    # TODO M3: itt egy „szabály módosult" esemény is lesz (Fable-átnézés F2).
-    created, re_triggered = events(db, alert)
-    assert (created.rule_version_id, re_triggered.rule_version_id) == (v1.id, v2.id)
+    created, changed, re_triggered = events(db, alert)
+    assert changed.event_type is AlertEventType.RULE_CHANGED
+    assert [e.rule_version_id for e in (created, changed, re_triggered)] == [v1.id, v2.id, v2.id]
 
 
 def test_severity_does_not_decrease_on_re_trigger(db, doctor, patient):
@@ -230,6 +237,58 @@ def test_alert_events_cannot_be_modified_or_deleted(db, doctor, patient):
 def test_invalid_threshold_params_are_rejected(db, doctor, patient, limits):
     with pytest.raises(ValidationError):
         make_threshold_rule(db, patient, doctor, limits=limits)
+
+
+@pytest.mark.parametrize(
+    ("measurement_type", "limits", "code"),
+    [
+        ("blood_presure", {"systolic": {"max": 140}}, "unknown_measurement_type"),
+        # A vérnyomás komponensei systolic és diastolic; a „value" az egyértékűeké.
+        ("blood_pressure", {"value": {"max": 140}}, "unknown_component"),
+        (
+            "blood_pressure",
+            {"systolic": {"max": 140}, "diastolc": {"max": 90}},
+            "unknown_component",
+        ),
+        ("heart_rate", {"systolic": {"max": 100}}, "unknown_component"),
+    ],
+)
+def test_threshold_target_must_exist(db, doctor, patient, measurement_type, limits, code):
+    with pytest.raises(RuleError) as error:
+        make_threshold_rule(db, patient, doctor, limits=limits, measurement_type=measurement_type)
+    assert error.value.code == code
+
+
+def test_window_components_are_checked_in_new_version(db, doctor, patient):
+    """Az időablakos szabály (a küszöb leszármazottja) módosításánál is."""
+    rule = create_rule(
+        db,
+        patient_id=patient.patient_profile.id,
+        created_by=doctor.id,
+        rule_type=RuleType.WINDOW,
+        params={
+            "measurement_type": "blood_pressure",
+            "limits": {"systolic": {"max": 140}},
+            "count": 3,
+            "window_days": 7,
+        },
+        severity=Severity.MODERATE,
+    )
+    with pytest.raises(RuleError) as error:
+        add_rule_version(
+            db,
+            rule,
+            created_by=doctor.id,
+            rule_type=RuleType.WINDOW,
+            params={
+                "measurement_type": "blood_pressure",
+                "limits": {"pulse": {"max": 100}},
+                "count": 3,
+                "window_days": 7,
+            },
+            severity=Severity.MODERATE,
+        )
+    assert error.value.code == "unknown_component"
 
 
 def test_open_alert_lookup_ignores_closed(db, doctor, patient):

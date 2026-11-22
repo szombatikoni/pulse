@@ -1,0 +1,95 @@
+/* Admin-felület (M3, A1), felületterv 2026-10-30 (docs/design/felulet_2026-10-30,
+   „Adminisztráció"). Az oldalfejléc a beteglistáé (pl-*), a fülek, kártyák,
+   táblázatok és ablakok az adatlapé (pd-*); itt csak az eltérések. */
+.ad-stack {
+  display: grid;
+  gap: 18px;
+}
+
+/* A táblázat itt kitölti a kártyát, és nem görget külön (a lista rövid).
+   A relatív pozíció kell: enélkül az utolsó oszlopfej rejtett (abszolút
+   pozicionált) felirata kilóg a táblázat vízszintes vágásából, és telefonon az
+   egész oldalt szélesíti. */
+.ad-card .pd-tbl-wrap {
+  position: relative;
+  max-height: none;
+}
+.ad-card .pd-tbl {
+  width: 100%;
+}
+.ad-card .pd-tbl td.n,
+.ad-card .pd-tbl td.nowrap {
+  white-space: nowrap;
+}
+.ad-card .pd-card-head .pd-h-card {
+  font-family: var(--pulse-serif);
+  font-size: 18px;
+  font-weight: 500;
+}
+.ad-card td .pulse-disabled-mark {
+  margin-left: 10px;
+}
+.ad-card .pd-card-head .head-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Állapot: pötty és szó (a terv „.band" + „.sev-dot" mintája). */
+.ad-band {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--pulse-ink-2);
+  white-space: nowrap;
+}
+.ad-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+  background: var(--pulse-ok);
+}
+.ad-dot.off {
+  background: var(--pulse-nodata);
+}
+
+.ad-note {
+  color: var(--pulse-ink-3);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+/* Az ablak egy-egy része (pl. a fiók állapota a szerkesztésben). */
+.ad-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--pulse-line);
+}
+.ad-section-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+}
+.ad-confirm {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--pulse-raised);
+  font-size: 13.5px;
+  color: var(--pulse-ink-2);
+}
+
+.ad-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}

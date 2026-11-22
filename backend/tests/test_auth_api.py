@@ -38,10 +38,21 @@ def test_wrong_password_and_unknown_email_get_the_same_answer(client, db):
 
 
 def test_inactive_user_cannot_log_in(client, db):
+    """Letiltott fiók (M3, A1): helyes jelszóval 403 account_disabled kóddal, token
+    nélkül; rossz jelszóval ugyanaz a 401, mint bármely sikertelen belépésnél."""
     user = make_patient(db)
     user.is_active = False
     db.flush()
-    assert login(client, user.email).status_code == 401
+    correct = login(client, user.email)
+    assert correct.status_code == 403
+    assert correct.json() == {"detail": {"code": "account_disabled"}}
+    wrong = client.post("/api/auth/login", json={"email": user.email, "password": "rossz-jelszo"})
+    unknown = client.post(
+        "/api/auth/login", json={"email": "senki@test.example", "password": "rossz-jelszo"}
+    )
+    assert wrong.status_code == unknown.status_code == 401
+    assert wrong.json() == unknown.json()
+    assert wrong.headers["WWW-Authenticate"] == unknown.headers["WWW-Authenticate"]
 
 
 def test_me_requires_token(client):

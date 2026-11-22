@@ -76,7 +76,9 @@ def test_login_failure_bodies_are_identical(client: TestClient, db: Session) -> 
     assert resp_unknown.json() == resp_wrong_pw.json()
 
 
-def test_login_disabled_account_returns_401(client: TestClient, db: Session) -> None:
+def test_login_disabled_account_returns_403(client: TestClient, db: Session) -> None:
+    """Helyes jelszóval a letiltott fiók 403 account_disabled kódot kap, tokent nem
+    (M3, A1; a hallgató döntése, 2026-11-21)."""
     user = make_patient(db, email="letiltott@example.com")
     user.is_active = False
     db.commit()
@@ -85,7 +87,8 @@ def test_login_disabled_account_returns_401(client: TestClient, db: Session) -> 
         "/api/auth/login", json={"email": "letiltott@example.com", "password": DEFAULT_PASSWORD}
     )
 
-    assert resp.status_code == 401
+    assert resp.status_code == 403
+    assert resp.json() == {"detail": {"code": "account_disabled"}}
 
 
 def test_login_disabled_account_body_matches_other_failures(
@@ -95,8 +98,9 @@ def test_login_disabled_account_body_matches_other_failures(
     user.is_active = False
     db.commit()
 
+    # Rossz jelszóval a letiltott fiók válasza ugyanaz, mint bármely sikertelen belépésé.
     resp_disabled = client.post(
-        "/api/auth/login", json={"email": "letiltott2@example.com", "password": DEFAULT_PASSWORD}
+        "/api/auth/login", json={"email": "letiltott2@example.com", "password": "rossz-jelszo-1"}
     )
     resp_unknown = client.post(
         "/api/auth/login", json={"email": "meg-egy-ismeretlen@example.com", "password": "x"}

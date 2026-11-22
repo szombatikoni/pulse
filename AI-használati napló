@@ -8,6 +8,486 @@ iteratív munka: a döntéseket (téma, scope, technológiák, ütemezés) én h
 az AI javaslatait átbeszéljük, én ellenőrzöm, és ahol szükséges, javítom.
 A hibák szűrése kétirányú — több esetben én azonosítottam az AI tévedését.
 
+## 2026-11-21, 22 — A8, A9, A1: megjegyzés, e-mail-értesítés, admin felület; K3: a FHIR-leképezés terve
+
+- Eszköz: Claude Code (a három modul kódtervezetét három Opus agent
+  készítette párhuzamosan, külön munkapéldányban; mindegyiket független
+  Fable-reviewer nézte át több körben; a K3 szövegét is külön agent írta és
+  külön reviewer ellenőrizte)
+
+- Az AI szerepe: egy elbukott CI-futás kivizsgálása és javítása; megjegyzés a
+  beteghez, küszöbvonal az aktív szabályokból, újrabelépés helyben lejárt
+  munkamenetnél (A8); e-mail az orvosnak új riasztáskor, kézbesítési sorral
+  és újrapróbálkozással, fejlesztői postafiókkal (A9); admin felület a
+  felhasználókhoz, az orvos–beteg összerendeléshez és a méréstípusok
+  rögzíthető tartományához, a letiltott beteg kezelése (A1); a telefonos
+  nézet újramérése; a követési terv FHIR R4 leképezésének szövegtervezete és
+  ellenőrzése a szabvány oldalain (K3); a README frissítése.
+
+- A saját munkám: a három modul tervezési kérdéseit egyenként döntöttem el,
+  mielőtt a kód elkészült; a K3 dolgozatba kerülő részét és a README
+  változásait a commit előtt átolvastam; az új felületeket (admin oldal,
+  megjegyzés, újrabelépő ablak) megnéztem, a riasztásról szóló e-mailt pedig
+  a fejlesztői postafiókban ellenőriztem (nincs benne betegadat, a
+  hivatkozása a riasztások oldalára visz).
+
+- Saját döntéseim:
+  - e-mail: három kísérlet rövid várakozással (1, majd 5 perc), a küldés a
+    háttérfolyamatban fut, a levélben nincs betegadat, a demóban a levelek
+    fejlesztői postafiókba érkeznek;
+  - megjegyzés: csak a beteghez rendelt orvosok látják, és utólag nem
+    szerkeszthető; az újrabelépő ablak mögött a tartalom elmosva látszik;
+  - letiltott beteg: nem kap új státuszt, a listán „Letiltva” jelölés
+    mutatja; a letiltás ideje nem számít elmulasztásnak, a korábbi
+    mulasztások megmaradnak, utólagos riasztás nem készül;
+  - K3: a dolgozatba rövid táblázat kerül, a teljes a repóba; az alkalom
+    megfelelője saját konvencióként a Task; a riasztásnak nincs egyetlen
+    pontos megfelelője, ezért belső entitás marad; a napi kétszeri mérés
+    korlátként szerepel.
+
+- Visszakérdezéseim:
+  - megkérdeztem, használható lenne-e valódi levélküldő szolgáltatás; a
+    terv szerinti fejlesztői postafiók maradt, így a demóból valódi címre
+    nem megy ki levél;
+  - a K3 függelékével a dolgozat 106 oldalra nőtt, ezt a mintadolgozat
+    terjedelméhez képest soknak találtam; a teljes táblázat ezért a repóba
+    került, a dolgozatban négy oldal maradt.
+
+- Ellenőrzés:
+  - az elbukott CI-futás oka időzítési hiba volt egy böngészős tesztben (a
+    teszt a lista frissülése előtt olvasta ki a sorokat); a teszt most
+    megvárja a frissülést;
+  - az admin modul első változata a letiltást egyetlen időponttal kezelte,
+    így egy letiltás és visszaengedés eltüntette volna a korábbi
+    mulasztásokat; az átnézés után a letiltott időszakok külön táblába
+    kerültek;
+  - az e-mailnél az átnézés két hibát talált: üres beállítással nem lehetett
+    kikapcsolni a küldést, és egy hibás sor feltarthatta a többi levelet;
+    mindkettő javítva;
+  - az újrabelépés első változata minden lekérdezést újratöltött, ami egy
+    félig kitöltött kérdőívet törölhetett volna; most csak a hibára futott
+    lekérdezések töltődnek újra;
+  - az AI becslése szerint a demóadatok betöltése tucatnyi levelet küldött
+    volna; a mérés szerint egyet sem, ezt most teszt rögzíti;
+  - telefonon az admin felhasználólistája vízszintesen kilógott, és több
+    gomb 40 képpontnál alacsonyabb volt; javítva, az első javítást az
+    átnézés után módosítani kellett;
+  - a K3 tervezetében a szabvánnyal való összevetés 14 állítást javított
+    vagy törölt; a független átnézés szerint az elemnevek és az
+    értékkészletek egyeznek a szabvánnyal, de több értelmező mondat túl
+    erős volt, és két sor besorolása nem volt következetes (az összesítés
+    így 5 teljes, 28 részleges, 5 nincs);
+  - 1146 backend-teszt és 31 böngészős teszt, a lefedettség 99%, a CI négy
+    része zöld;
+  - ismert, későbbre maradt: ha egy beteg éppen akkor van letiltva, amikor
+    egy korábbi mulasztása lezárul, arról nem készül riasztás; telefonon
+    néhány másodlagos gomb 40 képpontnál kisebb, és két táblázat oldalra
+    görgethető.
+
+## 2026-11-17, 20 — Az első teljes dolgozatváltozat: fejezetek, ábrák, képernyőképek; felületi javítások; a README próbája
+
+- Eszköz: Claude Code (a fejezettervezeteket, az ábrákat és a kódjavításokat
+  Opus agentek készítették; a fejezeteket és a kódot független Fable-reviewer
+  nézte át)
+
+- Az AI szerepe: szövegtervezet hét fejezethez a kód és a tervek alapján
+  (technológiák, biztonság, kódrészletek, tesztelés, a kiértékelés módszere,
+  DevOps, tapasztalatok); a tervezetek tényellenőrzése a kóddal szemben és a
+  leletek javítása; hat ábra (navigáció, biztonsági architektúra,
+  komponensdiagram, az adatmodell két részben, frissített architektúra);
+  tizenkét képernyőkép a futó demórendszerről; a képernyőképeken látott
+  hibák kivizsgálása és javítása; a README indítási részének végigpróbálása
+  friss klónból; a kísérőlevél szövegtervezete.
+
+- A saját munkám: a fejezettervezetekben megjelölt kérdésekre saját szavaimmal
+  válaszoltam (miért React, miért Python, miért rögzített verziók, miért
+  Playwright és GitHub Actions, a súlyosság kezelésének indoka, a token
+  tárolásának indoka, a megújító token elhagyása, a tapasztalatok fejezet
+  személyes részei), ezek a válaszok kerültek a szövegbe; amire nem tudtam
+  megalapozott választ adni, az kimaradt a szövegből; a tényellenőrzést, a
+  képernyőképeket, a hibák kivizsgálását és a README próbáját én kértem; a
+  javítások körét én hagytam jóvá.
+
+- Saját döntéseim:
+  - a kiértékelés eredményei, a felhasználói kipróbálás és az összegzés
+    ebből a változatból jelölten hiányzik, ezek a negyedik mérföldkőben
+    készülnek el;
+  - a dolgozatba valódi képernyőképek kerülnek, és előbb a rajtuk látható
+    hibákat javíttattam ki;
+  - a riasztáslistán a szabály neve külön sorba került, a súlyosság szóval
+    is ki van írva;
+  - az ismert hibák külön alfejezetet kaptak a Tesztelés fejezetben;
+  - a terjedelemről (92 oldal) a témavezetőt kérdezem meg.
+
+- Visszakérdezéseim:
+  - megkérdeztem, elég indok-e a token böngészőbeli tárolására, hogy a
+    rendszer nem kerül éles használatba. A válasz alapján a szöveg most a
+    konkrét kockázatot és az éles rendszerben választandó megoldást is leírja;
+  - a Cypressről olvasott állításaimat nem tudtam forrással igazolni, ezért a
+    szöveg olvasott tapasztalatként, nem tényként írja le őket;
+  - rákérdeztem, mit jelent az „első teljes változat” a kurzus kiírásában,
+    és ennek nyomán került a csomagba az indítási leírás próbája.
+
+- Ellenőrzés:
+  - a tényellenőrzés 44 javítandó pontot talált az AI által írt
+    fejezetekben, például hibás összeget egy teszttáblában, és egy már
+    elkészült funkciót, amelyet a szöveg tervként írt le; mind javítva;
+  - a lefedettségi adat a CI-futás naplójából származik, nem helyi mérésből;
+  - a képernyőképek három hibát mutattak meg: félreérthető volt a küszöb
+    segédszövege, a riasztáslista sorai bizonyos szélességnél szétestek, és
+    a demóadatban a szabályok később keletkeztek, mint a mérések. Az első
+    javítás után az átnézés kimutatta, hogy a sortörés hibája csak részben
+    szűnt meg; a második kör után 320 és 1920 pixel között nem maradt hiba
+    (csak Chromiumban mérve);
+  - a README próbája megmutatta, hogy a leírt klónozás a `main` ágat, vagyis
+    a második mérföldkő állapotát hozta le, és a demófiókok leírása több
+    ponton elavult; javítva;
+  - 984 backend-teszt és 26 böngészős teszt, a CI négy része zöld;
+  - ismert, későbbre maradt: a beteglista 992 és 1030 pixel között
+    összecsukódik; az új források még nincsenek a forrásjegyzékben.
+
+## 2026-11-16 — K4, A5: kérdőívszerkesztő; a határidő utáni Adathiány; NICE-panel
+
+- Eszköz: Claude Code (a kódtervezeteket Opus agentek készítették; minden
+  részt független Fable-reviewer nézett át, a leleteket további agentek
+  javították)
+
+- Az AI szerepe: a dolgozat dátumozott példáinak tesztjei (K4); a
+  kérdőívszerkesztő (új kérdőív és új verzió mentése, ütközés kezelése); a
+  NICE-kiértékelés panelje az orvosi adatlapon; a státuszszámítás igazítása;
+  a kódátnézések és a leletek javítása.
+
+- A saját munkám: a tervek döntési pontjaiban én döntöttem; a független
+  átnézéseket én kértem, a javítások körét és a későbbre halasztott tételeket
+  én hagytam jóvá.
+
+- Saját döntéseim:
+  - ahol a kód és a dolgozat működési szabályai eltértek, a kód igazodik a
+    dolgozathoz: a beteg rögtön a határidő után Adathiány státuszba kerül, a
+    pótlás 48 óráig lehetséges;
+  - a határidő után felírt napi előírás első alkalma a következő napon
+    esedékes;
+  - a NICE-panel csak az orvosnak látszik, az utolsó hét lezárt nap
+    méréseiből számol;
+  - a kérdőívet bármely orvos szerkesztheti, három rögzített sávval;
+    átnevezés és inaktiválás nincs;
+  - a nyelvváltó a negyedik mérföldkőre kerül;
+  - ettől a naptól kód csak független átnézés után kerül a repóba.
+
+- Ellenőrzés:
+  - a K4 tesztjei három eltérést mutattak ki a dolgozat példái és a kód
+    között a határidő utáni státuszban; ebből lett a fenti döntés;
+  - a kérdőívszerkesztő átnézése több hibát talált az AI kódjában (a nem
+    mentett szerkesztés elveszett, azonos feliratú válasz és vezérlőkarakter
+    is menthető volt, a szerkesztő újranyitáskor régi verziót mutathatott);
+    javítva, böngészős teszttel;
+  - 982 backend-teszt és egy várt bukás, 25 böngészős teszt, a CI négy része
+    zöld.
+
+## 2026-11-15, 16 — K2: a CQL-motor külön konténerben, NICE-kiértékelés végpontja; két független átnézés
+
+- Eszköz: Claude Code (a kódtervezeteket Opus agentek készítették; a kódot két
+  független Fable-reviewer nézte át, a leleteket további agentek javították)
+
+- Az AI szerepe: tervjavaslat a K2-höz három mélységi változattal és a
+  döntendő kérdésekkel (k2_terv_2026-11-12); a CQL-motor HTTP-szolgáltatásként
+  külön konténerben; a backend végpontja, amely a beteg vérnyomásméréseiből
+  FHIR-csomagot ad a motornak, az átlagot törtekkel maga is kiszámolja, és a
+  két eredményt összeveti; a tesztek és az új CI-lépések; a két kódátnézés és a
+  leletek javítása.
+
+- A saját munkám: a tervjavaslat változatai közül én választottam; a döntendő
+  kérdésekben én döntöttem (lásd lent); rákérdeztem egy ingadozó tesztre,
+  amelynek okát az AI először ismeretlennek jelentette; a független átnézést
+  én kértem, a javítások körét és a későbbre halasztott tételeket én hagytam
+  jóvá.
+
+- Saját döntéseim:
+  - a legszűkebb változat: gomb az orvos betegoldalán, az eredmény nem
+    tárolódik, riasztást és státuszt nem befolyásol;
+  - az időszak a NICE ajánlásához igazodik: a hét legutóbbi lezárt nap, az
+    első mérési nap kizárásával; a mai, még folyamatban lévő nap nem számít
+    bele;
+  - a kiértékelést csak a beteghez rendelt orvos látja, a beteg nem: ha baj
+    van, az orvos szól, a betegnek ez fölösleges nyugtalanságot okozhatna;
+  - a CQL-szolgáltatás tesztjei külön CI-lépést kaptak;
+  - a tesztadatok között marad egy beteg, akinél nincs elég mérés, a „nincs
+    elég adat” eset bemutatására;
+  - két kisebb lelet későbbre kerül (lásd Ellenőrzés).
+
+- Visszakérdezéseim:
+  - az ingadozó tesztnél nem fogadtam el, hogy az ok ismeretlen. Az ismételt
+    futtatás megmutatta a hibaüzenetet: a szolgáltatás a túl nagy kérésre
+    válaszolt és bontotta a kapcsolatot, miközben az ügyfél még küldött. A
+    javítás után az ismételt futtatások hibátlanok;
+  - megkérdeztem, hogy a mai napot is tartalmazó időszak nem mond-e ellent a
+    NICE ajánlásának; ennek nyomán lett az időszak a hét lezárt nap.
+
+- Ellenőrzés:
+  - 856 backend-teszt és 38 teszt a CQL-szolgáltatáson; a CI négy része zöld;
+  - az első átnézés három közepes hibát talált az AI kódjában: sok mérésnél a
+    motornak küldött csomag túllépte a méretkorlátot, és a végpont úgy
+    jelzett, mintha a szolgáltatás állna; egy hibás kérés leállította a
+    CQL-konténert; február 29-én születetteknél az életkor a két számításban
+    egy napon eltért. Mindhárom javítva, a harmadik előbb a valódi motoron
+    igazolva;
+  - az átnézés arra is rámutatott, hogy a backend tesztjeiben a motort
+    utánzat helyettesíti, így az egyezés ott semmit nem bizonyít. Ezért a CI
+    most a valódi konténereken is lefuttatja a teljes láncot, és az átlagot
+    egy harmadik, független úton is kiszámolja;
+  - a második, szűk átnézés a javításokat nézte: az új időszakot és az
+    óraátállítás környékét 39 esettel futtatta a valódi motoron, eltérés
+    nélkül; öt kisebb leletéből három javítva;
+  - ismert, később javítandó: a motor hívásának időkorlátja a válasz
+    fejlécének olvasására és a névfeloldásra nem érvényes; a CI láncpróbája
+    budapesti éjfélkor futva egyszer hibát jelezhet;
+  - ismert eltérés: tizedes vérnyomásértéknél a motor lebegőpontos átlaga
+    ritkán más besorolást ad, mint a pontos törtszámítás (a felület csak egész
+    értéket enged);
+  - az egyezés azt igazolja, hogy a számítás két megvalósítása egyezik; az
+    időszak és az időzóna kezelése mindkét oldalon közös kódból jön.
+
+## 2026-11-09 — A7: mérésjavítás újrakiértékeléssel; a nap munkájának áttekintése
+
+- Eszköz: Claude Code (a kódtervezetet egy Opus agent készítette)
+
+- Az AI szerepe: tervjavaslat az A7-hez a döntendő kérdésekkel
+  (a7_terv_2026-11-09); a javítás-végpont és a betegoldali javítás-folyamat;
+  a „kiváltó adat javítva" esemény és jelölés; a felülírt mérések kizárása a
+  kiértékelésből, a státuszból és a FHIR-kiadásból; a tesztek; a kérésemre a
+  nap munkájának és a beszélgetésnek az áttekintése.
+
+- A saját munkám: a tervjavaslat hat döntési pontját én hagytam jóvá; a
+  megvalósítás után három további kérdésben döntöttem (lásd lent); a nap végén
+  áttekintést kértem arról, hogy helyes volt-e a haladás menete, és ez több
+  hiányosságot is felszínre hozott (lásd Ellenőrzés).
+
+- Saját döntéseim:
+  - csak a mérés értékei javíthatók, az ideje nem; a javítás láncban
+    ismételhető, mindig csak a legutolsó változat érvényes; időkorlát nincs;
+  - a javítás nem zárja le a riasztást: a riasztás jelölést kap, és az orvos
+    dönt (a javítást a beteg végzi, a rendszer nem tudja ellenőrizni);
+  - lezárt riasztásnál a javítás ténye bekerül a történetbe, de az állapot
+    nem változik;
+  - a FHIR-kiadásból a felülírt mérés kimarad;
+  - a megvalósításkor szükségessé vált adatbázis-módosítás (a javítási lánc
+    elágazását tiltó megszorítás és a „teljesül-e még a feltétel" tárolása)
+    marad;
+  - a jelölés egy későbbi ismételt aktiválódás után is megmarad a lezárásig;
+  - az időablakos szabály egy feltárt korlátja (régebbi mérés határsértőre
+    javításakor a kártya legutóbbi kiváltója nem a legfrissebb mérés) ismert
+    korlátként későbbre kerül.
+
+- Ellenőrzés:
+  - 743 teszt (99% lefedettség), böngészős teszt 17/17 nulláról újraépített
+    példányon; a tesztek között a működési szabályok dátumozott javítás-példája
+    is végigfut; a FHIR-kiadás független ellenőrzése a javítás után is egyezik;
+  - az áttekintés hibákat talált az AI munkájában: a terv tényként állította,
+    hogy új adatbázis-migráció nem kell, a megvalósításkor mégis kellett; az
+    előző feltöltés utáni CI-futás eredményét az AI nem ellenőrizte, és csak
+    az áttekintéskor derült ki, hogy a futás hibás volt (a backend-ellenőrzés
+    el sem indult); a következő feltöltés előtt a backend-ellenőrzések helyben
+    lefutottak, utána a CI mindhárom része zöld lett;
+  - erre a részre független kódátnézés még nem készült.
+
+## 2026-11-09 — A6: riasztás-életút, Kezelve státusz, Riasztások oldal; független átnézés
+
+- Eszköz: Claude Code (a kódtervezeteket két Opus agent készítette; az A4 és az
+  A6 teljes kódját egy független Fable-reviewer is átnézte, a leleteket egy
+  harmadik agent javította)
+
+- Az AI szerepe: tervjavaslat az A6-hoz a döntendő kérdésekkel
+  (a6_terv_2026-11-09); az állapotváltás-végpontok és a riasztáskártya
+  életút-gombjai; a lezárás kötelező indoklással és nem kötelező, a betegnek
+  szóló üzenettel; a Kezelve státusz számítása; a Riasztások oldal; a
+  betegoldali visszajelzés-kártya; a független kódátnézés és a leletek
+  javítása.
+
+- A saját munkám: a tervjavaslat döntési pontjait én döntöttem el; a terv
+  feltárta, hogy a Kezelve jelentésénél a felületterv jelmagyarázata és az
+  M1-ben rögzített működési szabályok ütköznek, és a működési szabályok
+  változatát választottam, mert a dolgozat kiértékelési példái arra épülnek;
+  a felületet a képernyőképeken néztem át, és a beteglista csoportcímének
+  javítását („Kezelve") én kértem; a független átnézést én kértem, a javítások
+  körét és az M4-re halasztott tételeket én hagytam jóvá.
+
+- Saját döntéseim:
+  - a riasztás a beteg adatlapjának megnyitásakor automatikusan megtekintett
+    lesz (a felület külön jelzést küld, nem a lekérdezés mellékhatása);
+  - Kezelve = az orvos lezárta a riasztást, de megerősítő, rendben lévő adat
+    még nem érkezett; a megerősítést az aktuális szabályverzió szerint ítéljük
+    meg (a riasztás keletkezéskori jelentése változatlan marad);
+  - a lezárt riasztás végleges, újranyitás nincs: új kiváltó adat új riasztást
+    nyit;
+  - a felelős a beteghez éppen hozzárendelt orvos lehet (alapértelmezésben a
+    lezáró orvos maga), a korábbi felelősök az eseménytörténetben megmaradnak;
+  - a betegnek szóló üzenet a betegé: az orvos lezárt kártyáján csak a belső
+    indoklás látszik;
+  - az újra-hozzárendelés gombja a felületterv szerint rejtve marad (későbbi
+    apróság).
+
+- Ellenőrzés:
+  - 725 teszt (99% lefedettség), böngészős teszt 15/15 nulláról újraépített
+    példányon (a Riasztások oldal szűrése, a teljes lezárás-folyamat, és hogy
+    a beteg a visszajelzést látja, a belső indoklást viszont nem);
+  - a független Fable-átnézés kritikus és közepes hibát nem talált; négy
+    kisebb leletét (zárolási versenyhelyzet a kiértékelés és a lezárás közt,
+    a felelős-választó alapértéke betöltés közben, elavuló lista-gyorsítótár
+    szabálymódosítás után, egyidejű verziómentés hibaválasza) javíttattam, és
+    a feltárt teszthiányokra négy új teszt készült;
+  - a felületet a képernyőképeken (docs/files/review/kepek_a6_2026-11-09)
+    néztem át.
+
+## 2026-11-09 — A4: a négy szabálytípus, szabály-API, Szabályok fül
+
+- Eszköz: Claude Code (a kódtervezeteket három Opus agent készítette, lépésenként)
+
+- Az AI szerepe: tervjavaslat az A4-hez a döntendő kérdésekkel (a4_terv_2026-11-09);
+  az időablakos, a romló trend és az elmaradt adat szabálytípus megvalósítása a
+  meglévő szabálymotorban; a szabály-végpontok; az alkalmakra épülő
+  Adathiány-státusz; a Szabályok fül a beteg-adatlapon; a demóadatok igazítása
+  a kiértékelési fejezet rögzített beállításához.
+
+- A saját munkám: a tervjavaslat hat döntési pontját én döntöttem el (a
+  kérdőívszabálynál visszakérdeztem, és a tisztázás után az egy szabály = egy
+  feltétel változatot választottam, mert a riasztás magyarázata így egyértelmű);
+  az agent által felvetett eltéréseket (az ablak-kiértékelés csak határsértő új
+  mérésre fusson; az elmulasztott alkalmak zárása maradjon a háttérfolyamatban)
+  átgondolás után hagytam jóvá; a felületet a futó példányon végigpróbáltam, és
+  két javítást kértem: az eseménytörténet kiváltó adatai soronként, olvashatóan
+  jelenjenek meg, és az ismétlődő értékek helyett csak az átlépett határok
+  szerepeljenek; a hasábok igazítását én vetettem fel (kiderült, hogy a
+  jóváhagyott terv szerint áll); a commitokat logikai egységekre bontottam.
+
+- Saját döntéseim:
+  - egy kérdőívszabály egy feltételt figyel (sáv vagy trend), kettőhöz két
+    szabály kell;
+  - az elmaradt adat szabály célpontonként működik (méréstípus vagy kérdőív),
+    a sorozat az előírás-módosítási láncon átível;
+  - az időablakos szabály csak határsértő új mérésre értékel (a működési
+    szabályok lezárás-példája szerint);
+  - az elmulasztott alkalmak zárása a háttérfolyamatban marad, a legfeljebb
+    egyórás késés elfogadható;
+  - ahol a betegnek van lezárt alkalma, a frissességet az alkalmak teljesítése
+    adja, a 7 napos szabály csak előírás nélkül él;
+  - a demóadat-változások (Szabó, Kiss) és a szigorúbb kliensoldali
+    határ-ellenőrzés jóváhagyva; a „rendben" sáv választható marad.
+
+- Ellenőrzés:
+  - a tesztkészlet lépésenként bővült (620 → 655 → 662, 99% lefedettség), a
+    böngészős teszt 12/12 nulláról újraépített példányon, két új folyamattal
+    (szabálymódosítás verzióváltással, új szabály űrlapja);
+  - az 1. lépés szélső eseteit szándékos elrontással (mutációs próbával) is
+    ellenőriztük: mind az öt elrontásnál elbukott egy teszt;
+  - a felületet képernyőképeken (docs/files/review/kepek_a4_2026-11-09) és a
+    helyi példányon magam is végigpróbáltam; a zsúfolt eseménytörténetet és az
+    értékismétlést én szúrtam ki.
+
+## 2026-11-01 — A3: tárolt teendőlista; orvosi indoklás; független review és javítások
+
+- Eszköz: Claude Code (a kódtervezeteket Opus agentek készítették; a saját
+  átnézésem mellé, második szemként egy független Fable-reviewer is
+  átvizsgálta a teljes M3-kódot)
+
+- Az AI szerepe: a betegoldali teendőlista átállítása a tárolt alkalmakra (egy
+  igazságforrás); az előírás-visszavonás és -módosítás indoklás-mezője és a
+  betegoldali jelzések megvalósítása; a teljes M3-munka független kódátnézése
+  (docs/files/review/m3_review_2026-11-01.md), majd a leletek javítása.
+
+- A saját munkám: az indoklás-mező és a betegoldali jelzés az én ötletem (a
+  visszavonás betegoldali következményeit végiggondolva kértem őket); a
+  visszavonás szabályát példákon kérdeztem végig, mielőtt jóváhagytam; a
+  review két leleténél a javítási irányt én fordítottam meg; minden lépést én
+  vettem át: a kódváltozásokat a védési jegyzet magyarázataival együtt
+  néztem át, a felületet képernyőképeken és a demón ellenőriztem, és az
+  alábbi döntéseket meghoztam. A Fable-review ezt nem váltja ki, hanem
+  kiegészíti (gépi második szem a határesetekre).
+
+- Saját döntéseim:
+  - a „Kész" időpontja az első, teljesítő rögzítés ideje (az „első adat
+    számít" elv szerint);
+  - visszavonásnál a nyitott, nem teljesített alkalmak törlődnek, a
+    teljesítettek és elmulasztottak megmaradnak; az orvos nem kötelező
+    indoklást adhat, amit a beteg is lát a teendői között;
+  - a review két közepes leleténél az első javítási irányt elvetettem, mert a
+    kipróbálás megmutatta az árát: a lejáró előírás utolsó időszakánál a
+    határidő csonkolását választottam (a beteg valós határidőt lásson), a
+    módosításnál pedig a jövőbeli kezdet tiltását (a módosítás azonnal
+    hatályos), az end_date-tel zárás helyett, mert az új oszlopot és több új
+    határesetet hozott volna be.
+
+- Ellenőrzés:
+  - a tesztkészletet minden kör után a fő munkamenetben is lefuttattuk
+    (575 → 587 → 589 teszt, 99% lefedettség), a böngészős teszt 10/10 nulláról
+    újraépített példányon;
+  - a független review a jogosultsági mátrixot végpontonként, az
+    immutabilitási elveket és a FHIR-csomag tartalmát rendben találta, súlyos
+    hibát nem talált; a három közepes lelete közül a pótlási határ
+    óraátállási hibáját számszerűen is igazolta (a javítás előtt a tavaszi
+    óraátállás tesztje elbukott, utána átment);
+  - a felületi változásokat képernyőképeken is ellenőriztem
+    (docs/files/review/kepek_a3_2026-11-01).
+
+## 2026-10-30 — M3 indul: tárolt alkalmak, worker, FHIR-kiadás
+
+- Eszköz: Claude Code (a kódtervezeteket az én döntésemre külön Opus agentek
+  készítették; a feladatkijelölés, a döntések és az átvétel nálam maradt)
+
+- Az AI szerepe: az A2 tervjavaslata (alkalmak tárolása, háttérfolyamat); a
+  megvalósítás három lépésben: az alkalom-tábla migrációval és
+  szolgáltatással, a worker-konténer az admin „ellenőrzés most" végponttal,
+  majd a K1 FHIR-kiadás a háromlépcsős független ellenőrzéssel; a védési
+  jegyzet új fejezetei.
+
+- Saját döntéseim:
+  - az előírás módosítása lezárás + új előírás, a felületen a váltás
+    jelzésével (a múltbeli alkalmak értelmezése nem változhat meg utólag);
+  - a worker óránként fut, az intervallum környezeti változóból állítható; az
+    AI eredetileg 10 percet javasolt, rákérdeztem az indokára, és mivel
+    követelményből nem volt levezethető, az óránkéntit választottam;
+  - a háttérfolyamat visszamenőleg is megnyitja a kihagyott időszakok
+    alkalmait, és a seed végén lefut egy ellenőrzés, hogy a friss demó azonnal
+    helyes múltat mutasson;
+  - a kitöltés az alkalomhoz rögzített kérdőívverzióval történik (az M1
+    adatmodell szerint);
+  - a pontszám és a kiértékelési sáv nem kerül a FHIR-csomagba, mert a beteg
+    is letöltheti, és a felületen sem látja a saját pontjait.
+
+- Ellenőrzés:
+  - a tesztkészletet minden lépés után a fő munkamenetben is lefuttattuk
+    (430-ról 500 tesztre nőtt, 99% lefedettség), az e2e böngészős teszt friss
+    adatbázison 6/6;
+  - a workert élőben próbáltuk: induláskor a seedelt múltra 64 alkalmat
+    nyitott és 56-ot zárt elmulasztottra, leállításkor azonnal, tisztán áll le;
+  - a FHIR-kiadást az adatbázis soraiból induló, a kiadó kódjától független
+    SQL-ellenőrzés igazolja; szándékosan elrontott csomagon (átírt érték, más
+    alakú időpont, rossz verzióhivatkozás) mindhárom hibát jelezte;
+  - az agent a saját tesztjével fogott ki egy hibát (a kérdőívverzió státusza
+    elavult gyűjteményből számolódott), és egy rosszul választott
+    FHIR-kiterjesztést is magától javított.
+
+## 2026-10-28 — Válaszlevél a ZV-döntésről; az M3 újraütemezése
+
+- Eszköz: Claude Code
+
+- Az AI szerepe: a témavezető M2-válaszára adott rövid válaszlevél tervezete
+  (a záróvizsga-döntés és a CQL-futtató konténeres javaslatának nyugtázása);
+  az M3 heti tervének újraütemezési javaslata, mert a bontás 1. hete (ZH-hét)
+  kódmunka nélkül telt el; az állapotlap frissítése.
+
+- Saját döntéseim:
+  - a 2027. januári záróvizsgára jelentkezem (a Neptun-jelentkezést a határidő
+    előtt adom be);
+  - a válaszlevél és az újraütemezett heti terv tervezet, az átnézésem és a
+    jóváhagyásom után érvényes; a CQL-futtató külön konténeres megoldása a
+    levél elküldésével válik eldöntötté.
+
+- Ellenőrzés:
+  - az újraütemezés mérlegét (85,5 óra munka, benne a témavezető által kért
+    három új ábra; kb. 78–86 órás keret november 22-ig) a bontás tételei
+    alapján tételesen átszámolva nézem át; a tartalék elfogyott, ezt a terv
+    kimondja.
+
 ## 2026-10-17–18 — Teendőlista; a beteg- és az orvosi felület átalakítása; M2-levél
 
 - Eszköz: Claude Code; a telefonos nézet ellenőrzéséhez és az M3 tételes

@@ -2,6 +2,7 @@
 
 from zoneinfo import ZoneInfo
 
+from pydantic import PositiveFloat, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +30,36 @@ class Settings(BaseSettings):
     # ideje ebből számítódik — a mérés helyi napja (M3: alkalmak) és a FHIR-export
     # időeltolása. Az adatbázis az időpontokat időzónával (UTC-ben) tárolja.
     timezone: str = "Europe/Budapest"
+
+    # A háttérfolyamat (worker) két alkalom-ellenőrzése közti idő másodpercben
+    # (OCCURRENCE_CHECK_INTERVAL_SECONDS). Alapból óránként (a hallgató döntése,
+    # 2026-10-30): a határidők napi léptékűek, a pontosságot az idempotencia és
+    # az „ellenőrzés most" végpont adja, nem az ütem. A demóhoz és a
+    # teljesítményméréshez állítható.
+    occurrence_check_interval_seconds: PositiveInt = 3600
+
+    # A CQL-szolgáltatás (M3, K2) címe és a hívás időtúllépése másodpercben
+    # (CQL_SERVICE_URL, CQL_TIMEOUT_SECONDS). Az alapcím a compose belső hálózata;
+    # a szolgáltatás portot nem nyit a gép felé. Ha nem érhető el, csak a NICE-
+    # kiértékelés végpontja ad hibát (503), a riasztás és a státusz nem függ tőle.
+    cql_service_url: str = "http://cql:8080"
+    cql_timeout_seconds: PositiveFloat = 5.0
+
+    # Az orvosnak szóló e-mail-értesítés (M3, A9). SMTP_HOST üres = a küldés ki
+    # van kapcsolva: a kézbesítési sorok küldés nélkül várakoznak (pl. a pytest
+    # és a helyi futtatás alapból így megy). A compose a Mailpitre irányítja,
+    # amely valódi címre nem továbbít.
+    smtp_host: str = ""
+    smtp_port: PositiveInt = 1025
+    # A feladó címe (MAIL_FROM).
+    mail_from: str = "pulse@pulse.example"
+    # A felület címe a levélbeli hivatkozáshoz (APP_BASE_URL); az alapérték a
+    # compose frontendje a saját gépen.
+    app_base_url: str = "http://127.0.0.1:8080"
+    # A háttérfolyamat kézbesítő körei közti idő másodpercben
+    # (DELIVERY_INTERVAL_SECONDS): ennyi időnként ébred, és küldi a várakozó
+    # leveleket; az alkalom-ellenőrzés a saját ütemében marad.
+    delivery_interval_seconds: PositiveFloat = 30.0
 
     @property
     def tz(self) -> ZoneInfo:

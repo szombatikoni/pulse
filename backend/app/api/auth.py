@@ -5,17 +5,32 @@ from app.core.config import settings
 from app.core.db import DbSession
 from app.core.security import create_access_token
 from app.schemas.auth import CurrentUserResponse, LoginRequest, TokenResponse
-from app.services.users import authenticate, record_login
+from app.services.users import AccountDisabledError, authenticate, record_login
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", responses={401: {"description": "Hibás e-mail-cím vagy jelszó"}})
+@router.post(
+    "/login",
+    responses={
+        401: {"description": "Hibás e-mail-cím vagy jelszó"},
+        403: {
+            "description": "Helyes jelszó, de a fiók le van tiltva (detail.code: account_disabled)"
+        },
+    },
+)
 def login(body: LoginRequest, db: DbSession) -> TokenResponse:
     """Bejelentkezés e-mail-címmel és jelszóval; sikeres esetben hozzáférési token.
-    Minden sikertelen esetben (ismeretlen cím, rossz jelszó, letiltott fiók)
-    ugyanaz a válasz, hogy ne derüljön ki, melyik volt a hiba."""
-    user = authenticate(db, body.email, body.password)
+    Minden sikertelen esetben (ismeretlen cím, rossz jelszó, letiltott fiók rossz
+    jelszóval) ugyanaz a válasz, hogy ne derüljön ki, melyik volt a hiba. Egyetlen
+    kivétel: helyes jelszóval a letiltott fiók 403-at kap account_disabled kóddal
+    (M3, A1); ezt csak a jelszó ismerője tudhatja meg."""
+    try:
+        user = authenticate(db, body.email, body.password)
+    except AccountDisabledError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail={"code": "account_disabled"}
+        ) from error
     if user is None:
         # Az RFC 9110 szerint a 401-es válaszban kötelező a WWW-Authenticate fejléc.
         raise HTTPException(

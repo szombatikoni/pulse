@@ -163,6 +163,26 @@ def test_revoked_ended_and_future_assignments_are_not_listed(db, setup):
     assert patient_tasks(db, setup["pid"], now=local(2026, 10, 17, 8, 0)) == []
 
 
+def test_inactive_questionnaire_gives_no_task(db, setup):
+    template = create_template(
+        db,
+        code=WELLBEING_CODE,
+        name=WELLBEING_NAME,
+        created_by=setup["doctor"].id,
+        spec=WELLBEING_V1,
+    )
+    assign_questionnaire(
+        db,
+        patient_id=setup["pid"],
+        template=template,
+        assigned_by=setup["doctor"].id,
+        start_date=date(2026, 10, 6),
+    )
+    template.is_active = False
+    db.flush()
+    assert patient_tasks(db, setup["pid"], now=local(2026, 10, 17, 9, 0)) == []
+
+
 def test_missing_tasks_come_first(db, setup):
     bp_daily(db, setup, due=time(10, 0))
     assign_measurement(
