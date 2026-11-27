@@ -84,9 +84,19 @@ class EventExplanation:
 
 def list_patient_alerts(db: Session, patient_id: uuid.UUID, open_only: bool = True) -> list[Alert]:
     """A beteg riasztásai: elöl a súlyosabb, azon belül a frissebb."""
+    return alerts_by_patient(db, [patient_id], open_only).get(patient_id, [])
+
+
+def alerts_by_patient(
+    db: Session, patient_ids: list[uuid.UUID], open_only: bool = True
+) -> dict[uuid.UUID, list[Alert]]:
+    """Több beteg riasztásai egy lekérdezéssel (a beteglistához), betegenként
+    ugyanabban a sorrendben, mint a list_patient_alerts; akinek nincs, az kimarad."""
+    if not patient_ids:
+        return {}
     query = (
         select(Alert)
-        .where(Alert.patient_id == patient_id)
+        .where(Alert.patient_id.in_(patient_ids))
         .options(
             selectinload(Alert.rule_version),
             selectinload(Alert.events),
@@ -94,9 +104,15 @@ def list_patient_alerts(db: Session, patient_id: uuid.UUID, open_only: bool = Tr
     )
     if open_only:
         query = query.where(Alert.status != AlertStatus.CLOSED)
-    alerts = list(db.scalars(query))
-    alerts.sort(key=lambda a: (SEVERITY_RANK[a.severity], a.created_at), reverse=True)
-    return alerts
+    result: dict[uuid.UUID, list[Alert]] = {}
+    for alert in db.scalars(query):
+        result.setdefault(alert.patient_id, []).append(alert)
+    # Azonos súlyosság és keletkezési idő esetén az azonosító dönt, így a sorrend
+    # nem függ attól, milyen sorrendben adja vissza a sorokat az adatbázis (a lista
+    # és az adatlap ugyanazt mutatja).
+    for alerts in result.values():
+        alerts.sort(key=lambda a: (SEVERITY_RANK[a.severity], a.created_at, a.id), reverse=True)
+    return result
 
 
 def occurrence_triggers(db: Session, ids: list[uuid.UUID]) -> list[OccurrenceTrigger]:
@@ -138,21 +154,53 @@ def explain_event(db: Session, event: AlertEvent) -> EventExplanation:
     (küszöb- és időablakos szabálynál), kitöltésnél melyik kiértékelési sávba
     esett a pontszám, elmaradt adatnál melyik alkalom maradt el."""
     version = db.get(RuleVersion, event.rule_version_id) if event.rule_version_id else None
+    ids = _trigger_ids(event)
+    rule_type = version.rule_type if version is not None else None
+    data = _TriggerData()
+    if rule_type is RuleType.QUESTIONNAIRE:
+        data.submissions = get_submissions(db, ids)
+    elif rule_type is RuleType.MISSING_DATA:
+        data.occurrences = {o.occurrence.id: o for o in occurrence_triggers(db, ids)}
+    else:
+        data.measurements = {m.id: m for m in get_measurements(db, ids)}
+    return _explanation(event, version, data)
+
+
+@dataclass
+class _TriggerData:
+    """A magyarázatokhoz előre betöltött kiváltó adatok (egy vagy több eseményhez)."""
+
+    # A get_submissions sorrendjében (kitöltési idő szerint).
+    submissions: list[Submission] = field(default_factory=list)
+    occurrences: dict[uuid.UUID, OccurrenceTrigger] = field(default_factory=dict)
+    measurements: dict[uuid.UUID, Measurement] = field(default_factory=dict)
+
+
+def _trigger_ids(event: AlertEvent) -> list[uuid.UUID]:
+    return [uuid.UUID(i) for i in event.trigger_data_ids or []]
+
+
+def _explanation(
+    event: AlertEvent, version: RuleVersion | None, data: _TriggerData
+) -> EventExplanation:
+    """Az esemény magyarázata a már betöltött adatokból (lekérdezés nélkül)."""
     explanation = EventExplanation(event=event, version=version)
-    ids = [uuid.UUID(i) for i in event.trigger_data_ids or []]
+    ids = _trigger_ids(event)
     rule_type = version.rule_type if version is not None else None
     if rule_type is RuleType.QUESTIONNAIRE:
-        for submission in get_submissions(db, ids):
-            band = band_for(submission.version, submission.total_score)
-            explanation.triggers.append(TriggerExplanation(submission=submission, band=band))
+        wanted = set(ids)
+        for submission in data.submissions:
+            if submission.id in wanted:
+                band = band_for(submission.version, submission.total_score)
+                explanation.triggers.append(TriggerExplanation(submission=submission, band=band))
         return explanation
     if rule_type is RuleType.MISSING_DATA:
-        for occurrence in occurrence_triggers(db, ids):
-            explanation.triggers.append(TriggerExplanation(occurrence=occurrence))
+        for occurrence_id in ids:
+            if (occurrence := data.occurrences.get(occurrence_id)) is not None:
+                explanation.triggers.append(TriggerExplanation(occurrence=occurrence))
         return explanation
     # A tárolt sorrendben (javításnál [eredeti, javított], amelyek mérési ideje azonos).
-    by_id = {m.id: m for m in get_measurements(db, ids)}
-    for measurement in (by_id[i] for i in ids if i in by_id):
+    for measurement in (data.measurements[i] for i in ids if i in data.measurements):
         violations: list[Violation] = []
         if version is not None and rule_type in (RuleType.THRESHOLD, RuleType.WINDOW):
             # A WindowParams a ThresholdParams leszármazottja: a határok ugyanott
@@ -167,15 +215,73 @@ def explain_alert(db: Session, alert: Alert) -> list[EventExplanation]:
     return [explain_event(db, event) for event in alert.events]
 
 
+def _evaluations(alert: Alert) -> list[AlertEvent]:
+    """A riasztás kiértékelés-eseményei kiváltó adattal, a legújabb elöl. A
+    „kiváltó adat javítva" esemény nem kiértékelés, ezért kimarad (A7)."""
+    return [
+        event
+        for event in reversed(alert.events)
+        if event.trigger_data_ids and event.event_type is not AlertEventType.TRIGGER_CORRECTED
+    ]
+
+
 def latest_trigger(db: Session, alert: Alert) -> TriggerExplanation | None:
-    """A legutóbbi kiváltó adat a magyarázatával (a beteglista „Ok" oszlopához).
-    A „kiváltó adat javítva" esemény nem kiértékelés, ezért kimarad (A7)."""
-    for event in reversed(alert.events):
-        if event.trigger_data_ids and event.event_type is not AlertEventType.TRIGGER_CORRECTED:
-            triggers = explain_event(db, event).triggers
-            if triggers:
-                return triggers[-1]
+    """A legutóbbi kiváltó adat a magyarázatával (a beteglista „Ok" oszlopához)."""
+    for event in _evaluations(alert):
+        triggers = explain_event(db, event).triggers
+        if triggers:
+            return triggers[-1]
     return None
+
+
+def latest_triggers(db: Session, alerts: list[Alert]) -> dict[uuid.UUID, TriggerExplanation | None]:
+    """A latest_trigger több riasztásra, a riasztások számától független számú
+    lekérdezéssel (a beteglistához). Körönként minden még megoldatlan riasztás
+    következő kiértékelés-eseményét nézi; általában az első kör elég, újabb csak
+    akkor kell, ha a legutóbbi esemény kiváltó adata nem található."""
+    result: dict[uuid.UUID, TriggerExplanation | None] = {a.id: None for a in alerts}
+    pending = {a.id: events for a in alerts if (events := _evaluations(a))}
+    while pending:
+        current = {alert_id: events.pop(0) for alert_id, events in pending.items()}
+        versions, data = _load_trigger_data(db, list(current.values()))
+        for alert_id, event in current.items():
+            version = versions.get(event.rule_version_id) if event.rule_version_id else None
+            triggers = _explanation(event, version, data).triggers
+            if triggers:
+                result[alert_id] = triggers[-1]
+                del pending[alert_id]
+        pending = {alert_id: events for alert_id, events in pending.items() if events}
+    return result
+
+
+def _load_trigger_data(
+    db: Session, events: list[AlertEvent]
+) -> tuple[dict[uuid.UUID, RuleVersion], _TriggerData]:
+    """Az események szabályverziói és kiváltó adatai fajtánként egy-egy lekérdezéssel."""
+    version_ids = {e.rule_version_id for e in events if e.rule_version_id}
+    versions = {
+        v.id: v for v in db.scalars(select(RuleVersion).where(RuleVersion.id.in_(version_ids)))
+    }
+    submission_ids: list[uuid.UUID] = []
+    occurrence_ids: list[uuid.UUID] = []
+    measurement_ids: list[uuid.UUID] = []
+    for event in events:
+        version = versions.get(event.rule_version_id) if event.rule_version_id else None
+        rule_type = version.rule_type if version is not None else None
+        if rule_type is RuleType.QUESTIONNAIRE:
+            submission_ids += _trigger_ids(event)
+        elif rule_type is RuleType.MISSING_DATA:
+            occurrence_ids += _trigger_ids(event)
+        else:
+            measurement_ids += _trigger_ids(event)
+    data = _TriggerData()
+    if submission_ids:
+        data.submissions = get_submissions(db, submission_ids)
+    if occurrence_ids:
+        data.occurrences = {o.occurrence.id: o for o in occurrence_triggers(db, occurrence_ids)}
+    if measurement_ids:
+        data.measurements = {m.id: m for m in get_measurements(db, measurement_ids)}
+    return versions, data
 
 
 def user_names(db: Session, ids: set[uuid.UUID | None]) -> dict[uuid.UUID, str]:

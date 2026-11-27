@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import DoctorUser, ensure_patient_access
 from app.core.db import DbSession
@@ -19,32 +20,42 @@ from app.services.alerts import (
     TriggerExplanation,
     alert_user_ids,
     explain_alert,
-    latest_trigger,
+    latest_triggers,
     list_patient_alerts,
     occurrence_triggers,
     user_names,
 )
 from app.services.status import PatientStatusResult, compute_status, doctor_patient_list
-from app.services.tasks import PatientTask, patient_tasks
+from app.services.tasks import PatientTask, patient_tasks, tasks_by_patient
 
 router = APIRouter(tags=["patients"])
 
 FORBIDDEN = {403: {"description": "A felhasználó nem érheti el a beteg adatait"}}
 
 
-def _summary(
-    db: DbSession, patient: PatientProfile, result: PatientStatusResult, tasks: list[PatientTask]
-) -> PatientSummaryOut:
-    triggers = {r.alert.id: latest_trigger(db, r.alert) for r in result.reasons if r.alert}
+def _summaries(
+    db: DbSession,
+    rows: list[tuple[PatientProfile, PatientStatusResult]],
+    tasks: dict[uuid.UUID, list[PatientTask]],
+) -> list[PatientSummaryOut]:
+    """A beteglista sorai (és az adatlap fejléce, egy sorral). Az „Ok" oszlop
+    adatai és a nevek minden betegre együtt jönnek, így a lekérdezések száma
+    nem nő a betegek számával."""
+    reasons = [r for _, result in rows for r in result.reasons]
+    alerts = list({r.alert.id: r.alert for r in reasons if r.alert}.values())
+    triggers = latest_triggers(db, alerts)
     # Az elmulasztott alkalom okainál az alkalom a célpontjával (mit, mikorra).
-    missed = [r.occurrence.id for r in result.reasons if r.occurrence]
+    missed = [r.occurrence.id for r in reasons if r.occurrence]
     for occurrence in occurrence_triggers(db, missed):
         triggers[occurrence.occurrence.id] = TriggerExplanation(occurrence=occurrence)
     # A Kezelve okoknál a lezáró orvos neve (csak ha van ilyen ok: plusz egy lekérdezés).
-    names = user_names(db, {r.actor_id for r in result.reasons})
-    summary = patient_summary_out(patient, result, triggers, names)
-    summary.tasks = [task_out(t) for t in tasks]
-    return summary
+    names = user_names(db, {r.actor_id for r in reasons})
+    summaries = []
+    for patient, result in rows:
+        summary = patient_summary_out(patient, result, triggers, names)
+        summary.tasks = [task_out(t) for t in tasks[patient.id]]
+        summaries.append(summary)
+    return summaries
 
 
 # A teendőlista a státusz ELŐTT fut: megnyitja az aktuális és az előző időszak
@@ -60,10 +71,15 @@ def my_patients(db: DbSession, user: DoctorUser) -> list[PatientSummaryOut]:
     now = datetime.now(UTC)
     doctor_id = user.doctor_profile.id
     # A betegkör egyszer: a teendők és a státusz ugyanarra a listára (review k3).
-    patients = list(db.scalars(assigned_patients_query(doctor_id, now)).all())
-    tasks = {p.id: patient_tasks(db, p.id, now) for p in patients}
+    # A felhasználó (letiltott-e) betegenként kellene: egy lekérdezéssel előre.
+    patients = list(
+        db.scalars(
+            assigned_patients_query(doctor_id, now).options(selectinload(PatientProfile.user))
+        ).all()
+    )
+    tasks = tasks_by_patient(db, [p.id for p in patients], now)
     rows = doctor_patient_list(db, doctor_id, now, patients)
-    summaries = [_summary(db, patient, result, tasks[patient.id]) for patient, result in rows]
+    summaries = _summaries(db, rows, tasks)
     db.commit()  # a teendők a hiányzó alkalmakat megnyitják
     return summaries
 
@@ -75,8 +91,8 @@ def patient_detail(patient_id: uuid.UUID, db: DbSession, user: DoctorUser) -> Pa
     ensure_patient_access(db, user, patient_id)
     patient = db.get(PatientProfile, patient_id)
     now = datetime.now(UTC)
-    tasks = patient_tasks(db, patient_id, now)
-    summary = _summary(db, patient, compute_status(db, patient_id, now), tasks)
+    tasks = {patient_id: patient_tasks(db, patient_id, now)}
+    (summary,) = _summaries(db, [(patient, compute_status(db, patient_id, now))], tasks)
     db.commit()  # a teendők a hiányzó alkalmakat megnyitják
     return summary
 

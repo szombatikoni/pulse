@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from enum import StrEnum
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -38,7 +38,7 @@ from app.models import (
 )
 from app.services.disabled import (
     DisabledPeriod,
-    disabled_periods,
+    disabled_periods_by_patient,
     inactive_patients,
     is_excused,
 )
@@ -109,15 +109,101 @@ def assign_measurement(
     return assignment
 
 
-def _active_assignments(db: Session, patient_id: uuid.UUID, today: date) -> list[Assignment]:
-    """Az éppen érvényes előírások (ugyanaz a szűrés, mint a kirendelt kérdőíveknél)."""
-    return list(
-        db.scalars(
-            select(Assignment)
-            .where(Assignment.patient_id == patient_id, *valid_on(today))
-            .order_by(Assignment.start_date, Assignment.id)
+def _active_assignments(
+    db: Session, patient_ids: list[uuid.UUID], today: date
+) -> dict[uuid.UUID, list[Assignment]]:
+    """Az éppen érvényes előírások betegenként (ugyanaz a szűrés, mint a
+    kirendelt kérdőíveknél), egy lekérdezéssel."""
+    result: dict[uuid.UUID, list[Assignment]] = {}
+    if not patient_ids:
+        return result
+    for assignment in db.scalars(
+        select(Assignment)
+        .where(Assignment.patient_id.in_(patient_ids), *valid_on(today))
+        .order_by(Assignment.start_date, Assignment.id)
+    ):
+        result.setdefault(assignment.patient_id, []).append(assignment)
+    return result
+
+
+# Az előre betöltött alkalmak (előírás, határidő UTC-ben) szerint; lásd _Prefetch.
+Known = dict[tuple[uuid.UUID, datetime], AssignmentOccurrence]
+
+
+def _key(assignment_id: uuid.UUID, due_at: datetime) -> tuple[uuid.UUID, datetime]:
+    """A known kulcsa. A határidő UTC-re váltva: az adatbázis UTC-ben adja, az
+    időszaké helyi idő, és az óraátállítás napján (kétszer meglévő vagy
+    kimaradó helyi idő) a két alak Pythonban nem egyenlő (PEP 495), így a
+    keresés tévesen nem találná a meglévő alkalmat."""
+    return assignment_id, due_at.astimezone(UTC)
+
+
+@dataclass
+class _Prefetch:
+    """A teendők számolásához előre, egyszerre betöltött sorok (a beteglistán
+    minden betegre egy-egy lekérdezéssel). A known az aktuális és az előző
+    időszak már meglévő alkalmai; amelyik nincs benne, az még nem létezik, és
+    az occurrence_for nyitja meg. A többi lista csak azért van itt, hogy a
+    betöltött objektumok a számolás végéig a sessionben maradjanak (így a
+    db.get nem kérdez újra)."""
+
+    known: Known
+    keep: list[object]
+
+
+def _periods(assignment: Assignment, today: date) -> list[Period]:
+    """Az előírás aktuális és (ha van) előző időszaka: a teendő csak ezeket nézi."""
+    period = period_containing(assignment, today)
+    if period.first_day <= assignment.start_date:
+        return [period]
+    return [period, period_containing(assignment, period.first_day - timedelta(days=1))]
+
+
+def _prefetch(db: Session, assignments: list[Assignment], today: date) -> _Prefetch:
+    keys = [(a.id, p.due_at) for a in assignments for p in _periods(a, today)]
+    key = tuple_(AssignmentOccurrence.assignment_id, AssignmentOccurrence.due_at)
+    known: Known = {}
+    if keys:
+        for occurrence in db.scalars(select(AssignmentOccurrence).where(key.in_(keys))):
+            known[_key(occurrence.assignment_id, occurrence.due_at)] = occurrence
+    keep: list[object] = []
+    type_ids = {a.measurement_type_id for a in assignments} - {None}
+    if type_ids:
+        keep += db.scalars(select(MeasurementType).where(MeasurementType.id.in_(type_ids)))
+    template_ids = {a.questionnaire_template_id for a in assignments} - {None}
+    if template_ids:
+        keep += db.scalars(
+            select(QuestionnaireTemplate).where(QuestionnaireTemplate.id.in_(template_ids))
+        )
+    measurement_ids = {
+        o.measurement_id for o in known.values() if o.status in _DONE and o.measurement_id
+    }
+    if measurement_ids:
+        keep += db.scalars(select(Measurement).where(Measurement.id.in_(measurement_ids)))
+    return _Prefetch(known, keep)
+
+
+def _existing(
+    db: Session, known: Known | None, assignment: Assignment, period: Period
+) -> AssignmentOccurrence | None:
+    """Az időszak már meglévő alkalma (nem nyit újat)."""
+    if known is not None:
+        return known.get(_key(assignment.id, period.due_at))
+    return db.scalar(
+        select(AssignmentOccurrence).where(
+            AssignmentOccurrence.assignment_id == assignment.id,
+            AssignmentOccurrence.due_at == period.due_at,
         )
     )
+
+
+def _occurrence(
+    db: Session, known: Known | None, assignment: Assignment, period: Period
+) -> AssignmentOccurrence:
+    """Az időszak alkalma: az előre betöltött, vagy ha még nincs, az
+    occurrence_for nyitja meg (ugyanaz az idempotens út)."""
+    hit = known.get(_key(assignment.id, period.due_at)) if known is not None else None
+    return hit if hit is not None else occurrence_for(db, assignment, period)
 
 
 _DONE = {OccurrenceStatus.FULFILLED, OccurrenceStatus.FULFILLED_LATE}
@@ -146,6 +232,7 @@ def _catch_up_only(
     period: Period,
     now: datetime,
     excused: list[DisabledPeriod],
+    known: Known | None = None,
 ) -> PatientTask | None:
     """Visszaengedélyezés napja, ha a mai határidő a letiltás alatt telt le és a
     mai alkalom nem teljesült (A1): a mai alkalom nem teendő. Ha viszont az előző
@@ -167,7 +254,7 @@ def _catch_up_only(
     suggested = max(previous_period.due_at, now - MAX_BACKDATE + CATCH_UP_MARGIN)
     if now >= deadline or suggested >= previous_period.end:
         return None
-    previous = occurrence_for(db, assignment, previous_period)
+    previous = _occurrence(db, known, assignment, previous_period)
     if previous.status is not OccurrenceStatus.DUE:
         return None
     return PatientTask(
@@ -186,7 +273,11 @@ def _catch_up_only(
 
 
 def _task(
-    db: Session, assignment: Assignment, now: datetime, excused: list[DisabledPeriod]
+    db: Session,
+    assignment: Assignment,
+    now: datetime,
+    excused: list[DisabledPeriod],
+    known: Known | None = None,
 ) -> PatientTask | None:
     if assignment.target_kind is AssignmentTarget.MEASUREMENT:
         mtype = db.get(MeasurementType, assignment.measurement_type_id)
@@ -204,17 +295,12 @@ def _task(
         # A határidő a letiltás alatt telt le (A1): ez az alkalom nem esedékes és nem
         # késésben, sort sem nyitunk rá. Ha már teljesült, kész teendőként látszik;
         # ha nem, de az előző (számító) időszak még pótolható, az látszik.
-        existing = db.scalar(
-            select(AssignmentOccurrence).where(
-                AssignmentOccurrence.assignment_id == assignment.id,
-                AssignmentOccurrence.due_at == period.due_at,
-            )
-        )
+        existing = _existing(db, known, assignment, period)
         if existing is None or existing.status not in _DONE:
-            return _catch_up_only(db, assignment, code, name, period, now, excused)
+            return _catch_up_only(db, assignment, code, name, period, now, excused, known)
         current = existing
     else:
-        current = occurrence_for(db, assignment, period)
+        current = _occurrence(db, known, assignment, period)
     if current.status in _DONE:
         state = TaskState.DONE
     else:
@@ -232,7 +318,7 @@ def _task(
     )
     # A letiltott időszakba eső határidejű előző időszak nem elmaradt (A1).
     if previous_period is not None and not is_excused(excused, previous_period.due_at):
-        previous = occurrence_for(db, assignment, previous_period)
+        previous = _occurrence(db, known, assignment, previous_period)
         if previous.status not in _DONE:
             previous_missed = True
             # Az előző időszak vége az aktuális kezdete; a pótlás határa ugyanabból
@@ -265,14 +351,23 @@ def patient_tasks(
     """A beteg teendői az érvényes előírásai szerint. Sorrend: előbb ami még
     hiányzik (lejárt, esedékes), aztán a pótolható, végül a kész. A hiányzó
     alkalmakat megnyitja; a véglegesítést (commit) a hívó végzi."""
+    return tasks_by_patient(db, [patient_id], now)[patient_id]
+
+
+def tasks_by_patient(
+    db: Session, patient_ids: list[uuid.UUID], now: datetime | None = None
+) -> dict[uuid.UUID, list[PatientTask]]:
+    """A patient_tasks több betegre (a beteglistához): az előírások, a letiltott
+    időszakok és a meglévő alkalmak fajtánként egy lekérdezéssel jönnek, a
+    számolás betegenként ugyanaz. Lekérdezés csak a még hiányzó alkalom
+    megnyitásakor fut külön (occurrence_for)."""
     now = now or datetime.now(UTC)
-    if inactive_patients(db, [patient_id]):
-        return []  # letiltott beteg: nincs teendő, alkalmat sem nyit (A1)
+    inactive = inactive_patients(db, patient_ids)  # letiltott: nincs teendő, alkalmat sem nyit (A1)
+    active = [p for p in patient_ids if p not in inactive]
     today = now.astimezone(settings.tz).date()
-    excused = disabled_periods(db, patient_id)
-    tasks = [
-        t for a in _active_assignments(db, patient_id, today) if (t := _task(db, a, now, excused))
-    ]
+    excused = disabled_periods_by_patient(db, active)
+    assignments = _active_assignments(db, active, today)
+    prefetch = _prefetch(db, [a for rows in assignments.values() for a in rows], today)
 
     def rank(task: PatientTask) -> int:
         if task.state is TaskState.LATE:
@@ -281,6 +376,15 @@ def patient_tasks(
             return 1
         return 2 if task.catch_up_until else 3
 
-    tasks.sort(key=lambda t: (rank(t), t.due_at))
+    result: dict[uuid.UUID, list[PatientTask]] = {}
+    for patient_id in patient_ids:
+        periods = excused.get(patient_id, [])
+        tasks = [
+            t
+            for a in assignments.get(patient_id, [])
+            if (t := _task(db, a, now, periods, prefetch.known))
+        ]
+        tasks.sort(key=lambda t: (rank(t), t.due_at))
+        result[patient_id] = tasks
     db.flush()
-    return tasks
+    return result

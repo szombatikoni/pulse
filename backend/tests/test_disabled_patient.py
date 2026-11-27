@@ -56,7 +56,7 @@ from app.services.questionnaires import (
 )
 from app.services.rules import MissingDataParams, create_rule, missed_streak
 from app.services.status import PatientStatus, compute_status, data_age
-from app.services.tasks import TaskState, assign_measurement, patient_tasks
+from app.services.tasks import TaskState, assign_measurement, patient_tasks, tasks_by_patient
 from seed.questionnaires import WELLBEING_CODE, WELLBEING_NAME, WELLBEING_V1
 from tests.factories import (
     assign,
@@ -661,6 +661,37 @@ def test_reenable_day_keeps_done_task_and_previous_catch_up(db, s):
     assert task.due_at == local(2026, 10, 3, 10)
     assert task.previous_missed is True
     assert task.catch_up_until == local(2026, 10, 5, 0)
+
+
+@pytest.mark.parametrize(
+    "day",
+    [
+        date(2026, 10, 25),  # óraátállítás ősszel: a 02:30 kétszer van (fold)
+        date(2027, 3, 28),  # tavasszal: a 02:30 nem létezik (gap)
+    ],
+)
+def test_reenable_day_done_task_on_clock_change_day(db, s, day):
+    """Mint fent, de 02:30-as határidővel az óraátállítás napján. A tárolt
+    határidő UTC, az időszaké helyi idő; a kettő itt Pythonban nem egyenlő
+    (PEP 495), ezért az előre betöltött alkalmak kulcsa UTC (tasks.py)."""
+    assign_measurement(
+        db,
+        patient_id=s["pid"],
+        measurement_type=get_type_by_code(db, "blood_pressure"),
+        assigned_by=s["doctor"].id,
+        start_date=day - timedelta(days=1),
+        due_time=time(2, 30),
+    )
+    record_bp(db, s["patient"], 120, 80, at=local(day.year, day.month, day.day, 0, 30))
+    disable(db, s, local(day.year, day.month, day.day, 1))
+    enable(db, s, local(day.year, day.month, day.day, 4))  # a 02:30-as határidő kimentett
+    now = local(day.year, day.month, day.day, 10)
+    (task,) = patient_tasks(db, s["pid"], now)
+    assert task.state is TaskState.DONE
+    assert task.previous_missed is True  # a kezdőnapon nem mért (pótolható)
+    # A beteglista útja (több beteg egyszerre) ugyanezt adja.
+    (listed,) = tasks_by_patient(db, [s["pid"]], now)[s["pid"]]
+    assert listed == task
 
 
 def test_reenable_day_offers_catch_up_for_pre_disable_period(db, s):

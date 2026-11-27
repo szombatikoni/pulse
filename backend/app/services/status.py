@@ -92,10 +92,12 @@ from app.models import (
     not_superseded,
 )
 from app.services.access import assigned_patients_query
-from app.services.alerts import list_patient_alerts
+from app.services.alerts import alerts_by_patient
 from app.services.disabled import (
+    DisabledPeriod,
     disabled_overlap,
     disabled_periods,
+    disabled_periods_by_patient,
     excused_due,
     is_excused,
 )
@@ -106,6 +108,7 @@ from app.services.rules import (
     QuestionnaireParams,
     ThresholdParams,
     current_version,
+    current_versions,
     missing_target_column,
     missing_target_id,
     threshold_violations,
@@ -154,15 +157,38 @@ def last_data_at(db: Session, patient_id: uuid.UUID) -> datetime | None:
     """A legutóbbi adat ideje: mérés (a mérés ideje) vagy kérdőív-kitöltés. A
     felülírt mérés nem számít (A7); mivel a javítás a mérés idejét megtartja
     (D1), ez az értéket nem változtatja, csak a közös szabályt követi."""
-    measured = db.scalar(
-        select(func.max(Measurement.measured_at)).where(
-            Measurement.patient_id == patient_id, not_superseded()
+    return last_data_by_patient(db, [patient_id]).get(patient_id)
+
+
+def last_data_by_patient(
+    db: Session, patient_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, datetime | None]:
+    """A last_data_at több betegre, két csoportosító lekérdezéssel."""
+    if not patient_ids:
+        return {}
+    measured: dict[uuid.UUID, datetime] = {
+        patient_id: at
+        for patient_id, at in db.execute(
+            select(Measurement.patient_id, func.max(Measurement.measured_at))
+            .where(Measurement.patient_id.in_(patient_ids), not_superseded())
+            .group_by(Measurement.patient_id)
         )
-    )
-    submitted = db.scalar(
-        select(func.max(Submission.submitted_at)).where(Submission.patient_id == patient_id)
-    )
-    return max((t for t in (measured, submitted) if t is not None), default=None)
+    }
+    submitted: dict[uuid.UUID, datetime] = {
+        patient_id: at
+        for patient_id, at in db.execute(
+            select(Submission.patient_id, func.max(Submission.submitted_at))
+            .where(Submission.patient_id.in_(patient_ids))
+            .group_by(Submission.patient_id)
+        )
+    }
+    return {
+        patient_id: max(
+            (t for t in (measured.get(patient_id), submitted.get(patient_id)) if t is not None),
+            default=None,
+        )
+        for patient_id in patient_ids
+    }
 
 
 def latest_closed_occurrences(
@@ -175,13 +201,24 @@ def latest_closed_occurrences(
     teljesítésnél). Inaktív kérdőívre szóló előírás nem számít: arra a
     háttérfolyamat nem nyit alkalmat, így a beteg sem teljesíthetné (mint az
     open_due_occurrences-ben)."""
+    return latest_closed_occurrences_by_patient(db, [patient_id], now).get(patient_id, [])
+
+
+def latest_closed_occurrences_by_patient(
+    db: Session, patient_ids: list[uuid.UUID], now: datetime
+) -> dict[uuid.UUID, list[AssignmentOccurrence]]:
+    """A latest_closed_occurrences több betegre egy lekérdezéssel. A DISTINCT ON
+    előírásonként választ, az előírás pedig egy betegé, így az eredmény
+    betegenként ugyanaz, mint külön lekérdezve."""
+    if not patient_ids:
+        return {}
     today = now.astimezone(settings.tz).date()
-    latest = db.scalars(
-        select(AssignmentOccurrence)
+    rows = db.execute(
+        select(AssignmentOccurrence, Assignment.patient_id)
         .join(Assignment, AssignmentOccurrence.assignment_id == Assignment.id)
         .outerjoin(Assignment.template)
         .where(
-            Assignment.patient_id == patient_id,
+            Assignment.patient_id.in_(patient_ids),
             *valid_on(today),
             or_(
                 Assignment.target_kind == AssignmentTarget.MEASUREMENT,
@@ -202,7 +239,39 @@ def latest_closed_occurrences(
         .ext(distinct_on(AssignmentOccurrence.assignment_id))
         .order_by(AssignmentOccurrence.assignment_id, AssignmentOccurrence.due_at.desc())
     ).all()
-    return sorted(latest, key=lambda o: (o.due_at, o.id))
+    result: dict[uuid.UUID, list[AssignmentOccurrence]] = {}
+    for occurrence, patient_id in rows:
+        result.setdefault(patient_id, []).append(occurrence)
+    return {
+        patient_id: sorted(latest, key=lambda o: (o.due_at, o.id))
+        for patient_id, latest in result.items()
+    }
+
+
+def valid_assignments_by_patient(
+    db: Session, patient_ids: list[uuid.UUID], now: datetime
+) -> dict[uuid.UUID, list[Assignment]]:
+    """A betegek ma érvényes előírásai (ugyanaz a szűrés, mint
+    latest_closed_occurrences) egy lekérdezéssel."""
+    if not patient_ids:
+        return {}
+    today = now.astimezone(settings.tz).date()
+    assignments = db.scalars(
+        select(Assignment)
+        .outerjoin(Assignment.template)
+        .where(
+            Assignment.patient_id.in_(patient_ids),
+            *valid_on(today),
+            or_(
+                Assignment.target_kind == AssignmentTarget.MEASUREMENT,
+                QuestionnaireTemplate.is_active.is_(True),
+            ),
+        )
+    ).all()
+    result: dict[uuid.UUID, list[Assignment]] = {}
+    for assignment in assignments:
+        result.setdefault(assignment.patient_id, []).append(assignment)
+    return result
 
 
 def lapsed_without_row(
@@ -220,21 +289,22 @@ def lapsed_without_row(
     garancia a hívási sorrendtől (teendőlista, háttérfolyamat) független, és a
     státusz továbbra sem ír semmit. Előírás szerint a határidő; az előírás
     régebbi tárolt alkalma helyett ez számít (mint ha a sor meglenne)."""
-    today = now.astimezone(settings.tz).date()
-    assignments = db.scalars(
-        select(Assignment)
-        .outerjoin(Assignment.template)
-        .where(
-            Assignment.patient_id == patient_id,
-            *valid_on(today),
-            or_(
-                Assignment.target_kind == AssignmentTarget.MEASUREMENT,
-                QuestionnaireTemplate.is_active.is_(True),
-            ),
-        )
-    ).all()
+    return _lapsed(
+        valid_assignments_by_patient(db, [patient_id], now).get(patient_id, []),
+        disabled_periods(db, patient_id),
+        now,
+        stored,
+    )
+
+
+def _lapsed(
+    assignments: list[Assignment],
+    excused_periods: list[DisabledPeriod],
+    now: datetime,
+    stored: list[AssignmentOccurrence],
+) -> dict[uuid.UUID, datetime]:
+    """A lapsed_without_row számolása a már betöltött adatokból."""
     latest_stored = {o.assignment_id: o.due_at for o in stored}
-    excused_periods = disabled_periods(db, patient_id)
     lapsed = {}
     for assignment in assignments:
         period = latest_lapsed_period(assignment, now)
@@ -253,6 +323,17 @@ def lapsed_without_row(
 def latest_closed_alerts(db: Session, patient_id: uuid.UUID) -> list[tuple[Alert, AlertEvent]]:
     """A beteg szabályonként legutóbb lezárt riasztása a lezárás eseményével
     (egy lekérdezés). Lezárás-esemény nélküli lezárt riasztás nem számít."""
+    return latest_closed_alerts_by_patient(db, [patient_id]).get(patient_id, [])
+
+
+def latest_closed_alerts_by_patient(
+    db: Session, patient_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[tuple[Alert, AlertEvent]]]:
+    """A latest_closed_alerts több betegre egy lekérdezéssel. A DISTINCT ON
+    szabályonként választ, a szabály pedig egy betegé, így az eredmény (és a
+    szabály szerinti sorrend) betegenként ugyanaz, mint külön lekérdezve."""
+    if not patient_ids:
+        return {}
     rows = db.execute(
         select(Alert, AlertEvent)
         .join(
@@ -262,12 +343,17 @@ def latest_closed_alerts(db: Session, patient_id: uuid.UUID) -> list[tuple[Alert
                 AlertEvent.event_type == AlertEventType.CLOSED,
             ),
         )
-        .where(Alert.patient_id == patient_id, Alert.status == AlertStatus.CLOSED)
+        .where(Alert.patient_id.in_(patient_ids), Alert.status == AlertStatus.CLOSED)
         # PostgreSQL DISTINCT ON: szabályonként a legkésőbbi lezárás.
         .ext(distinct_on(Alert.rule_id))
         .order_by(Alert.rule_id, AlertEvent.created_at.desc(), AlertEvent.id)
+        # Az események a Kezelve ok magyarázatához kellenek (latest_triggers).
+        .options(selectinload(Alert.events))
     ).all()
-    return [(alert, event) for alert, event in rows]
+    result: dict[uuid.UUID, list[tuple[Alert, AlertEvent]]] = {}
+    for alert, event in rows:
+        result.setdefault(alert.patient_id, []).append((alert, event))
+    return result
 
 
 _DONE = (OccurrenceStatus.FULFILLED, OccurrenceStatus.FULFILLED_LATE)
@@ -362,16 +448,23 @@ def ok_data_since(
 
 
 def handled_reasons(
-    db: Session, patient_id: uuid.UUID, open_rule_ids: set[uuid.UUID]
+    db: Session,
+    patient_id: uuid.UUID,
+    open_rule_ids: set[uuid.UUID],
+    closed_alerts: list[tuple[Alert, AlertEvent]] | None = None,
+    versions: dict[uuid.UUID, RuleVersion] | None = None,
 ) -> list[StatusReason]:
     """A Kezelve okai: szabályonként a legutóbb lezárt riasztás, ha a lezárás
     óta nem jött rendben lévő adat, és a szabálynak nincs nyitott riasztása.
-    A legutóbbi lezárás elöl."""
+    A legutóbbi lezárás elöl. A closed_alerts és a versions (a szabályok
+    aktuális verziója) a beteglistán előre betöltve jön; ha nincs, itt kérjük le."""
+    if closed_alerts is None:
+        closed_alerts = latest_closed_alerts(db, patient_id)
     reasons = []
-    for alert, closed in latest_closed_alerts(db, patient_id):
+    for alert, closed in closed_alerts:
         if alert.rule_id in open_rule_ids:
             continue
-        version = current_version(db, alert.rule_id)
+        version = (versions or {}).get(alert.rule_id) or current_version(db, alert.rule_id)
         if ok_data_since(db, patient_id, version, closed.created_at):
             continue
         reasons.append(
@@ -387,32 +480,98 @@ def handled_reasons(
     return reasons
 
 
-def data_age(db: Session, patient_id: uuid.UUID, last: datetime, now: datetime) -> timedelta:
+def data_age(
+    db: Session,
+    patient_id: uuid.UUID,
+    last: datetime,
+    now: datetime,
+    periods: list[DisabledPeriod] | None = None,
+) -> timedelta:
     """A legutóbbi adat kora a frissességi szabályhoz: now - last, a letiltott
     időszakok [last, now]-ba eső része nélkül (a nyitott időszak mostanáig tart).
     Így letiltva az adat nem öregszik, visszaengedélyezés után pedig ott folytatódik,
     ahol a letiltáskor tartott (M3, A1). Sosem letiltott betegnél now - last."""
-    return now - last - disabled_overlap(disabled_periods(db, patient_id), last, now)
+    if periods is None:
+        periods = disabled_periods(db, patient_id)
+    return now - last - disabled_overlap(periods, last, now)
+
+
+@dataclass
+class StatusInputs:
+    """A státusz adatbázisból jövő bemenetei egy betegre. A beteglista ezeket
+    minden betegre egyszerre kéri le (status_inputs), így a lekérdezések száma
+    nem nő a betegek számával; a számolás ugyanaz, mint egy betegnél."""
+
+    open_alerts: list[Alert]
+    stored: list[AssignmentOccurrence]
+    assignments: list[Assignment]
+    periods: list[DisabledPeriod]
+    last: datetime | None
+    closed_alerts: list[tuple[Alert, AlertEvent]]
+    # A lezárt riasztások szabályainak aktuális verziója (a Kezelve okhoz).
+    versions: dict[uuid.UUID, RuleVersion]
+
+
+def status_inputs(
+    db: Session, patient_ids: list[uuid.UUID], now: datetime
+) -> dict[uuid.UUID, StatusInputs]:
+    """A betegek státuszának bemenetei, fajtánként egy lekérdezéssel."""
+    open_alerts = alerts_by_patient(db, patient_ids, open_only=True)
+    stored = latest_closed_occurrences_by_patient(db, patient_ids, now)
+    assignments = valid_assignments_by_patient(db, patient_ids, now)
+    periods = disabled_periods_by_patient(db, patient_ids)
+    last = last_data_by_patient(db, patient_ids)
+    closed_alerts = latest_closed_alerts_by_patient(db, patient_ids)
+    # Csak azoknak a szabályoknak kell a verziója, amelyeknek nincs nyitott riasztása.
+    open_rules = {a.rule_id for alerts in open_alerts.values() for a in alerts}
+    versions = current_versions(
+        db,
+        {
+            alert.rule_id
+            for rows in closed_alerts.values()
+            for alert, _ in rows
+            if alert.rule_id not in open_rules
+        },
+    )
+    return {
+        patient_id: StatusInputs(
+            open_alerts=open_alerts.get(patient_id, []),
+            stored=stored.get(patient_id, []),
+            assignments=assignments.get(patient_id, []),
+            periods=periods.get(patient_id, []),
+            last=last.get(patient_id),
+            closed_alerts=closed_alerts.get(patient_id, []),
+            versions=versions,
+        )
+        for patient_id in patient_ids
+    }
 
 
 def compute_status(
-    db: Session, patient_id: uuid.UUID, now: datetime | None = None
+    db: Session,
+    patient_id: uuid.UUID,
+    now: datetime | None = None,
+    inputs: StatusInputs | None = None,
 ) -> PatientStatusResult:
+    """A beteg státusza. Az inputs a beteglistán előre betöltött bemenet; ha
+    nincs, itt kérjük le (ugyanazokkal a lekérdezésekkel, egy betegre)."""
     now = now or datetime.now(UTC)
+    if inputs is None:
+        inputs = status_inputs(db, [patient_id], now)[patient_id]
     reasons: list[StatusReason] = []
 
-    open_alerts = list_patient_alerts(db, patient_id, open_only=True)
+    open_alerts = inputs.open_alerts
     for alert in open_alerts:
         status = (
             PatientStatus.SEVERE if alert.severity is Severity.SEVERE else PatientStatus.ATTENTION
         )
         reasons.append(StatusReason(status, "open_alert", alert=alert, at=alert.created_at))
 
-    stored = latest_closed_occurrences(db, patient_id, now)
+    stored = inputs.stored
     # Előírásonként a legutóbbi lezárt alkalom: a tárolt, vagy ha a későbbi
     # lejárt határidejű időszaknak még nincs sora, az (lásd lapsed_without_row;
     # ilyenkor az okban nincs alkalom). Határidő szerint.
-    rowless = lapsed_without_row(db, patient_id, now, stored)
+    rowless = _lapsed(inputs.assignments, inputs.periods, now, stored)
     closed: list[tuple[datetime, AssignmentOccurrence | None]] = [
         (o.due_at, o) for o in stored if o.assignment_id not in rowless
     ]
@@ -433,16 +592,24 @@ def compute_status(
                 )
             )
 
-    last = last_data_at(db, patient_id)
+    last = inputs.last
     if last is None:
         reasons.append(StatusReason(PatientStatus.NO_DATA, "no_data_yet"))
-    elif not closed and data_age(db, patient_id, last, now) > timedelta(
+    elif not closed and data_age(db, patient_id, last, now, inputs.periods) > timedelta(
         days=settings.data_freshness_days
     ):
         # A 7 napos szabály csak lezárt alkalom nélkül él (lásd a modul leírását).
         reasons.append(StatusReason(PatientStatus.NO_DATA, "stale_data", at=last))
 
-    reasons.extend(handled_reasons(db, patient_id, {a.rule_id for a in open_alerts}))
+    reasons.extend(
+        handled_reasons(
+            db,
+            patient_id,
+            {a.rule_id for a in open_alerts},
+            inputs.closed_alerts,
+            inputs.versions,
+        )
+    )
 
     if not reasons:
         reasons.append(StatusReason(PatientStatus.OK, "fresh_data", at=last))
@@ -460,10 +627,12 @@ def doctor_patient_list(
     """Az orvos éppen hozzá rendelt betegei státusszal, priorizálva (F9):
     elöl a Súlyos, a végén a Rendben; azonos státuszon belül név szerint.
     A patients a hívó által már lekérdezett betegkör (assigned_patients_query
-    ugyanerre az időpontra), hogy egy kérésen belül egyszer fusson (review k3)."""
+    ugyanerre az időpontra), hogy egy kérésen belül egyszer fusson (review k3).
+    A státusz bemenetei minden betegre egyszerre jönnek (status_inputs)."""
     now = now or datetime.now(UTC)
     if patients is None:
         patients = list(db.scalars(assigned_patients_query(doctor_id, now)).all())
-    rows = [(p, compute_status(db, p.id, now)) for p in patients]
+    inputs = status_inputs(db, [p.id for p in patients], now)
+    rows = [(p, compute_status(db, p.id, now, inputs[p.id])) for p in patients]
     rows.sort(key=lambda row: (PRIORITY.index(row[1].status), row[0].name))
     return rows

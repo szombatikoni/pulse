@@ -22,6 +22,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
@@ -326,6 +327,20 @@ def current_version(db: Session, rule_id: uuid.UUID) -> RuleVersion:
         .order_by(RuleVersion.version_no.desc())
         .limit(1)
     ).one()
+
+
+def current_versions(db: Session, rule_ids: set[uuid.UUID]) -> dict[uuid.UUID, RuleVersion]:
+    """A current_version több szabályra egy lekérdezéssel (a beteglistához)."""
+    if not rule_ids:
+        return {}
+    versions = db.scalars(
+        select(RuleVersion)
+        .where(RuleVersion.rule_id.in_(rule_ids))
+        # PostgreSQL DISTINCT ON: szabályonként a legnagyobb verziószám.
+        .ext(distinct_on(RuleVersion.rule_id))
+        .order_by(RuleVersion.rule_id, RuleVersion.version_no.desc())
+    )
+    return {v.rule_id: v for v in versions}
 
 
 @dataclass
